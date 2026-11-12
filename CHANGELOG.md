@@ -32,6 +32,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - View ▸ Large Icons shows Finder's 64 pt icons with names on up to two lines and Finder's
     selection; Small Icons and List get the Mac row height. The address bar's history list opens
     as a macOS menu. About 7-Zip shows the app icon with the version and credits centred.
+  - Space opens Quick Look for the selected files and folders, as in Finder, and an open
+    preview follows the selection (F3 still calculates a folder's size; items inside an archive
+    are not previewed). Classic keeps 7zFM's Space.
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style

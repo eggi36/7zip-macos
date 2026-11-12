@@ -4,6 +4,7 @@
 // included) in Light and Dark, in the demo folder of the showcase images.
 
 import AppKit
+import Quartz
 import SevenZipKit
 import XCTest
 @testable import SevenZipAppHost
@@ -257,6 +258,41 @@ final class NativeLookTests: AppHostTestCase {
         Settings.look = .classic
         let classic = try XCTUnwrap(OptionsSystemPage.formatIcon(for: zip))
         XCTAssertFalse(classic === mac, "Classic keeps the 7z.dll frame")
+    }
+
+    private func spaceKey(_ window: NSWindow) -> NSEvent {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                         windowNumber: window.windowNumber, context: nil, characters: " ",
+                         charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!
+    }
+
+    func testSpaceOpensQuickLookInTheMacLook() throws {
+        let controller = try openWindow(look: .mac)
+        show(controller, "/Applications")
+        let panel = controller.focusedPanel
+        let window = try XCTUnwrap(controller.window)
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(panel.tableView)
+        panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        panel.focusedIndex = 0
+        XCTAssertFalse(panel.quickLookPaths.isEmpty, "a file-system item can be previewed")
+        XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
+        let ql = try XCTUnwrap(QLPreviewPanel.shared())
+        XCTAssertTrue(wait(for: "Quick Look", timeout: 5) { ql.isVisible }, "Space opens Quick Look")
+        XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
+        XCTAssertTrue(wait(for: "Quick Look closed", timeout: 5) { !ql.isVisible }, "Space again closes it")
+    }
+
+    func testSpaceKeepsItsClassicMeaning() throws {
+        let controller = try openWindow(look: .classic)
+        show(controller, "/Applications")
+        let panel = controller.focusedPanel
+        let window = try XCTUnwrap(controller.window)
+        panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        panel.focusedIndex = 0
+        XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
+        XCTAssertFalse(QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible,
+                       "Classic: Space calculates the folder size, as 7zFM does")
     }
 
     func testMacMessageBoxKeepsTheAnswersInMacOrder() throws {

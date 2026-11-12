@@ -364,8 +364,22 @@ extension PanelViewController {
         if QLPreviewPanel.sharedPreviewPanelExists() && panel.isVisible {
             panel.orderOut(nil)
         } else {
+            // Only items on disk can be previewed; inside an archive there is nothing to show.
+            guard !quickLookPaths.isEmpty else { return }
             panel.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// The selected (or focused) items that exist on disk, in list order.
+    var quickLookPaths: [String] {
+        operatedRowIndices().map { rows[$0].fullPath }.filter { !$0.isEmpty }
+    }
+
+    /// Finder keeps an open preview on the selection: the panel shows what is selected now.
+    func refreshQuickLookIfShown() {
+        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(),
+              panel.isVisible, panel.dataSource === self else { return }
+        panel.reloadData()
     }
 }
 
@@ -401,11 +415,11 @@ extension PanelViewController: QLPreviewPanelDataSource, QLPreviewPanelDelegate 
     }
 
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        operatedRowIndices().filter { !rows[$0].fullPath.isEmpty }.count
+        quickLookPaths.count
     }
 
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
-        let paths = operatedRowIndices().map { rows[$0].fullPath }.filter { !$0.isEmpty }
+        let paths = quickLookPaths
         guard index >= 0, index < paths.count else { return nil }
         return URL(fileURLWithPath: paths[index]) as QLPreviewItem
     }

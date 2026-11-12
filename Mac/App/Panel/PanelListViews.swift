@@ -72,6 +72,7 @@ extension PanelViewController: NSTableViewDataSource, NSTableViewDelegate {
         }
         refreshStatusBar()                                        // OnItemChanged (01 §3.12)
         refreshSelectionAppearance()
+        refreshQuickLookIfShown()                                 // an open preview follows the selection
     }
 
     func tableViewColumnDidMove(_ notification: Notification) { saveColumnLayout() }
