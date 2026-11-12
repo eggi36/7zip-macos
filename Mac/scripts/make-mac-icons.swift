@@ -7,8 +7,8 @@
 // Draws everything with Core Graphics -- no SF Symbols (Apple's licence keeps them out of app
 // icons) and no third-party art:
 //
-//   * the app icon: a macOS squircle with a blue gradient and the 7-Zip mark, a white archive box
-//     closed by a zipper whose pull carries a geometric "7";
+//   * the app icon: a light macOS squircle with the archive icons' grey zipper and "7-Zip" in blue
+//     (the zipper alone at 16 and 32 px);
 //   * one document icon per format: macOS's own archive icon (`UTType.archive`, the grey sheet with
 //     the zipper that Finder shows for compressed files) with the extension under the zipper in
 //     the grey, size and place of the label on macOS's ZIP icon (measured: caps 84 of 1024 units,
@@ -50,111 +50,58 @@ func render(_ pixels: Int, _ draw: (CGFloat) -> Void) -> Data {
     return srgb.representation(using: .png, properties: [:])!
 }
 
-// MARK: - the mark: an archive box closed by a zipper
-
-/// The zipper mark in `rect`: a rounded box in `body` with a zipper down its middle in `teeth`, the
-/// slider near the top and its pull hanging down with a "7" cut out of it. `detail` drops the
-/// teeth and the 7 at small sizes, where they would turn to mush.
-func drawMark(in rect: NSRect, body: NSGradient, edge: NSColor, teeth: NSColor, pullFill: NSColor, detail: Bool) {
-    let r = rect.width * 0.14
-    let box = NSBezierPath(roundedRect: rect, xRadius: r, yRadius: r)
-    body.draw(in: box, angle: -90)
-    edge.setStroke()
-    box.lineWidth = max(2, rect.width * 0.012)
-    box.stroke()
-
-    // The lid seam: a band across the top quarter.
-    let seamY = rect.maxY - rect.height * 0.24
-    edge.withAlphaComponent(0.55).setFill()
-    NSRect(x: rect.minX + rect.width * 0.02, y: seamY, width: rect.width * 0.96, height: max(2, rect.height * 0.012)).fill()
-
-    // The zipper: two rows of teeth meeting at the middle, from the seam to near the bottom.
-    let cx = rect.midX
-    let toothW = rect.width * 0.075, toothH = rect.height * 0.034
-    let top = seamY - rect.height * 0.02, bottom = rect.minY + rect.height * 0.08
-    teeth.setFill()
-    if detail {
-        var y = top - toothH
-        var left = true
-        while y > bottom {
-            let x = left ? cx - toothW + toothW * 0.18 : cx - toothW * 0.18
-            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: toothW, height: toothH),
-                         xRadius: toothH * 0.35, yRadius: toothH * 0.35).fill()
-            y -= toothH * 1.05
-            left.toggle()
-        }
-    } else {
-        NSRect(x: cx - toothW * 0.4, y: bottom, width: toothW * 0.8, height: top - bottom).fill()
-    }
-
-    // The slider at the seam and its pull, a rounded tab hanging down over the teeth.
-    let sliderW = rect.width * 0.2, sliderH = rect.height * 0.1
-    let slider = NSBezierPath(roundedRect: NSRect(x: cx - sliderW / 2, y: seamY - sliderH * 0.6, width: sliderW, height: sliderH),
-                              xRadius: sliderH * 0.3, yRadius: sliderH * 0.3)
-    teeth.setFill()
-    slider.fill()
-    let pullW = rect.width * 0.24, pullH = rect.height * 0.36
-    let pullRect = NSRect(x: cx - pullW / 2, y: seamY - sliderH * 0.4 - pullH, width: pullW, height: pullH)
-    let pull = NSBezierPath(roundedRect: pullRect, xRadius: pullW * 0.28, yRadius: pullW * 0.28)
-    pullFill.setFill()
-    pull.fill()
-    teeth.setStroke()
-    pull.lineWidth = max(2, rect.width * 0.014)
-    pull.stroke()
-
-    guard detail else { return }
-    // A geometric "7" in the pull: a bar and a slanted stroke, in the teeth colour.
-    let s = pullRect.insetBy(dx: pullW * 0.2, dy: pullH * 0.18)
-    let bar = s.height * 0.16
-    let seven = NSBezierPath()
-    seven.move(to: NSPoint(x: s.minX, y: s.maxY))
-    seven.line(to: NSPoint(x: s.maxX, y: s.maxY))
-    seven.line(to: NSPoint(x: s.maxX, y: s.maxY - bar))
-    seven.line(to: NSPoint(x: s.minX + s.width * 0.5, y: s.minY))
-    seven.line(to: NSPoint(x: s.minX + s.width * 0.5 - bar * 1.15, y: s.minY))
-    seven.line(to: NSPoint(x: s.maxX - bar * 1.1, y: s.maxY - bar))
-    seven.line(to: NSPoint(x: s.minX, y: s.maxY - bar))
-    seven.close()
-    teeth.setFill()
-    seven.fill()
-}
-
 // MARK: - app icon
 
+/// macOS-style zipper (as on the system's archive icon): a capsule pull with a round hole, then
+/// alternating rounded teeth under it. `k` scales the 1024-unit design.
+func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColor, hole: NSColor, teeth: Int) {
+    let pullW = 150 * k, pullH = 300 * k
+    let pull = NSRect(x: cx - pullW / 2, y: top - pullH, width: pullW, height: pullH)
+    color.setFill()
+    NSBezierPath(roundedRect: pull, xRadius: pullW / 2, yRadius: pullW / 2).fill()
+    hole.setFill()
+    let d = pullW * 0.42
+    NSBezierPath(ovalIn: NSRect(x: cx - d / 2, y: pull.minY + pullW * 0.32, width: d, height: d)).fill()
+    color.setFill()
+    let tw = 170 * k, th = 48 * k
+    var y = pull.minY - 60 * k
+    for i in 0..<teeth {
+        let x = i % 2 == 0 ? cx - tw * 0.62 : cx - tw * 0.38
+        NSBezierPath(roundedRect: NSRect(x: x, y: y - th, width: tw, height: th), xRadius: th / 2, yRadius: th / 2).fill()
+        y -= th * 1.45
+    }
+}
+
+/// The app icon (the user's choice, variant A): a light tile like Apple's utilities, the grey
+/// zipper of the archive icons, "7-Zip" in blue under it; at 16 and 32 px the zipper alone,
+/// larger, since the name could not be read.
 func drawAppIcon(_ pixels: CGFloat) {
     // Big Sur grid: an 824-unit squircle in the 1024 canvas, with the system's soft shadow.
     let body = NSRect(x: 100, y: 100, width: 824, height: 824)
-    let radius: CGFloat = 185
-    let squircle = NSBezierPath(roundedRect: body, xRadius: radius, yRadius: radius)
+    let squircle = NSBezierPath(roundedRect: body, xRadius: 185, yRadius: 185)
     NSGraphicsContext.saveGraphicsState()
     let shadow = NSShadow()
     shadow.shadowColor = NSColor(white: 0, alpha: 0.28)
     shadow.shadowOffset = NSSize(width: 0, height: -10)
     shadow.shadowBlurRadius = 24
     shadow.set()
-    rgb(0x2A63E6).setFill()
+    rgb(0xE3E6EB).setFill()
     squircle.fill()
     NSGraphicsContext.restoreGraphicsState()
-    NSGradient(starting: rgb(0x5BA2FF), ending: rgb(0x1C45C9))!.draw(in: squircle, angle: -90)
-    // a faint highlight across the top half
-    NSGraphicsContext.saveGraphicsState()
-    squircle.addClip()
-    NSGradient(starting: NSColor(white: 1, alpha: 0.16), ending: NSColor(white: 1, alpha: 0))!
-        .draw(in: NSRect(x: 100, y: 512, width: 824, height: 412), angle: -90)
-    NSGraphicsContext.restoreGraphicsState()
+    NSGradient(starting: rgb(0xFFFFFF), ending: rgb(0xE3E6EB))!.draw(in: squircle, angle: -90)
+    rgb(0xD0D4DA).setStroke()
+    squircle.lineWidth = pixels <= 32 ? 12 : 3
+    squircle.stroke()
 
-    let mark = NSRect(x: 262, y: 222, width: 500, height: 560)
-    NSGraphicsContext.saveGraphicsState()
-    let markShadow = NSShadow()
-    markShadow.shadowColor = NSColor(white: 0, alpha: 0.25)
-    markShadow.shadowOffset = NSSize(width: 0, height: -8)
-    markShadow.shadowBlurRadius = 18
-    markShadow.set()
-    rgb(0xFFFFFF).setFill()
-    NSBezierPath(roundedRect: mark, xRadius: 70, yRadius: 70).fill()
-    NSGraphicsContext.restoreGraphicsState()
-    drawMark(in: mark, body: NSGradient(starting: rgb(0xFFFFFF), ending: rgb(0xE6ECF5))!,
-             edge: rgb(0xC5CFDD), teeth: rgb(0x23314D), pullFill: rgb(0xFFC63A), detail: pixels >= 64)
+    if pixels <= 32 {
+        drawSystemZipper(cx: 512, top: 860, scale: 1.05, color: rgb(0x8E9198), hole: rgb(0xF4F5F7), teeth: 4)
+        return
+    }
+    drawSystemZipper(cx: 512, top: 850, scale: 0.8, color: rgb(0x9C9FA6), hole: rgb(0xF4F5F7), teeth: 4)
+    let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 140, weight: .bold),
+                                                     .foregroundColor: rgb(0x2A63E6)]
+    let width = ("7-Zip" as NSString).size(withAttributes: attributes).width
+    ("7-Zip" as NSString).draw(at: NSPoint(x: 512 - width / 2, y: 150), withAttributes: attributes)
 }
 
 // MARK: - document icons
@@ -197,24 +144,6 @@ let docIcons: [DocIcon] = [
     DocIcon(name: "split", label: "001", color: 0x59606B),
     DocIcon(name: "fm", label: "", color: 0x59606B),
 ]
-
-func drawLabel(_ text: String, in box: NSRect, color: NSColor) {
-    var size = box.height * 0.9
-    var attributes: [NSAttributedString.Key: Any] = [:]
-    var bounds = NSRect.zero
-    while size > 8 {
-        attributes = [.font: NSFont.systemFont(ofSize: size, weight: .bold), .foregroundColor: color,
-                      .kern: -size * 0.01]
-        bounds = (text as NSString).boundingRect(with: NSSize(width: 4000, height: 4000), options: [], attributes: attributes)
-        if bounds.width <= box.width { break }
-        size *= 0.94
-    }
-    let font = attributes[.font] as! NSFont
-    let x = box.midX - bounds.width / 2
-    // draw(at:) takes the line's bottom (the descender); the caps are centred in the box.
-    let y = box.midY - font.capHeight / 2 + font.descender
-    (text as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attributes)
-}
 
 /// macOS's archive document icon, drawn at the representation that suits `pixels`.
 let systemArchiveIcon = NSWorkspace.shared.icon(for: .archive)
