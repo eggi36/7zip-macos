@@ -11,6 +11,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     /// The 7zFM toolbar strip (FMToolbar.swift): a flat Windows-style bar at the top of the
     /// content, not an NSToolbar, so macOS draws no glass capsules around the buttons (winmatch).
     let toolbarView = FMToolbarView()
+    /// native-look: the look this window is built in (fixed for its lifetime; a change rebuilds it).
+    let look = AppLook.current
+    var isMacLook: Bool { look == .mac }
     /// index 0 always exists; 1 is created on demand (SwitchOnOffOnePanel).
     private(set) var panels: [PanelViewController] = []
     private(set) var numPanels = 1
@@ -26,6 +29,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         return true
     }()
     private var toolbarsMask = Settings.toolbarsMask
+    /// native-look: the View > Toolbars mask for the Mac toolbar (MacToolbar.swift).
+    var toolbarsMaskForMac: UInt32 { toolbarsMask }
     /// Set when the window closes: it has saved its state then, and must not save again on Quit,
     /// where it would overwrite a window closed later (`MainWindows.saveAllForTermination`).
     private(set) var isClosed = false
@@ -64,7 +69,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
                               backing: .buffered, defer: false)
         window.title = "7-Zip"
         window.minSize = NSSize(width: 360, height: 240)
-        window.backgroundColor = WinChrome.face          // COLOR_BTNFACE (recheck §2)
+        if AppLook.isMac {
+            window.toolbarStyle = .unified               // native-look: title and toolbar in one bar
+        } else {
+            window.backgroundColor = WinChrome.face      // COLOR_BTNFACE (recheck §2)
+        }
         window.tabbingMode = .disallowed
         // The controller owns the window; with several windows opening and closing
         // (`MainWindows`), AppKit's extra release on close would free it under the controller.
@@ -319,6 +328,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         splitterRatio = ratio
     }
 
+    /// native-look: take over a window built in the other look (`MainWindows.rebuildForLookChange`):
+    /// its frame, its one or two panels, the divider, the focused panel and every panel's folder,
+    /// inside an archive included.
+    func adopt(_ previous: MainWindowController) {
+        guard let window, let old = previous.window else { return }
+        window.setFrame(old.frame, display: false)
+        previous.captureSplitterRatio()
+        splitterRatio = previous.splitterRatio
+        if previous.numPanels != numPanels { switchOnOffOnePanel() }
+        for (i, panel) in panels.enumerated() where i < previous.panels.count {
+            let path = previous.panels[i].currentPath
+            panel.navigate(to: path.isEmpty ? previous.panels[i].pathToPersist : path)
+        }
+        setFocusedPanel(min(previous.focusedPanelIndex, numPanels - 1))
+    }
+
     // MARK: - Panels (CApp::SwitchOnOffOnePanel, App.cpp:360-380)
 
     private func showSecondPanel() {
@@ -416,9 +441,25 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     }
 
     /// CApp::RefreshTitle (App.cpp:963): the focused panel's path, "7-Zip" when empty.
+    /// native-look: the Mac look names the folder (or archive) in the title, as Finder does, with the
+    /// full path as the subtitle, and gives a file-system folder its proxy icon and path menu.
     private func refreshTitle() {
         let path = focusedPanel.currentPath
-        window?.title = path.isEmpty ? "7-Zip" : path
+        guard isMacLook, let window else {
+            window?.title = path.isEmpty ? "7-Zip" : path
+            return
+        }
+        let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
+        let name = (trimmed as NSString).lastPathComponent
+        window.title = path.isEmpty ? "7-Zip" : (name.isEmpty || name == "/" ? trimmed : name)
+        window.subtitle = path.isEmpty ? "" : (trimmed as NSString).deletingLastPathComponent
+        if let snapshot = focusedPanel.snapshot, snapshot.isFileSystem, !snapshot.fullPath.isEmpty {
+            window.representedURL = URL(fileURLWithPath: snapshot.fullPath, isDirectory: true)
+        } else if let snapshot = focusedPanel.snapshot, !snapshot.archivePath.isEmpty {
+            window.representedURL = URL(fileURLWithPath: snapshot.archivePath)
+        } else {
+            window.representedURL = nil
+        }
     }
 
     // MARK: PanelDelegate
@@ -537,6 +578,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     /// ReloadToolbars: the archive buttons, then the standard ones, back to back; labels per
     /// "Show Buttons Text", bitmaps per "Large Buttons". Also the language switch's re-label.
     func reloadToolbars() {
+        if isMacLook {
+            toolbarView.configure([], showText: false, large: false)      // the strip takes no room
+            installMacToolbar()
+            Settings.toolbarsMask = toolbarsMask
+            return
+        }
         let large = (toolbarsMask & 2) != 0
         let specs = visibleToolbarItems.compactMap { Self.toolbarSpec($0, large: large) }
         // MoveSubWindows: the toolbar takes room only while one of the two toolbars is on (01 §1.2).
@@ -724,8 +771,11 @@ extension NSToolbarItem.Identifier {
 /// divider. 7zFM draws nothing there: the 4 px between the panels show the window's
 /// COLOR_BTNFACE (recheck §2, two-screen.png x 719-722).
 final class PanelSplitView: NSSplitView {
-    override var dividerThickness: CGFloat { 4 }
+    /// native-look: the Mac look uses AppKit's thin divider.
+    private let isMacLook = AppLook.isMac
+    override var dividerThickness: CGFloat { isMacLook ? 1 : 4 }
     override func drawDivider(in rect: NSRect) {
+        if isMacLook { super.drawDivider(in: rect); return }
         WinChrome.face.setFill()
         rect.fill()
     }

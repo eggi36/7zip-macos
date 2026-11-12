@@ -350,6 +350,8 @@ final class PanelTableHeaderView: NSTableHeaderView {
 /// Windows list control draws it (PanelSelectionStyle.swift, selcolors.md).
 final class PanelRowView: NSTableRowView {
 
+    /// native-look: the Mac look leaves the selection, the drop target and the focus to AppKit.
+    private let isMacLook = AppLook.isMac
     weak var panel: PanelViewController?
     var rowIndex = -1
     var isMySelected = false
@@ -390,7 +392,7 @@ final class PanelRowView: NSTableRowView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        drawFocusRectangle()
+        if !isMacLook { drawFocusRectangle() }
     }
 
     /// The name column's rect in this row, or nil when it is hidden.
@@ -422,13 +424,13 @@ final class PanelRowView: NSTableRowView {
     }
 
     override func drawSelection(in dirtyRect: NSRect) {
-        guard panel != nil else { super.drawSelection(in: dirtyRect); return }
+        guard panel != nil, !isMacLook else { super.drawSelection(in: dirtyRect); return }
         guard drawsHighlight else { return }                 // no LVS_SHOWSELALWAYS
         fillHighlight()
     }
 
     override func drawDraggingDestinationFeedback(in dirtyRect: NSRect) {
-        guard panel != nil else { super.drawDraggingDestinationFeedback(in: dirtyRect); return }
+        guard panel != nil, !isMacLook else { super.drawDraggingDestinationFeedback(in: dirtyRect); return }
         fillHighlight()
     }
 

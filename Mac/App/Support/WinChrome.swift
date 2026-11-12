@@ -54,13 +54,8 @@ enum WinChrome {
 
     // MARK: geometry (px = pt)
 
-    /// The address band (ReBarWindow32): 24 px high.
-    static let bandHeight: CGFloat = 24
-    /// The Up button's toolbar (ToolbarWindow32 1002): @2,1 23 x 22 in the band.
-    static let upButtonRect = NSRect(x: 2, y: 1, width: 23, height: 22)
-    /// ComboBoxEx32 1003 starts at x 33 and runs to the band's right edge.
-    static let comboX: CGFloat = 33
-    /// The status bar: 23 px including its top line; dividers 1 px at a part's right edge - 1,
-    /// rows 2..21; text ink 2 px into a part.
-    static let statusHeight: CGFloat = 23
+    // The address band's and the status bar's geometry (bandHeight, upButtonRect, comboX,
+    // comboInset, statusHeight) depends on the look and lives in AppLook.swift (app only).
+    // The status bar: 23 px including its top line; dividers 1 px at a part's right edge - 1,
+    // rows 2..21; text ink 2 px into a part.
 }

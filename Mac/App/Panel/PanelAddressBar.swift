@@ -46,7 +46,10 @@ final class PanelUpButton: NSButton {
     override func mouseEntered(with event: NSEvent) { isHovered = true }
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
+    private let isMacLook = AppLook.isMac
+
     override func draw(_ dirtyRect: NSRect) {
+        if isMacLook { drawMac(); return }
         let pressed = isHighlighted && isEnabled
         if isEnabled, pressed || isHovered {
             let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 2, yRadius: 2)
@@ -66,6 +69,21 @@ final class PanelUpButton: NSButton {
     /// open yellow folder -- the back with its tab at the left, the front flap slanting up to the
     /// right -- and a green arrow over it, its head at the top (tip at x 7.5), its stem leaning
     /// down to the left into the folder. Disabled: the grey the toolbar gives a disabled bitmap.
+    /// native-look: an SF Symbol chevron with AppKit's hover and press tints.
+    private func drawMac() {
+        let pressed = isHighlighted && isEnabled
+        if isEnabled, pressed || isHovered {
+            let path = NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6)
+            NSColor.labelColor.withAlphaComponent(pressed ? 0.16 : 0.08).setFill()
+            path.fill()
+        }
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        guard let symbol = NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return }
+        MacSymbol.draw(symbol, tint: isEnabled ? .secondaryLabelColor : .tertiaryLabelColor,
+                       centeredIn: bounds)
+    }
+
     static func drawIcon(at o: NSPoint, enabled: Bool) {
         func c(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor {
             enabled ? WinChrome.rgb(r, g, b) : WinChrome.gray((r * 0.3 + g * 0.59 + b * 0.11) * 0.55 + 100)
@@ -134,8 +152,9 @@ final class AddressComboCell: NSComboBoxCell {
 
     /// Where the text goes: 24 px from the left (the Edit 1003 at x 57 in a combo at x 33), the
     /// arrow's 18 px at the right kept clear.
-    static let textInsetLeft: CGFloat = 24
-    static let arrowWidth: CGFloat = 18
+    static var textInsetLeft: CGFloat { AppLook.isMac ? 28 : 24 }
+    static var arrowWidth: CGFloat { AppLook.isMac ? 24 : 18 }
+    private let isMacLook = AppLook.isMac
 
     private func textRect(_ frame: NSRect) -> NSRect {
         var r = frame
@@ -159,6 +178,7 @@ final class AddressComboCell: NSComboBoxCell {
     override func titleRect(forBounds rect: NSRect) -> NSRect { textRect(rect) }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        if isMacLook { drawMac(withFrame: cellFrame, in: controlView); return }
         WinChrome.window.setFill()
         cellFrame.fill()
         WinChrome.comboBorder.setFill()
@@ -179,6 +199,31 @@ final class AddressComboCell: NSComboBoxCell {
         path.lineWidth = 1
         WinChrome.comboArrow.setStroke()
         path.stroke()
+        drawInterior(withFrame: cellFrame, in: controlView)
+    }
+
+    /// native-look: a rounded field in the system's colours, the folder icon 6 pt in, an SF Symbol
+    /// chevron for the history drop-down.
+    private func drawMac(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let field = NSBezierPath(roundedRect: cellFrame.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+        NSColor.textBackgroundColor.setFill()
+        field.fill()
+        NSColor.separatorColor.setStroke()
+        field.lineWidth = 1
+        field.stroke()
+        if let icon {
+            let top = floor((cellFrame.height - 16) / 2)
+            let y = controlView.isFlipped ? cellFrame.minY + top : cellFrame.maxY - top - 16
+            icon.draw(in: NSRect(x: cellFrame.minX + 6, y: y, width: 16, height: 16), from: .zero,
+                      operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        let config = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        if let symbol = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) {
+            let arrow = NSRect(x: cellFrame.maxX - Self.arrowWidth, y: cellFrame.minY,
+                               width: Self.arrowWidth - 4, height: cellFrame.height)
+            MacSymbol.draw(symbol, tint: .secondaryLabelColor, centeredIn: arrow)
+        }
         drawInterior(withFrame: cellFrame, in: controlView)
     }
 
@@ -225,5 +270,22 @@ final class AddressComboBox: NSComboBox {
 
     override func draw(_ dirtyRect: NSRect) {
         cell?.draw(withFrame: bounds, in: self)
+    }
+}
+
+/// native-look: draws an SF Symbol in a colour, centred in a rect (flipped or not).
+enum MacSymbol {
+    static func draw(_ symbol: NSImage, tint: NSColor, centeredIn rect: NSRect) {
+        let size = symbol.size
+        let tinted = NSImage(size: size, flipped: false) { r in
+            symbol.draw(in: r)
+            tint.set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: rect.minX + floor((rect.width - size.width) / 2),
+                               y: rect.minY + floor((rect.height - size.height) / 2),
+                               width: size.width, height: size.height),
+                    from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 }

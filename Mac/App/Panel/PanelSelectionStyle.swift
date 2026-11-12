@@ -93,13 +93,22 @@ final class PanelCellView: NSTableCellView {
     var baseImage: NSImage?
     private(set) var isHighlighted = false
 
+    /// native-look: in the Mac look AppKit draws the selection and hands the cell its emphasized
+    /// background style, which turns the label white by itself; Classic draws everything here.
+    private let isMacLook = AppLook.isMac
+
     override var backgroundStyle: NSView.BackgroundStyle {
         get { super.backgroundStyle }
-        set { super.backgroundStyle = .normal }
+        set { super.backgroundStyle = isMacLook ? newValue : .normal }
     }
 
     func applyColors(highlighted: Bool) {
         isHighlighted = highlighted
+        if isMacLook {
+            textField?.textColor = isDeleted ? .systemRed : .labelColor
+            if isNameCell, let baseImage { imageView?.image = baseImage }
+            return
+        }
         textField?.textColor = highlighted ? PanelSelectionStyle.highlightText
                                            : PanelSelectionStyle.normalText(isDeleted: isDeleted)
         if isNameCell, let baseImage {

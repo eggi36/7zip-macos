@@ -1,0 +1,182 @@
+// NativeLookTests.swift -- native-look: the main window in the Mac look (AppLook.swift) keeps every
+// command of the Classic window and draws it with AppKit's chrome; the Classic look is unchanged.
+// Writes Mac/build/screenshots/nativelook-<name>.png: the whole window (title bar and toolbar
+// included) in Light and Dark, in the demo folder of the showcase images.
+
+import AppKit
+import SevenZipKit
+import XCTest
+@testable import SevenZipAppHost
+
+final class NativeLookTests: AppHostTestCase {
+
+    override var screenshotPrefix: String { "nativelook" }
+
+    private var controllers: [MainWindowController] = []
+    private var savedLook: String?
+    private var savedTheme: String?
+    private var savedNumPanels = 1
+    private var savedPanelPath: String?
+    private var savedAppearance: NSAppearance?
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        savedLook = Settings.string(Settings.Key.look)
+        savedTheme = Settings.string(Settings.Key.theme)
+        savedNumPanels = Settings.numPanels
+        savedPanelPath = Settings.panelPath(0)
+        savedAppearance = NSApp.appearance
+    }
+
+    override func tearDown() {
+        for controller in controllers { controller.closeDiscardingState() }
+        controllers = []
+        Settings.setString(savedLook, Settings.Key.look)
+        Settings.setString(savedTheme, Settings.Key.theme)
+        Settings.numPanels = savedNumPanels
+        Settings.setPanelPath(savedPanelPath, 0)
+        NSApp.appearance = savedAppearance
+        super.tearDown()
+    }
+
+    private func openWindow(look: AppLook, panels: Int = 1) throws -> MainWindowController {
+        Settings.look = look
+        Settings.numPanels = panels
+        let controller = MainWindowController()
+        controllers.append(controller)
+        let window = try XCTUnwrap(controller.window)
+        window.setContentSize(NSSize(width: 900, height: 460))
+        controller.showWindow(nil)
+        return controller
+    }
+
+    private func show(_ controller: MainWindowController, _ folder: String) {
+        let panel = controller.focusedPanel
+        var done = false
+        panel.navigate(to: folder) { _ in done = true }
+        XCTAssertTrue(wait(for: "folder listed") { done && !panel.rows.isEmpty })
+    }
+
+    func testTestHarnessStartsInClassic() {
+        Settings.removeKey(Settings.Key.look)
+        XCTAssertEqual(Settings.look, .classic, "the parity tests describe the Windows window")
+    }
+
+    func testClassicLookIsUnchanged() throws {
+        let controller = try openWindow(look: .classic)
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertNil(window.toolbar, "Classic draws the Windows strip, not an NSToolbar")
+        XCTAssertFalse(controller.toolbarView.isHidden)
+        XCTAssertEqual(controller.toolbarView.buttons.count, 7)
+        XCTAssertEqual(controller.focusedPanel.tableView.rowHeight, 19)
+        XCTAssertEqual(controller.focusedPanel.tableView.style, .plain)
+    }
+
+    func testMacLookKeepsEveryToolbarCommand() throws {
+        let controller = try openWindow(look: .mac)
+        let window = try XCTUnwrap(controller.window)
+        let toolbar = try XCTUnwrap(window.toolbar, "the Mac look uses an NSToolbar")
+        XCTAssertTrue(controller.toolbarView.isHidden, "the Windows strip takes no room")
+        let ids = toolbar.items.map(\.itemIdentifier)
+        for id in [NSToolbarItem.Identifier.szAdd, .szExtract, .szTest, .szCopy, .szMove, .szDelete, .szInfo,
+                   .szBack, .szForward] {
+            XCTAssertTrue(ids.contains(id), "missing \(id.rawValue)")
+        }
+        // the same selectors as the Classic buttons
+        for item in toolbar.items {
+            guard let spec = MainWindowController.toolbarSpec(item.itemIdentifier, large: false) else { continue }
+            XCTAssertEqual(item.action, spec.action, item.itemIdentifier.rawValue)
+            XCTAssertNotNil(item.image, "\(item.itemIdentifier.rawValue) has an SF Symbol")
+        }
+        let table = controller.focusedPanel.tableView
+        XCTAssertEqual(table.rowHeight, 24)
+        XCTAssertEqual(table.style, .inset)
+        XCTAssertTrue(table.usesAlternatingRowBackgroundColors)
+    }
+
+    func testMacLookFollowsToolbarMenus() throws {
+        let saved = Settings.toolbarsMask
+        defer { Settings.toolbarsMask = saved }
+        Settings.toolbarsMask = 8 | 4 | 1
+        let controller = try openWindow(look: .mac)
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(window.toolbar?.displayMode, .iconAndLabel)
+        controller.viewToolbarsShowButtonsText(nil)              // text off
+        XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
+        controller.viewArchiveToolbar(nil)                       // archive group off
+        let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
+        XCTAssertFalse(ids.contains(.szAdd))
+        XCTAssertTrue(ids.contains(.szCopy))
+    }
+
+    func testMacLookTitleNamesTheFolder() throws {
+        let controller = try openWindow(look: .mac)
+        show(controller, "/Applications")
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertTrue(wait(for: "title") { window.title == "Applications" })
+        XCTAssertEqual(window.subtitle, "/")
+        XCTAssertEqual(window.representedURL?.path, "/Applications")
+    }
+
+    func testLookChangeRebuildsTheWindow() throws {
+        let controller = try openWindow(look: .classic)
+        show(controller, "/Applications")
+        MainWindows.register(controller)
+        Settings.look = .mac
+        MainWindows.rebuildForLookChange()
+        // every registered window is rebuilt (the host app's own one too); ours is the one that
+        // took over /Applications
+        XCTAssertTrue(controller.isClosed, "the old window closes")
+        controllers += MainWindows.controllers
+        XCTAssertTrue(MainWindows.controllers.allSatisfy { $0.isMacLook && $0.window?.toolbar != nil })
+        XCTAssertTrue(wait(for: "same folder") {
+            MainWindows.controllers.contains { $0.isMacLook && $0.focusedPanel.currentPath.hasPrefix("/Applications") }
+        })
+        // put the host app's windows back into the Classic look the other tests expect
+        Settings.look = .classic
+        MainWindows.rebuildForLookChange()
+    }
+
+    func testRenderMacLook() throws {
+        try ShowcaseDemo.make()
+        try SZCodecs.loadCodecs()
+        for theme in [AppTheme.light, .dark] {
+            Settings.theme = theme
+            let controller = try openWindow(look: .mac)
+            show(controller, ShowcaseDemo.folder)
+            let panel = controller.focusedPanel
+            if let row = panel.rows.firstIndex(where: { $0.name == "Project backup.7z" }) {
+                panel.tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+                panel.focusedIndex = row
+            }
+            controller.window?.makeFirstResponder(panel.tableView)
+            try writeWholeWindow(try XCTUnwrap(controller.window), "main-\(theme.rawValue)")
+
+            Settings.numPanels = 2
+            let two = try openWindow(look: .mac, panels: 2)
+            two.window?.setContentSize(NSSize(width: 1100, height: 460))
+            show(two, ShowcaseDemo.folder)
+            try writeWholeWindow(try XCTUnwrap(two.window), "two-panels-\(theme.rawValue)")
+            for c in [controller, two] { c.closeDiscardingState() }
+        }
+    }
+
+    /// The window's frame view -- title bar, toolbar and content -- at 2x.
+    private func writeWholeWindow(_ window: NSWindow, _ name: String) throws {
+        let frameView = try XCTUnwrap(window.contentView?.superview)
+        frameView.layoutSubtreeIfNeeded()
+        frameView.displayIfNeeded()
+        _ = wait(for: "draw", timeout: 0.5) { false }
+        let bounds = frameView.bounds
+        let rep = try XCTUnwrap(frameView.bitmapImageRepForCachingDisplay(in: bounds))
+        frameView.cacheDisplay(in: bounds, to: rep)
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        let file = "\(screenshotPrefix)-\(name).png"
+        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+        attachment.name = file
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        try FileManager.default.createDirectory(atPath: TestPaths.screenshots, withIntermediateDirectories: true)
+        try png.write(to: URL(fileURLWithPath: TestPaths.screenshots).appendingPathComponent(file), options: .atomic)
+    }
+}

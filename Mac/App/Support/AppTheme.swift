@@ -103,7 +103,8 @@ extension Settings {
     /// `FM.Theme` (macOS only): System, Light (absent, the default) or Dark. Every choice is
     /// stored, System as "system", so it survives a later change of the default.
     static var theme: AppTheme {
-        get { string(Key.theme).flatMap(AppTheme.init(rawValue:)) ?? defaultTheme }
+        // native-look: the Mac look follows the system's Light / Dark unless a theme was chosen.
+        get { string(Key.theme).flatMap(AppTheme.init(rawValue:)) ?? (look == .mac ? .system : defaultTheme) }
         set { setString(newValue.rawValue, Key.theme) }
     }
 }

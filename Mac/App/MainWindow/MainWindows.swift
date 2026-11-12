@@ -77,6 +77,25 @@ enum MainWindows {
 
     /// Quit (`applicationWillTerminate`): every open window saves, backmost first, so the frontmost
     /// window's state is what the next launch starts from.
+    /// native-look: the look changed (Options > macOS > Appearance). Every window is built again
+    /// in the new look with its frame, its panels and their folders; the new windows open before the
+    /// old ones close, so closing the last old one does not end the app.
+    static func rebuildForLookChange() {
+        let old = frontToBack.filter { !$0.isClosed }
+        guard !old.isEmpty else { return }
+        old.first?.saveState()                       // the new windows restore from the settings
+        var replacements: [MainWindowController] = []
+        for previous in old.reversed() {             // back to front, so the old order is kept
+            let controller = MainWindowController()
+            register(controller)
+            controller.adopt(previous)
+            controller.showWindow(nil)
+            replacements.append(controller)
+        }
+        for previous in old { previous.closeDiscardingState() }
+        replacements.last?.window?.makeKeyAndOrderFront(nil)
+    }
+
     static func saveAllForTermination() {
         for controller in frontToBack.reversed() where !controller.isClosed {
             controller.saveState()

@@ -11,6 +11,19 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 [7-Zip 26.06](https://github.com/ip7z/7zip/releases/tag/26.06) (2026-11-06), which includes 26.05
 (2026-10-21).
 
+### Added
+
+- **Mac look for the main window** (Options ▸ macOS ▸ **Appearance**: *Mac* or *Classic
+  (Windows)*; Mac is the default of a fresh install). The same window, panels, menus, keys and
+  commands, drawn with macOS's own chrome: the toolbar in the title bar with SF Symbols and Back /
+  Forward next to the title (View ▸ Toolbars still picks the groups and the labels), the folder's
+  name as the window title with its path below and a proxy icon, a Finder-style list (system font,
+  24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
+  file icons), a rounded address field and a quiet status bar. In the Mac look the theme follows
+  the system's Light / Dark until one is chosen. Switching rebuilds the open windows in place,
+  keeping their size, panels and folders. Classic is the Windows window, unchanged. The dialogs
+  keep their current layout in both looks.
+
 ### Changed
 
 - Updated the engine to 7-Zip 26.06. Upstream's summary: improved support for split files created

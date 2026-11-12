@@ -92,7 +92,7 @@ extension PanelViewController {
         cell.isNameCell = isName
         let text = NSTextField(labelWithString: "")
         // The name in the list font, the other columns with tabular digits (sffont).
-        text.font = isName ? PanelMetrics.listFont : PanelMetrics.listDigitsFont
+        text.font = isName ? PanelMetrics.panelFont : PanelMetrics.panelDigitsFont
         text.lineBreakMode = .byTruncatingTail
         text.alignment = alignment
         text.usesSingleLineMode = true
@@ -105,7 +105,7 @@ extension PanelViewController {
         // combining marks) or that held a line break grew the field and moved its text off the line
         // every other row uses; Windows draws every label on the same baseline (listfeel §2).
         var constraints = [text.firstBaselineAnchor.constraint(equalTo: cell.topAnchor,
-                                                                constant: PanelMetrics.textBaseline(for: text.font ?? PanelMetrics.listFont))]
+                                                                constant: PanelMetrics.textBaseline(for: text.font ?? PanelMetrics.panelFont))]
         if isName {
             let image = NSImageView()
             image.translatesAutoresizingMaskIntoConstraints = false
@@ -634,7 +634,7 @@ final class PanelCollectionItem: NSCollectionViewItem {
         icon.setAccessibilityElement(false)
         label.translatesAutoresizingMaskIntoConstraints = false
         label.lineBreakMode = .byTruncatingMiddle
-        label.font = PanelMetrics.listFont                // the list's font in every view mode (Segoe UI 9)
+        label.font = PanelMetrics.panelFont               // the list's font in every view mode (Segoe UI 9)
         root.addSubview(icon)
         root.addSubview(label)
         view = root
