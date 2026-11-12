@@ -9,7 +9,8 @@ import SevenZipKit
 enum PanelIcons {
 
     static let smallSize = NSSize(width: 16, height: 16)
-    static let largeSize = NSSize(width: 32, height: 32)
+    /// native-look: Finder's 64 pt icons in the Mac look's Large Icons view.
+    static var largeSize: NSSize { AppLook.isMac ? NSSize(width: 64, height: 64) : NSSize(width: 32, height: 32) }
 
     static func icon(for row: PanelRow, snapshot: PanelSnapshot?, cache: inout [String: NSImage],
                      large: Bool) -> NSImage {

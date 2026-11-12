@@ -20,6 +20,10 @@ final class AboutDialog: NSObject {
 
         // IDD_ABOUT 2900 (AboutDialog.rc): 160 x 160 DLU = 240 x 260 px, every control on its .rc
         // rect (RcLayout, reports/dlgfeel.md section About).
+        if AppLook.isMac {
+            buildMac(parent: parent)
+            return
+        }
         let rc = RcDialog(2900)
         let form = RcFormView()
 
@@ -73,6 +77,54 @@ final class AboutDialog: NSObject {
 
     /// IDT_ABOUT_VERSION's text: MY_VERSION_CPU with "7-Zip <upstream>" replaced by the port's
     /// name, "7-Zip 26.03 for macOS 1.0.0 (arm64)" (pub3).
+    /// native-look: an About box as macOS apps show one -- the app icon, the name in bold, the
+    /// version and the credits centred in small type, the home page and OK at the bottom. The same
+    /// texts and buttons as IDD_ABOUT.
+    private func buildMac(parent: NSWindow?) {
+        let width: CGFloat = 360
+        let form = RcFormView(frame: NSRect(x: 0, y: 0, width: width, height: 10))
+        var y: CGFloat = 24
+        let icon = NSImageView(frame: NSRect(x: (width - 96) / 2, y: y, width: 96, height: 96))
+        icon.image = NSApp.applicationIconImage
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.setAccessibilityIdentifier("aboutLogo")
+        form.addSubview(icon)
+        y += 96 + 12
+        func centred(_ text: String, font: NSFont, color: NSColor = .labelColor, id: String? = nil, wraps: Bool = false) {
+            let field = wraps ? NSTextField(wrappingLabelWithString: text) : NSTextField(labelWithString: text)
+            field.font = font
+            field.textColor = color
+            field.alignment = .center
+            field.isSelectable = true
+            if let id { field.setAccessibilityIdentifier(id) }
+            field.preferredMaxLayoutWidth = width - 40
+            let height = ceil(field.fittingSize.height)
+            field.frame = NSRect(x: 20, y: y, width: width - 40, height: height)
+            form.addSubview(field)
+            y += height + 4
+        }
+        centred("7-Zip", font: .boldSystemFont(ofSize: 17))
+        y += 2
+        let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        centred(Self.versionText, font: small, color: .secondaryLabelColor, id: "aboutVersion")
+        centred(SZBenchmark.engineDateText, font: small, color: .secondaryLabelColor)
+        y += 8
+        centred(SZBenchmark.engineCopyrightText, font: small)
+        centred(Self.macCredit, font: small, id: "aboutMacCredit")
+        y += 8
+        centred(Lang.text(2901, "7-Zip is free software"), font: small, color: .secondaryLabelColor, wraps: true)
+        y += 16
+        let site = DialogKit.button("www.7-zip.org", target: self, action: #selector(homePageClicked))
+        let ok = DialogKit.button(Lang.text(401, "OK"), target: self, action: #selector(okClicked), key: "\r")
+        for b in [site, ok] { b.sizeToFit(); b.frame.size.width = max(b.frame.width + 16, 96) }
+        site.frame.origin = NSPoint(x: 20, y: y)
+        ok.frame.origin = NSPoint(x: width - 20 - ok.frame.width, y: y)
+        form.addSubview(site)
+        form.addSubview(ok)
+        y += ok.frame.height + 20
+        RcPlace.install(form, in: window, size: NSSize(width: width, height: y), parent: parent)
+    }
+
     static var versionText: String {
         let engine = SZBenchmark.versionWithCPUText
         let prefix = "7-Zip \(PortVersion.upstream)"

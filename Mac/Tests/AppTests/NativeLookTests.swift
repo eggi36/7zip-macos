@@ -297,6 +297,34 @@ final class NativeLookTests: AppHostTestCase {
         }
     }
 
+    func testRenderMacRemainingViews() throws {
+        try ShowcaseDemo.make()
+        try SZCodecs.loadCodecs()
+        Settings.theme = .light
+        let controller = try openWindow(look: .mac)
+        show(controller, ShowcaseDemo.folder)
+        let panel = controller.focusedPanel
+        let window = try XCTUnwrap(controller.window)
+        for (mode, name) in [(0, "large-icons"), (1, "small-icons"), (2, "list")] {
+            panel.setListViewMode(mode)
+            _ = wait(for: "relayout", timeout: 0.5) { false }
+            try writeWholeWindow(window, "view-\(name)")
+        }
+        panel.setListViewMode(3)
+        panel.showAddressPopup()
+        _ = wait(for: "popup", timeout: 0.5) { false }
+        if let popup = AddressPopup.current?.panel {
+            try writeWholeWindow(popup, "address-popup")
+        }
+        AddressPopup.current?.close()
+        XCTAssertTrue(ModalProbe.present({ AboutDialog.show(parent: window) }) { w in
+            try? self.writeWholeWindow(w, "about")
+        })
+        XCTAssertTrue(ModalProbe.present(timeout: 60, { BenchmarkDialog.run(parent: window) }) { w in
+            try? self.writeWholeWindow(w, "benchmark")
+        })
+    }
+
     /// The window's frame view -- title bar, toolbar and content -- at 2x.
     private func writeWholeWindow(_ window: NSWindow, _ name: String) throws {
         let frameView = try XCTUnwrap(window.contentView?.superview)

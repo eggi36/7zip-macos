@@ -29,6 +29,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - Messages and questions are Mac alerts: the app icon (a caution sign for errors and warnings)
     beside the selectable message, the default button rightmost, centred over their window. The
     answers, keys and Esc behaviour are unchanged.
+  - View ▸ Large Icons shows Finder's 64 pt icons with names on up to two lines and Finder's
+    selection; Small Icons and List get the Mac row height. The address bar's history list opens
+    as a macOS menu. About 7-Zip shows the app icon with the version and credits centred.
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style
