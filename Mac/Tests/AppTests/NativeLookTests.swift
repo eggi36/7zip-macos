@@ -283,6 +283,33 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(wait(for: "Quick Look closed", timeout: 5) { !ql.isVisible }, "Space again closes it")
     }
 
+    func testArrowKeysInQuickLookMoveThroughTheList() throws {
+        let controller = try openWindow(look: .mac)
+        show(controller, "/Applications")
+        let panel = controller.focusedPanel
+        let window = try XCTUnwrap(controller.window)
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(panel.tableView)
+        panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        panel.focusedIndex = 0
+        XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
+        let ql = try XCTUnwrap(QLPreviewPanel.shared())
+        XCTAssertTrue(wait(for: "Quick Look", timeout: 5) { ql.isVisible })
+        defer { ql.orderOut(nil) }
+        let first = panel.quickLookPaths
+        let down = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.numericPad, .function], timestamp: 0,
+                                    windowNumber: ql.windowNumber, context: nil,
+                                    characters: String(UnicodeScalar(NSDownArrowFunctionKey)!),
+                                    charactersIgnoringModifiers: String(UnicodeScalar(NSDownArrowFunctionKey)!),
+                                    isARepeat: false, keyCode: 125)!
+        // what Quick Look does with a key while it is key: it asks its delegate first
+        XCTAssertTrue(panel.previewPanel(ql, handle: down), "the list takes the arrow")
+        XCTAssertEqual(panel.tableView.selectedRow, 1, "Down moved the selection")
+        XCTAssertNotEqual(panel.quickLookPaths, first, "the preview shows the next item")
+        XCTAssertTrue(ql.isVisible, "Quick Look stays open")
+        XCTAssertFalse(panel.previewPanel(ql, handle: spaceKey(ql)), "Space stays with Quick Look (it closes)")
+    }
+
     func testSpaceKeepsItsClassicMeaning() throws {
         let controller = try openWindow(look: .classic)
         show(controller, "/Applications")

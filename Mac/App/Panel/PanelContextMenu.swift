@@ -418,6 +418,19 @@ extension PanelViewController: QLPreviewPanelDataSource, QLPreviewPanelDelegate 
         quickLookPaths.count
     }
 
+    /// As in Finder, the preview panel is key while it is open, and the keys that move through a
+    /// list -- the arrows, Home / End, Page Up / Down, type-to-find -- go to the panel's list, so
+    /// the preview follows the new selection (`refreshQuickLookIfShown`). Space and Esc stay with
+    /// Quick Look, which closes on them.
+    func previewPanel(_ panel: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
+        guard let event, event.type == .keyDown else { return false }
+        let key = event.charactersIgnoringModifiers?.unicodeScalars.first.map { Int($0.value) } ?? 0
+        if key == 0x20 || event.keyCode == 53 { return false }               // Space, Esc: Quick Look's
+        let list: NSView = listViewMode == 3 ? tableView : iconView.collectionView
+        list.keyDown(with: event)
+        return true
+    }
+
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
         let paths = quickLookPaths
         guard index >= 0, index < paths.count else { return nil }
