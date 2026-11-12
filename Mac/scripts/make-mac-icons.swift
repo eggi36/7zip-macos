@@ -9,9 +9,12 @@
 //
 //   * the app icon: a macOS squircle with a blue gradient and the 7-Zip mark, a white archive box
 //     closed by a zipper whose pull carries a geometric "7";
-//   * one document icon per format family: the macOS document sheet with a folded corner, the
-//     zipper mark in the family's colour and the extension as a label (no label at 16 and 32 px,
-//     where it could not be read).
+//   * one document icon per format: macOS's own archive icon (`UTType.archive`, the grey sheet with
+//     the zipper that Finder shows for compressed files) with the extension under the zipper in
+//     the grey, size and place of the label on macOS's ZIP icon (measured: caps 84 of 1024 units,
+//     baseline 137 above the bottom, #B6B6B6). No label at 16 and 32 px, as on macOS's own icons.
+//     The archive icon is taken from the Mac the script runs on, so the result follows that
+//     macOS version; it is Apple's artwork -- fine for your own build, not for redistribution.
 //
 // Writes Mac/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png, Mac/Resources/Icons/
 // doc-<name>.icns (through `iconutil`), Mac/Resources/Assets.xcassets/doc-<name>.imageset/
@@ -162,8 +165,8 @@ struct DocIcon {
     let color: UInt32
 }
 
-// Families: 7z blue, zip amber, rar purple, compressors green, disk images teal, packages brown,
-// split / generic graphite.
+// The label each format's icon carries (the colours are unused since the icons follow macOS's
+// archive icon; kept for the contact sheet's grouping).
 let docIcons: [DocIcon] = [
     DocIcon(name: "7z", label: "7Z", color: 0x2A63E6),
     DocIcon(name: "zip", label: "ZIP", color: 0xE69A00),
@@ -183,7 +186,7 @@ let docIcons: [DocIcon] = [
     DocIcon(name: "apfs", label: "APFS", color: 0x168C9E),
     DocIcon(name: "ntfs", label: "NTFS", color: 0x168C9E),
     DocIcon(name: "fat", label: "FAT", color: 0x168C9E),
-    DocIcon(name: "squashfs", label: "SQFS", color: 0x168C9E),
+    DocIcon(name: "squashfs", label: "SQUASHFS", color: 0x168C9E),
     DocIcon(name: "cab", label: "CAB", color: 0xA0652D),
     DocIcon(name: "deb", label: "DEB", color: 0xA0652D),
     DocIcon(name: "rpm", label: "RPM", color: 0xA0652D),
@@ -213,58 +216,36 @@ func drawLabel(_ text: String, in box: NSRect, color: NSColor) {
     (text as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attributes)
 }
 
-func drawDocIcon(_ doc: DocIcon, _ pixels: CGFloat) {
-    // The document sheet: 640 x 860 units, a 160-unit folded corner at the top right.
-    let page = NSRect(x: 192, y: 82, width: 640, height: 860)
-    let fold: CGFloat = 170
-    let sheet = NSBezierPath()
-    let r: CGFloat = 36
-    sheet.move(to: NSPoint(x: page.minX + r, y: page.minY))
-    sheet.line(to: NSPoint(x: page.maxX - r, y: page.minY))
-    sheet.appendArc(from: NSPoint(x: page.maxX, y: page.minY), to: NSPoint(x: page.maxX, y: page.minY + r), radius: r)
-    sheet.line(to: NSPoint(x: page.maxX, y: page.maxY - fold))
-    sheet.line(to: NSPoint(x: page.maxX - fold, y: page.maxY))
-    sheet.line(to: NSPoint(x: page.minX + r, y: page.maxY))
-    sheet.appendArc(from: NSPoint(x: page.minX, y: page.maxY), to: NSPoint(x: page.minX, y: page.maxY - r), radius: r)
-    sheet.line(to: NSPoint(x: page.minX, y: page.minY + r))
-    sheet.appendArc(from: NSPoint(x: page.minX, y: page.minY), to: NSPoint(x: page.minX + r, y: page.minY), radius: r)
-    sheet.close()
-    NSGraphicsContext.saveGraphicsState()
-    let shadow = NSShadow()
-    shadow.shadowColor = NSColor(white: 0, alpha: 0.22)
-    shadow.shadowOffset = NSSize(width: 0, height: -8)
-    shadow.shadowBlurRadius = 16
-    shadow.set()
-    rgb(0xFFFFFF).setFill()
-    sheet.fill()
-    NSGraphicsContext.restoreGraphicsState()
-    NSGradient(starting: rgb(0xFFFFFF), ending: rgb(0xF1F3F7))!.draw(in: sheet, angle: -90)
-    rgb(0xC9CED6).setStroke()
-    sheet.lineWidth = pixels <= 32 ? 14 : 5
-    sheet.stroke()
-    // the folded corner
-    let corner = NSBezierPath()
-    corner.move(to: NSPoint(x: page.maxX - fold, y: page.maxY))
-    corner.line(to: NSPoint(x: page.maxX - fold + 18, y: page.maxY - fold + 18))
-    corner.line(to: NSPoint(x: page.maxX, y: page.maxY - fold))
-    corner.close()
-    NSGradient(starting: rgb(0xE9EDF2), ending: rgb(0xCDD3DC))!.draw(in: corner, angle: -45)
-    rgb(0xC9CED6).setStroke()
-    corner.lineWidth = pixels <= 32 ? 10 : 4
-    corner.stroke()
+/// macOS's archive document icon, drawn at the representation that suits `pixels`.
+let systemArchiveIcon = NSWorkspace.shared.icon(for: .archive)
 
-    // The mark in the family colour, and the label under it.
-    let color = rgb(doc.color)
-    let hasLabel = pixels >= 64 && !doc.label.isEmpty
-    let markSize: CGFloat = hasLabel ? 330 : 400
-    let markY: CGFloat = hasLabel ? 400 : 250
-    let mark = NSRect(x: 512 - markSize / 2, y: markY, width: markSize, height: markSize * 1.08)
-    let light = color.blended(withFraction: 0.18, of: .white) ?? color
-    drawMark(in: mark, body: NSGradient(starting: light, ending: color)!, edge: color.blended(withFraction: 0.25, of: .black) ?? color,
-             teeth: rgb(0xFFFFFF, 0.92), pullFill: color.blended(withFraction: 0.3, of: .black) ?? color, detail: pixels >= 64)
-    if hasLabel {
-        drawLabel(doc.label, in: NSRect(x: 252, y: 170, width: 520, height: 170), color: color)
+func drawDocIcon(_ doc: DocIcon, _ pixels: CGFloat) {
+    let full = NSRect(x: 0, y: 0, width: 1024, height: 1024)
+    // `NSImage` picks the representation nearest the destination's pixel size.
+    systemArchiveIcon.draw(in: full, from: .zero, operation: .sourceOver, fraction: 1,
+                           respectFlipped: false, hints: [.ctm: NSAffineTransform(), .interpolation: NSImageInterpolation.high.rawValue])
+    guard pixels >= 64, !doc.label.isEmpty else { return }
+    drawSystemLabel(doc.label)
+}
+
+/// The extension as macOS writes it on its ZIP icon: SF Pro, caps 84 units high, centred, the
+/// baseline 137 units above the bottom, light grey; a long label shrinks to stay on the sheet.
+func drawSystemLabel(_ text: String) {
+    let color = rgb(0xB6B6B6)
+    let maxWidth: CGFloat = 440
+    var size: CGFloat = 84 / NSFont.systemFont(ofSize: 100).capHeight * 100
+    var attributes: [NSAttributedString.Key: Any] = [:]
+    var width: CGFloat = 0
+    while true {
+        attributes = [.font: NSFont.systemFont(ofSize: size, weight: .regular), .foregroundColor: color]
+        width = (text as NSString).size(withAttributes: attributes).width
+        if width <= maxWidth || size < 40 { break }
+        size *= 0.95
     }
+    let font = attributes[.font] as! NSFont
+    // draw(at:) takes the line's bottom: the baseline sits -descender above it.
+    let origin = NSPoint(x: 512 - width / 2, y: 137 + font.descender)
+    (text as NSString).draw(at: origin, withAttributes: attributes)
 }
 
 // MARK: - writing
