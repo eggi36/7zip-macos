@@ -189,7 +189,8 @@ enum QuickLookSettingsBridge {
         QuickLookPreferences(language: Settings.string(Settings.Key.lang) ?? "",
                              theme: Settings.theme.rawValue,
                              timestampLevel: Settings.timestampLevel,
-                             timestampShowUTC: Settings.timestampShowUTC)
+                             timestampShowUTC: Settings.timestampShowUTC,
+                             look: Settings.look.rawValue)
     }
 
     /// Writes the snapshot into the extension's container when it exists. Never in a test
@@ -219,7 +220,7 @@ enum QuickLookIntegration {
         for group in [Settings.Group.view, Settings.Group.language] {
             NotificationCenter.default.addObserver(forName: group.notificationName, object: nil, queue: .main) { note in
                 let key = note.userInfo?[Settings.keyUserInfoKey] as? String
-                let watched: Set<String> = [Settings.Key.lang, Settings.Key.theme,
+                let watched: Set<String> = [Settings.Key.lang, Settings.Key.theme, Settings.Key.look,
                                             Settings.Key.timestampLevel, Settings.Key.timestampShowUTC]
                 guard key == nil || watched.contains(key!) else { return }
                 QuickLookSettingsBridge.push()

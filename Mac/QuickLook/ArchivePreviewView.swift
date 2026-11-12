@@ -37,15 +37,24 @@ import SevenZipKit
 
 /// Geometry of the preview (the panel's, PanelMetrics: rows 19, header 24, icon 16 at x 4).
 enum PreviewMetrics {
-    static let rowHeight: CGFloat = 19
-    static let headerHeight: CGFloat = 24
+    /// native-look: the Mac look (the app's `FM.Look`, pushed into the container) draws the list
+    /// with AppKit's metrics, font, header, selection, stripes and the system's file icons, as
+    /// the app's Mac-look file list does. Set once from the preferences (`PreviewSettings`).
+    /// Mac by default, Classic under XCTest (whose parity tests describe the Windows list).
+    static var isMac = NSClassFromString("XCTestCase") == nil
+
+    static var rowHeight: CGFloat { isMac ? 22 : 19 }
+    static var headerHeight: CGFloat { isMac ? 28 : 24 }
     static let iconSize: CGFloat = 16
     static let subitemPadding: CGFloat = 6
     static let bandPadding: CGFloat = 12
     static let summaryRowHeight: CGFloat = 17
     static let minimumColumnWidth: CGFloat = 100
 
-    static var font: NSFont { ListFontChoice.current }
+    static var font: NSFont { isMac ? NSFont.systemFont(ofSize: NSFont.systemFontSize) : ListFontChoice.current }
+    /// The list's background and text: the system's in the Mac look, Windows' in Classic.
+    static var background: NSColor { isMac ? .textBackgroundColor : WinChrome.window }
+    static var text: NSColor { isMac ? .labelColor : WinChrome.text }
     static var digitsFont: NSFont { ListFontChoice.withTabularDigits(font) }
     static var boldFont: NSFont { NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
 
@@ -216,7 +225,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override func draw(_ dirtyRect: NSRect) {
-        WinChrome.window.setFill()
+        PreviewMetrics.background.setFill()
         bounds.fill()
     }
 
@@ -228,7 +237,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         addSubview(scrollView)
 
         summaryField.font = PreviewMetrics.digitsFont
-        summaryField.textColor = WinChrome.text
+        summaryField.textColor = PreviewMetrics.isMac ? .secondaryLabelColor : WinChrome.text
         summaryField.lineBreakMode = .byTruncatingTail
         summaryField.cell?.truncatesLastVisibleLine = true
         summaryField.setAccessibilityIdentifier("quickLookSummary")
@@ -237,20 +246,22 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         noticeIcon.contentTintColor = .systemOrange
         noticeIcon.imageScaling = .scaleProportionallyDown
         noticeField.font = PreviewMetrics.font
-        noticeField.textColor = WinChrome.text
+        noticeField.textColor = PreviewMetrics.text
         noticeField.setAccessibilityIdentifier("quickLookNotice")
 
         configureOutline()
     }
 
     private func configureOutline() {
-        outlineView.headerView = PreviewHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
+        let isMac = PreviewMetrics.isMac
+        outlineView.headerView = isMac ? NSTableHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
+                                       : PreviewHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
         outlineView.rowHeight = PreviewMetrics.rowHeight
         outlineView.rowSizeStyle = .custom
         outlineView.intercellSpacing = NSSize(width: 0, height: 0)
-        outlineView.backgroundColor = WinChrome.window
+        outlineView.backgroundColor = PreviewMetrics.background
         outlineView.gridStyleMask = []
-        outlineView.usesAlternatingRowBackgroundColors = false
+        outlineView.usesAlternatingRowBackgroundColors = isMac
         outlineView.style = .plain
         outlineView.indentationPerLevel = 16
         outlineView.autoresizesOutlineColumn = false
@@ -262,9 +273,14 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         outlineView.setAccessibilityIdentifier("quickLookList")
         for column in Column.allCases {
             let tableColumn = NSTableColumn(identifier: column.identifier)
-            let header = PreviewHeaderCell(textCell: column.title)
-            header.alignment = column.alignment
-            tableColumn.headerCell = header
+            if isMac {
+                tableColumn.headerCell.stringValue = column.title
+                tableColumn.headerCell.alignment = column.alignment
+            } else {
+                let header = PreviewHeaderCell(textCell: column.title)
+                header.alignment = column.alignment
+                tableColumn.headerCell = header
+            }
             tableColumn.title = column.title
             tableColumn.minWidth = 24
             tableColumn.maxWidth = 2000
@@ -278,7 +294,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = WinChrome.window
+        scrollView.backgroundColor = PreviewMetrics.background
     }
 
     // MARK: columns (01 §3.2: an archive folder's kpidName, kpidSize, kpidPackSize, kpidMTime)
@@ -426,6 +442,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
     /// icon for folders.
     static func icon(for node: ArchivePreviewNode) -> NSImage {
         if node.isDirectory { return Icons.folder }
+        if PreviewMetrics.isMac { return Icons.icon(forName: node.name, isDirectory: false) }   // native-look
         return PanelArchiveIcons.icon(forName: node.name, large: false)
             ?? Icons.icon(forName: node.name, isDirectory: false)
     }
@@ -506,6 +523,7 @@ final class PreviewRowView: NSTableRowView {
     static let highlight = NSColor(srgbRed: 0, green: 120 / 255, blue: 212 / 255, alpha: 1)
 
     override func drawSelection(in dirtyRect: NSRect) {
+        if PreviewMetrics.isMac { super.drawSelection(in: dirtyRect); return }      // native-look
         guard selectionHighlightStyle != .none else { return }
         Self.highlight.setFill()
         bounds.fill()
@@ -524,7 +542,7 @@ final class PreviewCellView: NSTableCellView {
         super.init(frame: .zero)
         let field = NSTextField(labelWithString: "")
         field.font = column == .name ? PreviewMetrics.font : PreviewMetrics.digitsFont
-        field.textColor = WinChrome.text
+        field.textColor = PreviewMetrics.text
         field.lineBreakMode = .byTruncatingTail
         field.alignment = column.alignment
         field.cell?.truncatesLastVisibleLine = true
@@ -541,7 +559,7 @@ final class PreviewCellView: NSTableCellView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override var backgroundStyle: NSView.BackgroundStyle {
-        didSet { textField?.textColor = backgroundStyle == .emphasized ? .white : WinChrome.text }
+        didSet { textField?.textColor = backgroundStyle == .emphasized ? .white : PreviewMetrics.text }
     }
 
     override func layout() {

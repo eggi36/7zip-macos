@@ -31,6 +31,7 @@ struct QuickLookPreferences: Equatable {
     enum Key {
         static let language = "Lang"
         static let theme = "FM.Theme"
+        static let look = "FM.Look"
         static let timestampLevel = "FM.TimestampLevel"
         static let timestampShowUTC = "FM.TimestampShowUTC"
     }
@@ -39,14 +40,18 @@ struct QuickLookPreferences: Equatable {
     var language: String?
     /// `FM.Theme`: "system" | "light" | "dark" (`AppTheme`); nil = follow the system.
     var theme: String?
+    /// `FM.Look`: "mac" | "classic" (`AppLook`, native-look); nil = Mac.
+    var look: String?
     /// `FM.TimestampLevel` (`SZTimestampLevel` raw value); nil = minutes.
     var timestampLevel: Int?
     /// `FM.TimestampShowUTC`; nil = local time.
     var timestampShowUTC: Bool?
 
-    init(language: String? = nil, theme: String? = nil, timestampLevel: Int? = nil, timestampShowUTC: Bool? = nil) {
+    init(language: String? = nil, theme: String? = nil, timestampLevel: Int? = nil, timestampShowUTC: Bool? = nil,
+         look: String? = nil) {
         self.language = language
         self.theme = theme
+        self.look = look
         self.timestampLevel = timestampLevel
         self.timestampShowUTC = timestampShowUTC
     }
@@ -54,6 +59,7 @@ struct QuickLookPreferences: Equatable {
     init(dictionary: [String: Any]) {
         language = dictionary[Key.language] as? String
         theme = dictionary[Key.theme] as? String
+        look = dictionary[Key.look] as? String
         timestampLevel = (dictionary[Key.timestampLevel] as? NSNumber)?.intValue
         timestampShowUTC = (dictionary[Key.timestampShowUTC] as? NSNumber)?.boolValue
     }
@@ -62,6 +68,7 @@ struct QuickLookPreferences: Equatable {
         var out: [String: Any] = [:]
         if let language { out[Key.language] = language }
         if let theme { out[Key.theme] = theme }
+        if let look { out[Key.look] = look }
         if let timestampLevel { out[Key.timestampLevel] = timestampLevel }
         if let timestampShowUTC { out[Key.timestampShowUTC] = timestampShowUTC }
         return out

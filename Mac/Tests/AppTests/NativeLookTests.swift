@@ -29,7 +29,28 @@ final class NativeLookTests: AppHostTestCase {
         savedAppearance = NSApp.appearance
     }
 
+    /// Quick Look closes with an animation: wait until it is really gone, so the next test starts
+    /// without a preview on screen.
+    private func closeQuickLook() {
+        guard QLPreviewPanel.sharedPreviewPanelExists(), let ql = QLPreviewPanel.shared() else { return }
+        if ql.isVisible { ql.orderOut(nil) }
+        if !wait(for: "Quick Look closed", timeout: 3, until: { !ql.isVisible }) { ql.close() }
+    }
+
+    /// Quick Look attaches to the key window's responder chain: the test app must be frontmost
+    /// with the panel's list as first responder. When macOS keeps it in the background (someone
+    /// is using the Mac), the preview cannot find its controller and the test is skipped.
+    private func makeListKey(_ controller: MainWindowController) throws {
+        let window = try XCTUnwrap(controller.window)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(controller.focusedPanel.tableView)
+        try XCTSkipUnless(wait(for: "key window", timeout: 3) { window.isKeyWindow && NSApp.isActive },
+                          "the test app is not frontmost; Quick Look needs the key window")
+    }
+
     override func tearDown() {
+        closeQuickLook()
         for controller in controllers { controller.closeDiscardingState() }
         controllers = []
         Settings.setString(savedLook, Settings.Key.look)
@@ -267,18 +288,20 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testSpaceOpensQuickLookInTheMacLook() throws {
+        closeQuickLook()
         let controller = try openWindow(look: .mac)
         show(controller, "/Applications")
         let panel = controller.focusedPanel
         let window = try XCTUnwrap(controller.window)
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(panel.tableView)
+        try makeListKey(controller)
         panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         panel.focusedIndex = 0
         XCTAssertFalse(panel.quickLookPaths.isEmpty, "a file-system item can be previewed")
         XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
         let ql = try XCTUnwrap(QLPreviewPanel.shared())
         XCTAssertTrue(wait(for: "Quick Look", timeout: 5) { ql.isVisible }, "Space opens Quick Look")
+        XCTAssertTrue((ql.currentController as AnyObject?) === panel, "the panel controls the preview")
+        _ = wait(for: "the opening animation", timeout: 1) { false }   // a close mid-animation is ignored
         XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
         XCTAssertTrue(wait(for: "Quick Look closed", timeout: 5) { !ql.isVisible }, "Space again closes it")
     }
@@ -288,14 +311,12 @@ final class NativeLookTests: AppHostTestCase {
         show(controller, "/Applications")
         let panel = controller.focusedPanel
         let window = try XCTUnwrap(controller.window)
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(panel.tableView)
+        try makeListKey(controller)
         panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         panel.focusedIndex = 0
         XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
         let ql = try XCTUnwrap(QLPreviewPanel.shared())
         XCTAssertTrue(wait(for: "Quick Look", timeout: 5) { ql.isVisible })
-        defer { ql.orderOut(nil) }
         let first = panel.quickLookPaths
         let down = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.numericPad, .function], timestamp: 0,
                                     windowNumber: ql.windowNumber, context: nil,
@@ -310,7 +331,28 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertFalse(panel.previewPanel(ql, handle: spaceKey(ql)), "Space stays with Quick Look (it closes)")
     }
 
+    func testRenderMacQuickLookPreview() throws {
+        try SZCodecs.loadCodecs()
+        let saved = PreviewMetrics.isMac
+        defer { PreviewMetrics.isMac = saved }
+        for (isMac, name) in [(true, "mac"), (false, "classic")] {
+            PreviewMetrics.isMac = isMac
+            let url = URL(fileURLWithPath: TestPaths.fixture("test.7z"))
+            let preview = ArchivePreviewBuilder.build(path: url.path)
+            let view = ArchivePreviewView(frame: NSRect(x: 0, y: 0, width: 640, height: 300))
+            let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            window.contentView = view
+            view.show(preview, fileURL: url)
+            XCTAssertEqual(view.outlineView.rowHeight, isMac ? 22 : 19)
+            XCTAssertEqual(view.outlineView.usesAlternatingRowBackgroundColors, isMac)
+            window.orderFront(nil)
+            try writeWholeWindow(window, "quicklook-\(name)")
+            window.orderOut(nil)
+        }
+    }
+
     func testSpaceKeepsItsClassicMeaning() throws {
+        closeQuickLook()
         let controller = try openWindow(look: .classic)
         show(controller, "/Applications")
         let panel = controller.focusedPanel

@@ -35,6 +35,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - Space opens Quick Look for the selected files and folders, as in Finder, and an open
     preview follows the selection -- the arrow keys move through the list while it is open -- (F3 still calculates a folder's size; items inside an archive
     are not previewed). Classic keeps 7zFM's Space.
+  - The Quick Look preview of an archive in Finder follows the look too: in the Mac look its
+    list has the system font, striped rows, the native header and selection and the system's file
+    icons.
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style
