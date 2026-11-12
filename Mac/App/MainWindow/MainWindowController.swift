@@ -244,6 +244,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             panel.saveColumnLayout()            // SaveListViewInfo (Panel.cpp:598-602)
         }
         Settings.autoRefresh = autoRefresh
+        syncMaskFromMacToolbar()
         Settings.toolbarsMask = toolbarsMask
     }
 
@@ -606,10 +607,29 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.autoRefresh = autoRefresh
     }
 
-    @objc func viewArchiveToolbar(_ sender: Any?) { toolbarsMask ^= 8; reloadToolbars() }             // IDM_VIEW_ARCHIVE_TOOLBAR 750
-    @objc func viewStandardToolbar(_ sender: Any?) { toolbarsMask ^= 4; reloadToolbars() }            // IDM_VIEW_STANDARD_TOOLBAR 751
+    @objc func viewArchiveToolbar(_ sender: Any?) {                                                   // IDM_VIEW_ARCHIVE_TOOLBAR 750
+        if isMacLook { toggleMacToolbarGroup(Self.macArchiveGroup); syncMaskFromMacToolbar(); return }
+        toolbarsMask ^= 8; reloadToolbars()
+    }
+    @objc func viewStandardToolbar(_ sender: Any?) {                                                  // IDM_VIEW_STANDARD_TOOLBAR 751
+        if isMacLook { toggleMacToolbarGroup(Self.macStandardGroup); syncMaskFromMacToolbar(); return }
+        toolbarsMask ^= 4; reloadToolbars()
+    }
     @objc func viewToolbarsLargeButtons(_ sender: Any?) { toolbarsMask ^= 2; reloadToolbars() }       // IDM_VIEW_TOOLBARS_LARGE_BUTTONS 752: IDB_* 48x36 vs IDB_*2 24x24
-    @objc func viewToolbarsShowButtonsText(_ sender: Any?) { toolbarsMask ^= 1; reloadToolbars() }    // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
+    @objc func viewToolbarsShowButtonsText(_ sender: Any?) {                                          // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
+        if isMacLook { toggleMacToolbarText(); syncMaskFromMacToolbar(); return }
+        toolbarsMask ^= 1; reloadToolbars()
+    }
+
+    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the View >
+    /// Toolbars check marks and the Classic look see the same choice.
+    func syncMaskFromMacToolbar() {
+        guard isMacLook else { return }
+        let mask = macToolbarMask(keeping: toolbarsMask)
+        guard mask != toolbarsMask else { return }
+        toolbarsMask = mask
+        Settings.toolbarsMask = mask
+    }
 
     @objc func viewTimestampLevel(_ sender: Any?) {                                         // IDM_VIEW_TIME + k
         guard let level = (sender as? NSMenuItem)?.representedObject as? Int else { return }
@@ -721,6 +741,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             return shown
         case #selector(viewTwoPanels(_:)): item.state = numPanels == 2 ? .on : .off
         case #selector(viewAutoRefresh(_:)): item.state = autoRefresh ? .on : .off
+        case #selector(viewArchiveToolbar(_:)) where isMacLook:
+            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 8) != 0 ? .on : .off
+        case #selector(viewStandardToolbar(_:)) where isMacLook:
+            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 4) != 0 ? .on : .off
+        case #selector(viewToolbarsShowButtonsText(_:)) where isMacLook:
+            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 1) != 0 ? .on : .off
         case #selector(viewArchiveToolbar(_:)): item.state = (toolbarsMask & 8) != 0 ? .on : .off
         case #selector(viewStandardToolbar(_:)): item.state = (toolbarsMask & 4) != 0 ? .on : .off
         case #selector(viewToolbarsLargeButtons(_:)): item.state = (toolbarsMask & 2) != 0 ? .on : .off

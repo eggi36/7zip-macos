@@ -258,6 +258,9 @@ final class PanelTableView: NSTableView {
     func itemHitRect(row: Int) -> NSRect {
         guard let panel, row >= 0, row < numberOfRows else { return .zero }
         let rowRect = rect(ofRow: row)
+        // native-look: as in Finder, the whole row is the item in the Mac look -- a click anywhere on
+        // it selects, and the rubber band starts only on the empty list below the rows.
+        if AppLook.isMac { return rowRect }
         if Settings.fullRow {
             let last = tableColumns.indices.last.map { rect(ofColumn: $0).maxX } ?? rowRect.maxX
             return NSRect(x: rowRect.minX, y: rowRect.minY, width: max(0, last - rowRect.minX), height: rowRect.height)

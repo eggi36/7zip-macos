@@ -39,7 +39,10 @@ final class NativeLookTests: AppHostTestCase {
         super.tearDown()
     }
 
+    private static let toolbarDefaultsKey = "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)"
+
     private func openWindow(look: AppLook, panels: Int = 1) throws -> MainWindowController {
+        UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)   // a fresh arrangement
         Settings.look = look
         Settings.numPanels = panels
         let controller = MainWindowController()
@@ -104,9 +107,50 @@ final class NativeLookTests: AppHostTestCase {
         controller.viewToolbarsShowButtonsText(nil)              // text off
         XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
         controller.viewArchiveToolbar(nil)                       // archive group off
-        let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
+        var ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
         XCTAssertFalse(ids.contains(.szAdd))
         XCTAssertTrue(ids.contains(.szCopy))
+        XCTAssertEqual(Settings.toolbarsMask & (8 | 4 | 1), 4, "the mask follows the toolbar")
+        controller.viewArchiveToolbar(nil)                       // and back on, at the end
+        ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
+        XCTAssertEqual(Array(ids.suffix(3)), MainWindowController.macArchiveGroup)
+        UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
+    }
+
+    func testMacToolbarIsCustomizable() throws {
+        let controller = try openWindow(look: .mac)
+        let toolbar = try XCTUnwrap(controller.window?.toolbar)
+        XCTAssertTrue(toolbar.allowsUserCustomization, "right-click > Customize Toolbar...")
+        XCTAssertTrue(toolbar.autosavesConfiguration)
+        let allowed = controller.toolbarAllowedItemIdentifiers(toolbar)
+        for id in MainWindowController.macExtraItems {
+            XCTAssertTrue(allowed.contains(id))
+            let item = controller.toolbar(toolbar, itemForItemIdentifier: id, willBeInsertedIntoToolbar: false)
+            XCTAssertNotNil(item?.image, "\(id.rawValue) has an SF Symbol")
+            XCTAssertNotNil(item?.action)
+            XCTAssertFalse(item?.label.hasSuffix("...") ?? true)
+        }
+        // a customised item survives a View > Toolbars change: groups are edited in place
+        toolbar.insertItem(withItemIdentifier: .szRefresh, at: 2)
+        controller.viewStandardToolbar(nil)
+        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == .szRefresh })
+        UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
+    }
+
+    func testMacLookClickAnywhereInTheRowSelects() throws {
+        // one look at a time: the look is app-wide (a change rebuilds every window)
+        for (look, expected) in [(AppLook.classic, false), (.mac, true)] {
+            let controller = try openWindow(look: look)
+            show(controller, "/Applications")
+            let table = controller.focusedPanel.tableView
+            table.layoutSubtreeIfNeeded()
+            let rowRect = table.rect(ofRow: 0)
+            // a point near the row's right edge, in the date columns, far from the name
+            let point = NSPoint(x: rowRect.maxX - 20, y: rowRect.midY)
+            XCTAssertEqual(table.isOnItem(point, row: 0), expected,
+                           look == .mac ? "Mac: the whole row is the item" : "Classic: only the name (LVHT_ONITEM)")
+            controller.closeDiscardingState()
+        }
     }
 
     func testMacLookTitleNamesTheFolder() throws {

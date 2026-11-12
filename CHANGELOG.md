@@ -23,6 +23,11 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   the system's Light / Dark until one is chosen. Switching rebuilds the open windows in place,
   keeping their size, panels and folders. Classic is the Windows window, unchanged. The dialogs
   keep their current layout in both looks.
+  - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
+    name and icon, unless *Full row select* is on).
+  - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
+    Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
+    arrangement is saved. View ▸ Toolbars adds or removes the archive and standard groups in place.
 
 ### Changed
 
