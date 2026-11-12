@@ -72,8 +72,94 @@ final class SplitCombineTests: XCTestCase {
         XCTAssertEqual(unchanged as String?, "x.")
         XCTAssertFalse(SZSplitFile.parseFirstVolumeName("data.bin.002", unchangedPart: &unchanged))
         XCTAssertFalse(SZSplitFile.parseFirstVolumeName("data.bin", unchangedPart: &unchanged))
-        // trailing dots trimmed, empty falls back to "file"
-        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "...001"), "file")
+        // 26.06 Generate_SubName drops one trailing dot; an empty name falls back to "file"
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "...001"), "..")
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: ".001"), "file")
+        // 26.06 CSplitVolName::ParseName: "…000" starts a series too, the counter needs a dot
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("data.bin.000", unchangedPart: &unchanged))
+        XCTAssertEqual(unchanged as String?, "data.bin.")
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("x.01", unchangedPart: &unchanged))
+        XCTAssertFalse(SZSplitFile.parseFirstVolumeName("data001", unchangedPart: &unchanged))
+        XCTAssertFalse(SZSplitFile.parseFirstVolumeName("001", unchangedPart: &unchanged))
+    }
+
+    // MARK: GNU split names (CSplitVolName, 7-Zip 26.06)
+
+    func testLatinFirstVolumeNameParsing() {
+        var unchanged: NSString?
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("a.7z.aa", unchangedPart: &unchanged))
+        XCTAssertEqual(unchanged as String?, "a.7z.")
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "a.7z.aa"), "a.7z")
+        // split's default prefix "x": xaa, xab, …
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("xaa", unchangedPart: &unchanged))
+        XCTAssertEqual(unchanged as String?, "x")
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "xaa"), "x")
+        // longer suffixes (split -a 3) and upper case
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("log.aaa", unchangedPart: &unchanged))
+        XCTAssertEqual(unchanged as String?, "log.")
+        XCTAssertTrue(SZSplitFile.parseFirstVolumeName("BIG.AA", unchangedPart: &unchanged))
+        XCTAssertEqual(unchanged as String?, "BIG.")
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "aaa"), "file")
+        // a later part is not the first one
+        XCTAssertFalse(SZSplitFile.parseFirstVolumeName("a.7z.ab", unchangedPart: &unchanged))
+    }
+
+    private func touch(_ names: [String], in dir: String) {
+        for name in names {
+            FileManager.default.createFile(atPath: (dir as NSString).appendingPathComponent(name), contents: Data([1]))
+        }
+    }
+
+    private static let letters = (UnicodeScalar("a").value...UnicodeScalar("z").value).map { String(UnicodeScalar($0)!) }
+
+    func testLatinSeriesWithGrowingSuffix() throws {
+        // GNU split: aa … yz, then the suffix grows: zaaa, zaab, …
+        let dir = try tempDir("gnu")
+        var expected: [String] = []
+        for a in Self.letters.dropLast() { for b in Self.letters { expected.append("p." + a + b) } }
+        expected += ["p.zaaa", "p.zaab", "p.zaac"]
+        touch(expected, in: dir)
+        XCTAssertEqual(SZSplitFile.volumeNames(forFirstVolume: "p.aa", in: dir), expected)
+    }
+
+    func testLatinSeriesWithFixedSuffix() throws {
+        // split -a 2 that used every name up to zz: "za" exists, so the series stays two letters
+        // and ends after "zz"
+        let dir = try tempDir("fixed")
+        var expected: [String] = []
+        for a in Self.letters { for b in Self.letters { expected.append("q" + a + b) } }
+        touch(expected + ["qzaaa"], in: dir)
+        XCTAssertEqual(SZSplitFile.volumeNames(forFirstVolume: "qaa", in: dir), expected)
+    }
+
+    func testNumericGnuSeriesWithGrowingSuffix() throws {
+        // split -d: 00 … 89, then 9000, 9001, …
+        let dir = try tempDir("gnud")
+        var expected = (0...89).map { String(format: "n.%02d", $0) }
+        expected += ["n.9000", "n.9001"]
+        touch(expected, in: dir)
+        XCTAssertEqual(SZSplitFile.volumeNames(forFirstVolume: "n.00", in: dir), expected)
+    }
+
+    func testCombineFilesMadeBySplit() throws {
+        let dir = try tempDir("bsdsplit")
+        let source = (dir as NSString).appendingPathComponent("orig.bin")
+        let original = Data((0..<5000).map { UInt8(truncatingIfNeeded: $0 &* 7 &+ $0 >> 8) })
+        try original.write(to: URL(fileURLWithPath: source))
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/split")
+        process.arguments = ["-b", "1000", source, (dir as NSString).appendingPathComponent("orig.bin.")]
+        try process.run()
+        process.waitUntilExit()
+        try XCTSkipUnless(process.terminationStatus == 0, "split could not run")
+
+        let names = SZSplitFile.volumeNames(forFirstVolume: "orig.bin.aa", in: dir)
+        XCTAssertEqual(names, ["orig.bin.aa", "orig.bin.ab", "orig.bin.ac", "orig.bin.ad", "orig.bin.ae"])
+        XCTAssertEqual(SZSplitFile.combinedName(forFirstVolume: "orig.bin.aa"), "orig.bin")
+        let joined = (dir as NSString).appendingPathComponent("joined.bin")
+        let ok = offMain { (try? SZSplitFile.combine(names, in: dir, to: joined, progress: nil)) != nil }
+        XCTAssertTrue(ok)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: joined)), original)
     }
 
     // MARK: split then combine

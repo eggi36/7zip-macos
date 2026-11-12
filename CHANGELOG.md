@@ -18,6 +18,13 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   Mach-O files, and "some bugs and vulnerabilities were fixed" — among others the CAB, MSLZ, MUB,
   Split, PE, UDF and Z handlers and the Quantum, Shrink and Z decoders were reworked or hardened
   against malformed archives. No extension, menu item or dialog control was added or removed.
+- **Combine files** recognises the parts the Linux/macOS `split` tool makes (`file.aa`,
+  `file.ab`, …, including the longer names GNU split uses after `yz`, and `split -d`'s
+  `file.00`, `file.01`, …), as 7-Zip File Manager 26.06 does. The dialog now names the file it
+  will create above the list of parts. A first part named `….000` is accepted too; a name ending in
+  digits without a dot before them (`data001`) is no longer taken for a split file, and only one
+  trailing dot is removed from the proposed name.
+- **Split file** refuses more than 536 870 911 parts, as 7-Zip 26.06 does.
 - The bundled assets come from the official 7-Zip 26.06 Windows release (`7z2606-x64.exe`): new
   `7z.sfx` and `7zCon.sfx` self-extracting modules and the 26.06 help pages.
 

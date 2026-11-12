@@ -44,20 +44,22 @@ FOUNDATION_EXPORT NSArray<NSString *> *SZSplitVolumePresets(void);
                   error:(NSError **)error
     NS_SWIFT_NAME(split(at:volumeBasePath:volumeSizes:progress:));
 
-/// CVolSeqName::ParseName: YES when `name` ends in `0…01` (digits only, value 1), i.e. it
-/// is the first volume of a series. `unchangedPart` receives the name without the number.
+/// CSplitVolName::ParseName (7-Zip 26.06): YES when `name` is the first part of a series --
+/// `name.001` / `name.000` (digits after a dot) or `nameaa` / `nameAA` (GNU split). Later parts
+/// are refused. `unchangedPart` receives the name without the counter.
 + (BOOL)parseFirstVolumeName:(NSString *)name
                unchangedPart:(NSString * _Nullable * _Nullable)unchangedPart
     NS_SWIFT_NAME(parseFirstVolumeName(_:unchangedPart:));
 
 /// The consecutive volumes of the series starting at `firstName` inside `directory`, in
-/// order, stopping at the first gap (CApp::Combine, PanelSplitFile.cpp:455-470).
+/// order, stopping at the first gap (CApp::Combine, PanelSplitFile.cpp). A GNU split series
+/// continues after "…yz" with "…zaaa" (its suffix grows), which is tried when "…za" is missing.
 + (NSArray<NSString *> *)volumeNamesForFirstVolume:(NSString *)firstName
                                        inDirectory:(NSString *)directory
     NS_SWIFT_NAME(volumeNames(forFirstVolume:in:));
 
-/// The output name Combine proposes: the first volume's name without the numeric extension,
-/// trailing dots trimmed, "file" when nothing is left.
+/// The output name Combine proposes (CSplitVolName::Generate_SubName): the first volume's name
+/// without the counter and one trailing dot, "file" when nothing is left.
 + (NSString *)combinedNameForFirstVolume:(NSString *)firstName
     NS_SWIFT_NAME(combinedName(forFirstVolume:));
 
