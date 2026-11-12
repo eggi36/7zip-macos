@@ -205,6 +205,46 @@ final class NativeLookTests: AppHostTestCase {
         }
     }
 
+    func testRenderMacDialogs() throws {
+        try ShowcaseDemo.make()
+        try SZCodecs.loadCodecs()
+        Settings.look = .mac
+        let demo = ShowcaseDemo.folder
+        defer {
+            while NSApp.modalWindow != nil { NSApp.abortModal() }
+            if let w = OptionsWindowController.shared.window, w.isVisible { ModalProbe.close(w) }
+        }
+        for theme in [AppTheme.light, .dark] {
+            Settings.theme = theme
+            var input = CompressDialogInput()
+            input.directoryPrefix = demo + "/"
+            input.archiveBaseName = "Documents"
+            input.itemPaths = [demo + "/Documents"]
+            XCTAssertTrue(ModalProbe.present(timeout: 60, { _ = CompressDialogController.run(input) }) { w in
+                try? self.writeWholeWindow(w, "add-\(theme.rawValue)")
+            })
+            var extract = ExtractDialog.Options()
+            extract.directoryPath = demo + "/Photos 2025/"
+            extract.archivePath = demo + "/Photos 2025.zip"
+            XCTAssertTrue(ModalProbe.present({ _ = ExtractDialog.run(extract) }) { w in
+                try? self.writeWholeWindow(w, "extract-\(theme.rawValue)")
+            })
+            let options = OptionsWindowController.shared
+            let optionsWindow = try XCTUnwrap(options.window)
+            XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { _ in })
+            options.selectPage(options.pageCount - 1)
+            let tabView = try XCTUnwrap(optionsWindow.contentView?.subviews.compactMap { $0 as? NSTabView }.first,
+                                        "the Mac look uses AppKit's tab view")
+            XCTAssertEqual(tabView.tabViewType, .topTabsBezelBorder)
+            XCTAssertEqual(tabView.selectedTabViewItem?.label, "macOS")
+            XCTAssertFalse(tabView.tabViewItems.contains { $0.label.isEmpty })
+            try writeWholeWindow(optionsWindow, "options-macos-\(theme.rawValue)")
+            options.selectPage(4)
+            try writeWholeWindow(optionsWindow, "options-settings-\(theme.rawValue)")
+            ModalProbe.close(optionsWindow)
+        }
+    }
+
     /// The window's frame view -- title bar, toolbar and content -- at 2x.
     private func writeWholeWindow(_ window: NSWindow, _ name: String) throws {
         let frameView = try XCTUnwrap(window.contentView?.superview)

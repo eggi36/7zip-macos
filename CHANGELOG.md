@@ -21,8 +21,11 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. In the Mac look the theme follows
   the system's Light / Dark until one is chosen. Switching rebuilds the open windows in place,
-  keeping their size, panels and folders. Classic is the Windows window, unchanged. The dialogs
-  keep their current layout in both looks.
+  keeping their size, panels and folders. Classic is the Windows window, unchanged.
+  - The dialogs follow the look too: the system font at its regular size, AppKit's own pop-up
+    menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
+    Cancel left of OK and Help as the round "?" button at the left. Options gets AppKit's tabs.
+    Every control stays where the Windows layout puts it, so nothing moves out of reach.
   - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
     name and icon, unless *Full row select* is on).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create

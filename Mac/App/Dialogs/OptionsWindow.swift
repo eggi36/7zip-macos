@@ -182,7 +182,15 @@ enum OptionsUI {
 
 final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTabViewDelegate {
 
-    static let shared = OptionsWindowController()
+    /// native-look: rebuilt when the look changed since it was built and it is not on screen.
+    static var shared: OptionsWindowController {
+        if let instance, instance.look == AppLook.current || instance.window?.isVisible == true { return instance }
+        let fresh = OptionsWindowController()
+        instance = fresh
+        return fresh
+    }
+    private static var instance: OptionsWindowController?
+    let look = AppLook.current
 
     // The property sheet as 7zFM 26.03 shows it (dlgfeel-data/win/dlg-options-*.txt): a fixed
     // 494 x 550 client area (no WS_THICKFRAME), the tab control at 6,7 482x507, the page at
@@ -190,19 +198,30 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     // sffont: the horizontal metrics are stretched by DLU.scaleX with the pages (316 DLU wide), so
     // a wider dialog font keeps Windows' proportions; at scale 1 they are the pixels above.
     static var pageWidth: CGFloat { DLU.x(316) }
-    static var clientSize: NSSize { NSSize(width: pageWidth + 20, height: 550) }
+    static var clientSize: NSSize {
+        // native-look: AppKit's bezel tab view needs a margin around the page.
+        AppLook.isMac ? NSSize(width: pageWidth + 44, height: 590) : NSSize(width: pageWidth + 20, height: 550)
+    }
+    /// native-look: the Mac look's NSTabView (tabs on top, bezel) holding the pages.
+    static var macTabViewRect: NSRect { NSRect(x: 12, y: 10, width: pageWidth + 20, height: 528) }
     static var tabControlRect: NSRect { NSRect(x: 6, y: 7, width: pageWidth + 8, height: 507) }
     static var pageRect: NSRect { NSRect(x: 10, y: 29, width: pageWidth, height: 481) }
     static var pageSize: NSSize { pageRect.size }
     /// The four 50 x 14 DLU buttons, 4 DLU apart, the last 4 DLU from the right edge.
     private static func buttonRect(_ fromRight: Int) -> NSRect {
         let w = DLU.x(50), gap = DLU.x(4)
+        if AppLook.isMac {
+            let margin: CGFloat = 20
+            return NSRect(x: clientSize.width - margin - w - CGFloat(fromRight) * (w + 12), y: 550, width: w, height: 23)
+        }
         return NSRect(x: clientSize.width - gap - w - CGFloat(fromRight) * (w + gap), y: 520, width: w, height: 23)
     }
-    static var okRect: NSRect { buttonRect(3) }          // IDOK
-    static var cancelRect: NSRect { buttonRect(2) }      // IDCANCEL
-    static var applyRect: NSRect { buttonRect(1) }       // ID_APPLY_NOW 12321
-    static var helpRect: NSRect { buttonRect(0) }        // IDHELP
+    // native-look: the Mac order is Apply, Cancel, OK from the left of the right-hand group, and
+    // Help is the round "?" button at the left margin.
+    static var okRect: NSRect { AppLook.isMac ? buttonRect(0) : buttonRect(3) }          // IDOK
+    static var cancelRect: NSRect { AppLook.isMac ? buttonRect(1) : buttonRect(2) }      // IDCANCEL
+    static var applyRect: NSRect { AppLook.isMac ? buttonRect(2) : buttonRect(1) }       // ID_APPLY_NOW 12321
+    static var helpRect: NSRect { buttonRect(0) }                                        // IDHELP
 
     private let tabView = NSTabView()
     private let tabControl = OptionsTabControl(frame: OptionsWindowController.tabControlRect)
@@ -219,7 +238,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
                               styleMask: [.titled, .closable],
                               backing: .buffered, defer: false)
         window.title = Lang.text(2100, "Options")     // IDS_OPTIONS 2100
-        window.backgroundColor = WinChrome.face          // COLOR_BTNFACE (recheck §2)
+        if !AppLook.isMac { window.backgroundColor = WinChrome.face }   // COLOR_BTNFACE (recheck §2); native-look: AppKit's
         window.tabbingMode = .disallowed
         TestAnimations.apply(to: window)
         window.isReleasedWhenClosed = false          // the controller reuses it on every open
@@ -263,9 +282,14 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             OptionsLanguagePage(),    // IDD_LANG 2101
             OptionsMacPage(),         // macOS addition (theme): Theme, Show grid lines
         ]
-        tabView.tabViewType = .noTabsNoBorder
-        tabView.drawsBackground = false
-        tabView.frame = Self.pageRect
+        if look == .mac {
+            tabView.tabViewType = .topTabsBezelBorder
+            tabView.frame = Self.macTabViewRect
+        } else {
+            tabView.tabViewType = .noTabsNoBorder
+            tabView.drawsBackground = false
+            tabView.frame = Self.pageRect
+        }
         for page in pages {
             page.owner = self
             let item = NSTabViewItem(viewController: page)
@@ -287,12 +311,20 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         cancelButton.keyEquivalent = "\u{1b}"
         applyButton.isEnabled = false
 
-        content.addSubview(tabControl)
+        if look != .mac { content.addSubview(tabControl) }
         content.addSubview(tabView)
         for (button, rect) in [(okButton, Self.okRect), (cancelButton, Self.cancelRect),
                                (applyButton, Self.applyRect), (helpButton, Self.helpRect)] {
             content.addSubview(button)
             RcPlace.button(button, rect)
+        }
+        if look == .mac {
+            helpButton.setAccessibilityLabel(helpButton.title)
+            helpButton.toolTip = helpButton.title
+            helpButton.title = ""
+            helpButton.bezelStyle = .helpButton
+            let size = helpButton.intrinsicContentSize
+            helpButton.frame = NSRect(x: 20, y: Self.okRect.midY - size.height / 2, width: size.width, height: size.height)
         }
         window.contentView = content
         window.setContentSize(Self.clientSize)
@@ -363,7 +395,13 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         okButton.title = Lang.text(401, "OK")
         cancelButton.title = Lang.text(402, "Cancel")
         applyButton.title = "Apply"   // not in the lang files (comctl32 string)
-        helpButton.title = Lang.text(409, "Help")
+        if look == .mac {
+            helpButton.toolTip = Lang.text(409, "Help")
+            helpButton.setAccessibilityLabel(helpButton.toolTip)
+            for (item, page) in zip(tabView.tabViewItems, pages) { item.label = pageTitle(page) }
+        } else {
+            helpButton.title = Lang.text(409, "Help")
+        }
         tabControl.setTitles(pages.map(pageTitle))
         for (i, page) in pages.enumerated() {
             tabView.tabViewItem(at: i).label = pageTitle(page)

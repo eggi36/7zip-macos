@@ -190,7 +190,7 @@ final class WinComboBox: NSComboBox {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        focusRingType = .none
+        focusRingType = AppLook.isMac ? .default : .none
         hover.attach(to: self)
     }
 
@@ -200,9 +200,15 @@ final class WinComboBox: NSComboBox {
         hover.attach(to: self)
     }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: WinCombo.height) }
+    /// native-look: AppKit's own combo box in the Mac look.
+    private let isMacLook = AppLook.isMac
+
+    override var intrinsicContentSize: NSSize {
+        isMacLook ? super.intrinsicContentSize : NSSize(width: NSView.noIntrinsicMetric, height: WinCombo.height)
+    }
 
     override func draw(_ dirtyRect: NSRect) {
+        if isMacLook { super.draw(dirtyRect); return }
         cell?.draw(withFrame: bounds, in: self)
     }
 }
@@ -226,16 +232,22 @@ final class WinComboBoxCell: NSComboBoxCell {
     /// Windows (wincompare-dlgfeel-copy-win.png).
     static let bezelShift = NSSize(width: -5, height: -2)
 
+    private let isMacLook = AppLook.isMac
+
     override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        if isMacLook { return super.drawingRect(forBounds: rect) }
         guard let view = controlView else { return rect }
         let r = textRect(rect, in: view)
         let dy = view.isFlipped ? Self.bezelShift.height : -Self.bezelShift.height
         return NSRect(x: r.minX + Self.bezelShift.width, y: r.minY + dy, width: r.width - Self.bezelShift.width, height: r.height)
     }
 
-    override func titleRect(forBounds rect: NSRect) -> NSRect { drawingRect(forBounds: rect) }
+    override func titleRect(forBounds rect: NSRect) -> NSRect {
+        isMacLook ? super.titleRect(forBounds: rect) : drawingRect(forBounds: rect)
+    }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        if isMacLook { super.draw(withFrame: cellFrame, in: controlView); return }
         let control = controlView as? NSControl
         let editing = control?.currentEditor() != nil
         let state: WinCombo.State = !isEnabled ? .disabled : (editing ? .focused : .normal)
