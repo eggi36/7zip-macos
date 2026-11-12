@@ -169,11 +169,17 @@ class RcFormView: NSView {
         func button(_ id: Int) -> NSButton? {
             placedIDs.values.first { $0.id == id && !$0.view.isHidden }?.view as? NSButton
         }
-        let ok = button(1), cancel = button(2), help = button(9)
+        let cancel = button(2), help = button(9)
+        // The confirming button: IDOK, else the default (Return) button of the dialog's own ID
+        // (Continue, Link, Close, ...) -- whichever is not Cancel or Help.
+        let ok = button(1) ?? placedIDs.values.compactMap { $0.view as? NSButton }.first {
+            !$0.isHidden && $0.keyEquivalent == "\r" && $0 !== cancel && $0 !== help
+        }
         let row: [NSButton] = [ok, cancel, help].compactMap { $0 }
-        guard let anchor = row.first else { return }
+        guard let anchor = row.first(where: { $0 !== help }) ?? row.first else { return }
         let sameRow = row.filter { abs($0.frame.midY - anchor.frame.midY) < 6 }
-        if let help, sameRow.contains(help), help.bezelStyle != .helpButton {
+        let margin = RcDialog.margin.width
+        if let help, sameRow.contains(help), help.frame.minX > margin + 1 {
             let others = sameRow.filter { $0 !== help }
             let rightEdge = others.map(\.frame.maxX).max() ?? help.frame.maxX
             if help.frame.maxX > rightEdge {
@@ -181,12 +187,14 @@ class RcFormView: NSView {
                 let shift = help.frame.maxX - rightEdge
                 for b in others { b.frame.origin.x += shift }
             }
-            help.setAccessibilityLabel(help.title)
-            help.toolTip = help.title
-            help.title = ""
-            help.bezelStyle = .helpButton
+            if help.bezelStyle != .helpButton {
+                help.setAccessibilityLabel(help.title)
+                help.toolTip = help.title
+                help.title = ""
+                help.bezelStyle = .helpButton
+            }
             let size = help.intrinsicContentSize
-            help.frame = NSRect(x: RcDialog.margin.width, y: (anchor.frame.midY - size.height / 2).rounded(),
+            help.frame = NSRect(x: margin, y: (anchor.frame.midY - size.height / 2).rounded(),
                                 width: size.width, height: size.height)
         }
         if let ok, let cancel, sameRow.contains(ok), sameRow.contains(cancel), ok.frame.minX < cancel.frame.minX {

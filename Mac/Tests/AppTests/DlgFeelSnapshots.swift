@@ -69,13 +69,20 @@ final class DlgFeelSnapshots: AppHostTestCase {
     /// exists (a flag file, because xcodebuild does not pass the shell's environment on).
     private var paired: Bool { FileManager.default.fileExists(atPath: DlgSnap.buildDirectory + "/PAIRED") }
 
+    /// native-look: with Mac/build/dlgfeel/MAC present the dialogs are rendered in the Mac look.
+    private var macLook: Bool { FileManager.default.fileExists(atPath: DlgSnap.buildDirectory + "/MAC") }
+    private var savedLook: String?
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         NSApp.appearance = NSAppearance(named: .aqua)
+        savedLook = Settings.string(Settings.Key.look)
+        if macLook { Settings.look = .mac }
     }
 
     override func tearDown() {
         NSApp.appearance = nil
+        Settings.setString(savedLook, Settings.Key.look)
         super.tearDown()
     }
 
