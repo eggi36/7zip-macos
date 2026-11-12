@@ -5,13 +5,12 @@ Every edit to `C/`, `CPP/`, `Asm/` is listed here. All hunks are pure `#ifdef _W
 unified diff is `Mac/docs/upstream-patches.diff`, generated against the upstream mirror with
 `git diff main -- C CPP Asm DOC > Mac/docs/upstream-patches.diff`.
 
-**Base: 7-Zip 26.04.** Re-verified when 26.04 was merged (`mac/up2604`): the merge applied every
-hunk without a conflict and the patch lines are unchanged from 26.03. Each one is still needed --
-26.04 touched none of the code paths they fix. In particular, 26.04 corrected the
-`MY_CPU_LE_` typo in `CProxyArc2::Load`, which enables the zero-copy name branch for
-`PROP_DATA_TYPE_wchar_t_PTR_Z_LE`; with the 4-byte `wchar_t` of macOS that type is UTF-32 and no
-handler returns it, so the names still come through the `GetProperty` branch the `AgentProxy.cpp`
-patch fixes.
+**Base: 7-Zip 26.06.** Re-verified when 26.06 was merged (`mac/upstream-26.06`): every hunk
+applied without a conflict except `SplitUtils.cpp`, where upstream moved `GetNumberOfVolumes` into
+`PanelSplitFile.cpp` (as an `inline` function used only by the Windows File Manager). The patch now
+only wraps `k_Sizes[]` / `AddVolumeItems` in `#ifdef _WIN32`; `SplitUtils.h` still declares
+`GetNumberOfVolumes` but nothing in the port calls it (`SZSplitFile.mm` has its own copy). No other
+patched code path changed in 26.05 or 26.06, and each hunk is still needed.
 
 | File | Hunk | Reason |
 |---|---|---|
@@ -24,7 +23,7 @@ patch fixes.
 | `CPP/7zip/UI/Agent/ArchiveFolderOut.cpp` | `enumerator.DirEntry_IsDir(fileInfo, false)` on POSIX; `SetFileAttrib(path, 0)` before `RemoveDir` only on Windows | POSIX `CDirEntry` has no `IsDir()`; read-only attribute clearing is a Windows need |
 | `CPP/7zip/UI/Agent/UpdateCallbackAgent.cpp` | `UINT64` -> `UInt64` in `SetTotal`/`SetCompleted` | `UINT64` is a Windows SDK typedef; the declaration already uses `UInt64` |
 | `CPP/7zip/UI/Agent/ArchiveFolderOpen.cpp` | icon code (`ResourceString.h`, `g_hInstance`, `CCodecIcons::LoadIcons`, `AddIconExt`, `GetIconPath` body) wrapped in `#ifdef _WIN32`; `GetExtensions` enumerates `g_CodecsObj->Formats[i].Exts` on non-Windows | same information from the format table without Win32 resources; `GetIconPath` returns `S_OK` with no path |
-| `CPP/7zip/UI/FileManager/SplitUtils.h/.cpp` | `AddVolumeItems(NControl::CComboBox&)` and `k_Sizes[]` wrapped in `#ifdef _WIN32` | Win32 combo box; `ParseVolumeSizes`/`GetNumberOfVolumes` stay portable |
+| `CPP/7zip/UI/FileManager/SplitUtils.h/.cpp` | `AddVolumeItems(NControl::CComboBox&)` and `k_Sizes[]` wrapped in `#ifdef _WIN32` | Win32 combo box; `ParseVolumeSizes` stays portable (since 26.06 upstream defines `GetNumberOfVolumes` in `PanelSplitFile.cpp`) |
 | `CPP/7zip/UI/Common/LoadCodecs.cpp` | `item.TimeFlags = arc.TimeFlags;` added to the static `CCodecs::Load()` loop under `#ifdef __APPLE__` | the static registration path (no `Z7_EXTERNAL_CODECS`) never copies `CArcInfo::TimeFlags`, so `Get_TimePrecFlags()` and `Get_DefaultTimePrec()` are 0 and the Compress Options timestamp-precision combo is empty. The DLL path reads the same value from `NHandlerPropID::kTimeFlags`; Windows builds use the DLL path and are unaffected. |
 | `CPP/7zip/UI/Common/ArchiveExtractCallback.h/.cpp`, `CPP/7zip/UI/Common/Extract.cpp`, `CPP/7zip/UI/Agent/Agent.cpp` | the five Zone.Identifier guards `defined(_WIN32) && !defined(UNDER_CE)` widened to `|| defined(__APPLE__)`; `ReadZoneFile_Of_BaseFile` / `WriteZoneFile_To_BaseFile` get an `#ifdef __APPLE__` body that reads / writes the `com.apple.quarantine` extended attribute instead of the `:Zone.Identifier` stream (`<sys/xattr.h>` included under `__APPLE__`) | quarantine propagation on ordinary extraction (`-snz`, Options "Propagate Zone.Id stream", `01 §9 #23`; `mac/opsgaps`). Only the engine knows each extracted file's disk path at `CloseFile` time, so the kAll / kOffice policy (upstream's `kOfficeExtensions`) can only be applied there; post-processing from the bridge would have to guess which files the run wrote. Windows preprocesses exactly as before. |
 | `CPP/7zip/UI/Agent/AgentProxy.cpp` | `CProxyArc2::Load`: the `NCOM::CPropVariant prop` that receives `kpidName` is declared before the `if` under `#ifdef __APPLE__` instead of inside the `else` block | use after free: `s = prop.bstrVal` was copied by `AllocStringAndCopy` *after* the block had freed the BSTR. Windows' allocator leaves the bytes in place; macOS zeroes freed small blocks, so every item of a tree handler (`kpidIsTree` + `IArchiveGetRawProps`: WIM, XAR, HFS, APFS, NTFS, Ext, FAT) had a name of NULs and the panel listed blank rows (`mac/archgaps`, `RawPropertiesTests`). Windows preprocesses exactly as before. |

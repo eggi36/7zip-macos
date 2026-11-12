@@ -5,6 +5,28 @@ All notable changes to 7-Zip for macOS are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its own version; the engine version
 is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
+## [1.3.0] — unreleased
+
+7-Zip 26.06 for macOS 1.3.0: the engine updated to
+[7-Zip 26.06](https://github.com/ip7z/7zip/releases/tag/26.06) (2026-11-06), which includes 26.05
+(2026-10-21).
+
+### Changed
+
+- Updated the engine to 7-Zip 26.06. Upstream's summary: improved support for split files created
+  by the Linux `split` utility (`file.aa`, `file.ab`, …), improved unpacking of Z archives and
+  Mach-O files, and "some bugs and vulnerabilities were fixed" — among others the CAB, MSLZ, MUB,
+  Split, PE, UDF and Z handlers and the Quantum, Shrink and Z decoders were reworked or hardened
+  against malformed archives. No extension, menu item or dialog control was added or removed.
+- The bundled assets come from the official 7-Zip 26.06 Windows release (`7z2606-x64.exe`): new
+  `7z.sfx` and `7zCon.sfx` self-extracting modules and the 26.06 help pages.
+
+### Changed in upstream sources
+
+- Upstream moved `GetNumberOfVolumes` from `SplitUtils.cpp` into `PanelSplitFile.cpp`; the
+  `SplitUtils.cpp` patch now only guards the Win32 combo-box code. All other guarded macOS patches
+  carry over unchanged ([Mac/docs/upstream-patches.md](Mac/docs/upstream-patches.md)).
+
 ## [1.2.1] — 2026-10-08
 
 7-Zip 26.04 for macOS 1.2.1: Quick Look preview fix.
@@ -196,6 +218,7 @@ First public release: a native macOS port of the 7-Zip File Manager on the 7-Zip
   behaves correctly on macOS; Windows behaviour is unchanged. See
   [Mac/docs/upstream-patches.md](Mac/docs/upstream-patches.md).
 
+[1.3.0]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.0
 [1.2.1]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.2.1
 [1.2.0]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.2.0
 [1.1.3]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.1.3
