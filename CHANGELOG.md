@@ -26,6 +26,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
     Cancel left of OK and Help as the round "?" button at the left. Options gets AppKit's tabs.
     Every control stays where the Windows layout puts it, so nothing moves out of reach.
+  - Messages and questions are Mac alerts: the app icon (a caution sign for errors and warnings)
+    beside the selectable message, the default button rightmost, centred over their window. The
+    answers, keys and Esc behaviour are unchanged.
   - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
     name and icon, unless *Full row select* is on).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create

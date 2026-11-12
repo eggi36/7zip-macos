@@ -295,6 +295,8 @@ final class WinMessageBoxWindow: NSWindow {
     let boxButtons: WinMessageBox.Buttons
     let icon: WinMessageBox.Icon
     let layout: WinMessageBoxLayout
+    /// native-look: the Mac look's alert layout (nil in Classic).
+    let macLayout: MacMessageBoxLayout?
     /// The window the box belongs to (nil only when the app shows no window).
     private(set) weak var ownerWindow: NSWindow?
     /// The push buttons, in the Windows order (Yes, No, Cancel / OK, Cancel).
@@ -311,8 +313,9 @@ final class WinMessageBoxWindow: NSWindow {
         ownerWindow = owner
         layout = WinMessageBoxLayout(text: text, caption: caption, buttonCount: buttons.results.count,
                                      hasIcon: icon != .none, customTitles: buttons.customTitles)
+        macLayout = AppLook.isMac ? MacMessageBoxLayout(text: text, titles: buttons.results.map(buttons.title(of:))) : nil
         // MB_YESNO has no Cancel: its close box is disabled (SC_CLOSE is not in its system menu).
-        super.init(contentRect: NSRect(origin: .zero, size: layout.clientSize),
+        super.init(contentRect: NSRect(origin: .zero, size: macLayout?.clientSize ?? layout.clientSize),
                    styleMask: [.titled, .closable], backing: .buffered, defer: false)
         title = caption
         isReleasedWhenClosed = false
@@ -324,7 +327,45 @@ final class WinMessageBoxWindow: NSWindow {
         standardWindowButton(.zoomButton)?.isHidden = true
     }
 
+    /// native-look: an alert as macOS draws one -- the app icon (a caution sign for an error or a
+    /// warning) at the left, the message beside it in the system font, selectable, and the buttons
+    /// at the bottom right with the default (Windows' first button) rightmost. The answers, keys,
+    /// Esc rule and copy-as-text are the Windows box's.
+    private func buildMac(_ mac: MacMessageBoxLayout) {
+        let content = RcFormView(frame: NSRect(origin: .zero, size: mac.clientSize))
+        if icon != .none {
+            let image: NSImage? = (icon == .error || icon == .warning)
+                ? NSImage(named: NSImage.cautionName) : NSApp.applicationIconImage
+            let view = NSImageView(frame: mac.iconFrame)
+            view.image = image
+            view.imageScaling = .scaleProportionallyUpOrDown
+            view.setAccessibilityElement(false)
+            content.addSubview(view)
+        }
+        let text = NSTextField(wrappingLabelWithString: message)
+        text.font = MacMessageBoxLayout.font
+        text.isSelectable = true
+        text.frame = mac.textFrame
+        content.addSubview(text)
+        for (i, answer) in boxButtons.results.enumerated() {
+            let button = NSButton(title: boxButtons.title(of: answer), target: self, action: #selector(buttonClicked(_:)))
+            button.bezelStyle = .rounded
+            button.tag = answer.rawValue
+            if i == 0 {
+                button.keyEquivalent = "\r"
+            } else if answer == .cancel || (answer == boxButtons.escapeResult && WinMessageBox.Result.customButtons.contains(answer)) {
+                button.keyEquivalent = "\u{1b}"
+            }
+            button.frame = mac.buttonFrames[i]
+            content.addSubview(button)
+            pushButtons.append(button)
+        }
+        contentView = content
+        initialFirstResponder = pushButtons.first
+    }
+
     private func build() {
+        if let macLayout { buildMac(macLayout); return }
         let content = WinMessageBoxContentView(frame: NSRect(origin: .zero, size: layout.clientSize))
         content.bandTop = layout.bandTop
         if let frame = layout.iconFrame {
@@ -385,6 +426,11 @@ final class WinMessageBoxWindow: NSWindow {
     /// The centre of the owner's screen, the whole frame (MessageBox centres on the monitor, title
     /// bar included; the owner's own position does not matter).
     private func placeOnOwnersScreen() {
+        if macLayout != nil {
+            // native-look: a Mac alert sits over the window it belongs to.
+            DialogKit.center(self, over: ownerWindow)
+            return
+        }
         guard let screen = ownerWindow?.screen ?? NSScreen.main else { return }
         let size = frame.size
         setFrameOrigin(NSPoint(x: (screen.frame.midX - size.width / 2).rounded(),
@@ -578,5 +624,57 @@ final class WinMessageBoxIconView: NSView {
             .draw(in: NSRect(x: 15, y: 8, width: 2, height: 12), angle: 90)
         Self.c(5, 5, 5).setFill()
         NSBezierPath(ovalIn: NSRect(x: 14.5, y: 22.6, width: 3, height: 3)).fill()
+    }
+}
+
+/// native-look: the Mac look's alert geometry -- a 64 pt icon 20 pt in, the message 104 pt in and
+/// wrapped to the width, regular push buttons 20 pt from the bottom right, the first (default)
+/// rightmost and the others to its left in order.
+struct MacMessageBoxLayout {
+    static let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    static let margin: CGFloat = 20
+    static let iconSize: CGFloat = 64
+    static let minWidth: CGFloat = 440
+    static let maxTextWidth: CGFloat = 520
+
+    let clientSize: NSSize
+    let iconFrame: NSRect
+    let textFrame: NSRect
+    let buttonFrames: [NSRect]
+
+    init(text: String, titles: [String]) {
+        let m = Self.margin
+        let textX = m + Self.iconSize + m
+        let probe = NSButton(title: "", target: nil, action: nil)
+        probe.bezelStyle = .rounded
+        let widths: [CGFloat] = titles.map { title in
+            probe.title = title
+            return max(88, ceil(probe.intrinsicContentSize.width) + 12)
+        }
+        let buttonHeight = ceil(probe.intrinsicContentSize.height)
+        let buttonsWidth = widths.reduce(0, +) + CGFloat(max(0, widths.count - 1)) * 12
+        // The text gets as wide as its longest line needs, between the minimum and the maximum.
+        let natural = ceil((text as NSString).boundingRect(with: NSSize(width: Self.maxTextWidth, height: .greatestFiniteMagnitude),
+                                                          options: [.usesLineFragmentOrigin],
+                                                          attributes: [.font: Self.font]).width) + 4
+        let width = max(Self.minWidth, textX + natural + m, m + buttonsWidth + m)
+        let textWidth = width - textX - m
+        let field = NSTextField(wrappingLabelWithString: text)
+        field.font = Self.font
+        field.preferredMaxLayoutWidth = textWidth
+        let textHeight = ceil(field.fittingSize.height)
+        iconFrame = NSRect(x: m, y: m, width: Self.iconSize, height: Self.iconSize)
+        textFrame = NSRect(x: textX, y: m, width: textWidth, height: textHeight)
+        let contentBottom = max(m + Self.iconSize, m + textHeight)
+        let buttonY = contentBottom + m
+        var x = width - m
+        var frames: [NSRect] = []
+        for w in widths {
+            x -= w
+            frames.append(NSRect(x: x, y: buttonY, width: w, height: buttonHeight))
+            x -= 12
+        }
+        buttonFrames = frames
+        clientSize = NSSize(width: width, height: buttonY + buttonHeight + m)
     }
 }

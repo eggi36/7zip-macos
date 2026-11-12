@@ -245,6 +245,44 @@ final class NativeLookTests: AppHostTestCase {
         }
     }
 
+    func testMacMessageBoxKeepsTheAnswersInMacOrder() throws {
+        Settings.look = .mac
+        let box = WinMessageBoxWindow(text: "Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
+                                      buttons: .yesNoCancel, icon: .question, owner: nil)
+        XCTAssertNotNil(box.macLayout)
+        XCTAssertEqual(box.pushButtons.map(\.title), ["Yes", "No", "Cancel"], "same answers")
+        XCTAssertTrue(box.defaultButtonCell === box.pushButtons.first?.cell, "Yes stays the default")
+        let xs = box.pushButtons.map(\.frame.minX)
+        XCTAssertGreaterThan(xs[0], xs[1], "the default sits rightmost")
+        XCTAssertGreaterThan(xs[1], xs[2])
+        Settings.look = .classic
+        let classic = WinMessageBoxWindow(text: "x", caption: "c", buttons: .ok, icon: .none, owner: nil)
+        XCTAssertNil(classic.macLayout)
+    }
+
+    func testRenderMacAlertsAndProgress() throws {
+        Settings.look = .mac
+        for theme in [AppTheme.light, .dark] {
+            Settings.theme = theme
+            let question = WinMessageBoxWindow(text: "Are you sure you want to delete 'notes.md'?",
+                                               caption: "Confirm File Delete", buttons: .yesNoCancel,
+                                               icon: .question, owner: nil)
+            question.orderFront(nil)
+            try writeWholeWindow(question, "alert-question-\(theme.rawValue)")
+            question.orderOut(nil)
+            let error = WinMessageBoxWindow(text: "Cannot open the file as archive:\n/Users/Shared/7-Zip Demo/presentation.key",
+                                            caption: "7-Zip", buttons: .ok, icon: .error, owner: nil)
+            error.orderFront(nil)
+            try writeWholeWindow(error, "alert-error-\(theme.rawValue)")
+            error.orderOut(nil)
+            let progress = ProgressDialog(title: Lang.text(3300, "Extracting"), showCompressionInfo: true)
+            progress.window.setContentSize(progress.window.contentMinSize)
+            progress.window.orderFront(nil)
+            try writeWholeWindow(progress.window, "progress-\(theme.rawValue)")
+            progress.window.orderOut(nil)
+        }
+    }
+
     /// The window's frame view -- title bar, toolbar and content -- at 2x.
     private func writeWholeWindow(_ window: NSWindow, _ name: String) throws {
         let frameView = try XCTUnwrap(window.contentView?.superview)
