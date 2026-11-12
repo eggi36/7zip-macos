@@ -241,8 +241,22 @@ final class NativeLookTests: AppHostTestCase {
             try writeWholeWindow(optionsWindow, "options-macos-\(theme.rawValue)")
             options.selectPage(4)
             try writeWholeWindow(optionsWindow, "options-settings-\(theme.rawValue)")
+            options.selectPage(0)                                   // System: the format icons
+            try writeWholeWindow(optionsWindow, "options-system-\(theme.rawValue)")
             ModalProbe.close(optionsWindow)
         }
+    }
+
+    func testSystemPageShowsTheBundledIconsInTheMacLook() throws {
+        guard let zip = FileTypes.all.first(where: { $0.ext == "zip" }) else { return XCTFail("no zip type") }
+        let bundled = try XCTUnwrap(Bundle.main.url(forResource: "doc-zip", withExtension: "icns"))
+        Settings.look = .mac
+        let mac = try XCTUnwrap(OptionsSystemPage.formatIcon(for: zip))
+        XCTAssertTrue(mac.representations.contains { $0 is NSBitmapImageRep && $0.pixelsWide >= 512 },
+                      "the Mac look uses doc-zip.icns (\(bundled.lastPathComponent)), not the 16 px .ico frame")
+        Settings.look = .classic
+        let classic = try XCTUnwrap(OptionsSystemPage.formatIcon(for: zip))
+        XCTAssertFalse(classic === mac, "Classic keeps the 7z.dll frame")
     }
 
     func testMacMessageBoxKeepsTheAnswersInMacOrder() throws {
