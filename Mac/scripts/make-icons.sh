@@ -1,6 +1,12 @@
 #!/bin/sh
 # make-icons.sh -- regenerate every icon asset of 7-Zip.app from the upstream Windows resources.
 #
+# native-look: the app icon and the document icons that ship (AppIcon.appiconset, doc-*.icns,
+# doc-*.imageset) now come from Mac/scripts/make-mac-icons.sh, which draws them in the macOS style.
+# Running this script brings back the enlarged Windows frames for all of them; run
+# make-mac-icons.sh afterwards to restore the shipped ones (its verify stage expects the Windows
+# frames and fails on the macOS-style files).
+#
 # The assets under Mac/Resources/Assets.xcassets and Mac/Resources/Icons are *generated*, never
 # hand-edited: run this after touching the generator or the association table and commit the
 # result.  See ai/api/icons.md for the naming scheme and the extension -> icon mapping.

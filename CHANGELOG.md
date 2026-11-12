@@ -29,6 +29,12 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - Messages and questions are Mac alerts: the app icon (a caution sign for errors and warnings)
     beside the selectable message, the default button rightmost, centred over their window. The
     answers, keys and Esc behaviour are unchanged.
+- **New app and document icons in the macOS style**, drawn for the Mac instead of enlarged from
+  the Windows pixel art: the app icon is a blue squircle with a zipped archive whose pull carries
+  the 7, and every archive type Finder shows gets a document sheet with that mark in its family's
+  colour (7z blue, ZIP amber, RAR purple, compressed tarballs green, disk images teal, packages
+  brown) and its extension. The Classic look's file list keeps 7-Zip's Windows icons.
+  `Mac/scripts/make-mac-icons.sh` regenerates them.
   - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
     name and icon, unless *Full row select* is on).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
