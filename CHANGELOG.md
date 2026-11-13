@@ -5,7 +5,7 @@ All notable changes to 7-Zip for macOS are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its own version; the engine version
 is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
-## [1.3.0] — unreleased
+## [1.3.0] — 2026-11-14
 
 7-Zip 26.06 for macOS 1.3.0: the engine updated to
 [7-Zip 26.06](https://github.com/ip7z/7zip/releases/tag/26.06) (2026-11-06), which includes 26.05
