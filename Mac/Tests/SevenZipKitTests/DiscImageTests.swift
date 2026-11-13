@@ -554,4 +554,71 @@ final class DiscImageTests: XCTestCase {
         XCTAssertEqual(UInt32(littleEndian: f1edc), edc(f1.prefix(0x808)), "Form 1 EDC")
         XCTAssertEqual(bin.suffix(audio.count), audio)
     }
+
+    // MARK: - CHD
+
+    /// A CHD v4 file around `logical`: deflated hunks, the second stored, all-zero hunks as
+    /// "mini" entries, and `metadata` (tag, text) entries chained at the end.
+    private func chd(_ logical: Data, hunkBytes: Int, metadata: [(String, String)]) -> Data {
+        var hunks = blocks(logical, hunkBytes)
+        if let last = hunks.last, last.count < hunkBytes { hunks[hunks.count - 1] = last + Data(count: hunkBytes - last.count) }
+        let mapStart = 108, dataStart = mapStart + hunks.count * 16
+        var map = Data(), body = Data()
+        for (i, hunk) in hunks.enumerated() {
+            if hunk.allSatisfy({ $0 == 0 }) {
+                map += be64(0) + be32(0) + be16(0) + Data([0, 3])
+                continue
+            }
+            let stored = i == 1
+            let packed = stored ? hunk : deflate(hunk)
+            map += be64(dataStart + body.count) + be32(0) + be16(packed.count & 0xFFFF) + Data([UInt8(packed.count >> 16), stored ? 2 : 1])
+            body += packed
+        }
+        var meta = Data()
+        let metaStart = dataStart + body.count
+        for (k, entry) in metadata.enumerated() {
+            let text = Data(entry.1.utf8) + Data([0])
+            let here = metaStart + meta.count
+            let next = k + 1 < metadata.count ? here + 16 + text.count : 0
+            meta += Data(entry.0.utf8) + be32(text.count) + be64(next) + text
+        }
+        var h = Data("MComprHD".utf8) + be32(108) + be32(4) + be32(0) + be32(1) + be32(hunks.count)
+        h += be64(logical.count) + be64(metadata.isEmpty ? 0 : metaStart) + be32(hunkBytes) + zeros(60)
+        XCTAssertEqual(h.count, 108)
+        return h + map + body + meta
+    }
+
+    /// A CD: frames of 2352 + 96 bytes, each track padded to 4 frames, audio big-endian.
+    func testChdCdWithDataAndAudio() throws {
+        func frames(_ sectors: Data, swap: Bool) -> (Data, Int) {
+            var out = Data()
+            let n = sectors.count / 2352
+            for f in 0..<n {
+                var s = sectors.subdata(in: (f * 2352)..<((f + 1) * 2352))
+                if swap { for j in stride(from: 0, to: s.count, by: 2) { s.swapAt(s.startIndex + j, s.startIndex + j + 1) } }
+                out += s + Data(count: 96)
+            }
+            let padded = (n + 3) / 4 * 4
+            out += Data(count: (padded - n) * 2448)
+            return (out, n)
+        }
+        let (dataFrames, dataCount) = frames(rawMode1(iso), swap: false)
+        let (audioFrames, audioCount) = frames(audio, swap: true)
+        let logical = dataFrames + audioFrames
+        let file = chd(logical, hunkBytes: 8 * 2448, metadata: [
+            ("CHT2", "TRACK:1 TYPE:MODE1_RAW SUBTYPE:NONE FRAMES:\(dataCount) PREGAP:0 PGTYPE:MODE1 PGSUB:RW POSTGAP:0"),
+            ("CHT2", "TRACK:2 TYPE:AUDIO SUBTYPE:NONE FRAMES:\(audioCount) PREGAP:0 PGTYPE:AUDIO PGSUB:RW POSTGAP:0"),
+        ])
+        try write(file, "arcade.chd")
+        try checkDataAndAudio(path("arcade.chd"))
+    }
+
+    /// A hard disk: no track list, one image.
+    func testChdHardDisk() throws {
+        let disk = iso + Data(count: 4096)
+        try write(chd(disk, hunkBytes: 4096, metadata: []), "disk.chd")
+        let items = try list(path("disk.chd"))
+        XCTAssertEqual(items.map(\.name), ["image.img"])
+        XCTAssertEqual(data(try extract(path("disk.chd")), "image.img"), disk)
+    }
 }

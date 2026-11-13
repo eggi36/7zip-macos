@@ -238,7 +238,7 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
   Sources.Add(CMyComPtr<IInStream>(stream));
 
   CRecordVector<UInt32> sessionTracks;    // SINF: tracks per session, in order
-  CRecordVector<CTrack> found;
+  CObjectVector<CTrack> found;
   size_t pos = 0;
   while (pos + 8 <= listSize)
   {

@@ -39,11 +39,13 @@ struct CTrack
   UInt32 UserOffset;     // where the exposed bytes start inside a sector
   UInt32 UserSize;       // exposed bytes per sector
   bool RawData;          // a data track exposed as raw sectors (.bin)
+  bool SwapAudio;        // audio stored big-endian (CHD): swapped to the WAV's little-endian
+  AString Name;          // a fixed item name (a hard-disk CHD's "image.img"), else TrackNN.ext
 
   CTrack():
       Number(0), Session(1), Audio(false), AudioKnown(false), SourceIndex(0), Offset(0),
       NumSectors(0), SectorSize(kRawSize), Stride(kRawSize),
-      UserOffset(0), UserSize(kRawSize), RawData(false) {}
+      UserOffset(0), UserSize(kRawSize), RawData(false), SwapAudio(false) {}
 
   UInt64 ExposedSize() const { return NumSectors * UserSize + (Audio ? kWavHeaderSize : 0); }
   UInt64 PackedSize() const { return NumSectors * Stride; }
@@ -60,7 +62,7 @@ class CDiscHandler:
 
 protected:
   CObjectVector< CMyComPtr<IInStream> > Sources;
-  CRecordVector<CTrack> Tracks;
+  CObjectVector<CTrack> Tracks;
   UInt64 PhySize;
   bool IsArc;
   bool Unsupported;

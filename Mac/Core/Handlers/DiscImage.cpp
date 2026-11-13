@@ -129,10 +129,33 @@ Z7_COM7F_IMF(CTrackStream::Read(void *data, UInt32 size, UInt32 *processedSize))
     pos -= kWavHeaderSize;
   }
   const UInt64 sector = pos / Track.UserSize;
-  const UInt32 within = (UInt32)(pos - sector * Track.UserSize);
+  UInt32 within = (UInt32)(pos - sector * Track.UserSize);
   UInt32 rem = Track.UserSize - within;
   if (size > rem)
     size = rem;
+  if (Track.SwapAudio)
+  {
+    // Whole 16-bit samples: from the even byte at or before `within`, at most one sector.
+    Byte buf[kRawSize];
+    const UInt32 start = within & ~(UInt32)1;
+    const UInt32 len = ((within + size + 1) & ~(UInt32)1) - start;
+    RINOK(InStream_SeekSet(Source, Track.Offset + sector * Track.Stride + Track.UserOffset + start))
+    size_t got = len;
+    RINOK(ReadStream(Source, buf, &got))
+    if (got < len)
+      memset(buf + got, 0, len - got);
+    for (UInt32 i = 0; i + 1 < len; i += 2)
+    {
+      const Byte t = buf[i];
+      buf[i] = buf[i + 1];
+      buf[i + 1] = t;
+    }
+    memcpy(data, buf + (within - start), size);
+    _virtPos += size;
+    if (processedSize)
+      *processedSize = size;
+    return S_OK;
+  }
   const UInt64 phys = Track.Offset + sector * Track.Stride + Track.UserOffset + within;
   RINOK(InStream_SeekSet(Source, phys))
   UInt32 got = 0;
@@ -352,6 +375,11 @@ Z7_COM7F_IMF(CDiscHandler::GetNumberOfItems(UInt32 *numItems))
 
 static void TrackName(const CTrack &t, unsigned index, AString &s)
 {
+  if (!t.Name.IsEmpty())
+  {
+    s = t.Name;
+    return;
+  }
   char temp[16];
   s = "Track";
   const UInt32 n = t.Number != 0 ? t.Number : (UInt32)index + 1;
