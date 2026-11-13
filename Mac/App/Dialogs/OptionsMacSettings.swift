@@ -72,10 +72,24 @@ extension OptionsSettingsPage {
 
     func relabelMacRows() {
         themeLabel.stringValue = AppTheme.labelText
+        fitThemeRow()
         for (i, theme) in AppTheme.allCases.enumerated() { themePopup.item(at: i)?.title = theme.title }
         themePopup.needsDisplay = true
         quickLookBox.title = Lang.text(PreviewLangID.checkbox, "Quick Look preview for archives")
         resetButton.title = SettingsReset.buttonTitle
+    }
+
+    /// The pop-up follows its label, 8 pt after the text, like the rows above start at the
+    /// margin: the template's 76-DLU label leaves room for a long translation, and the Mac rule
+    /// that a label left of its control hugs it (RcFormView) put a short "Theme:" far right.
+    func fitThemeRow() {
+        guard themeLabel.frame.width > 0 else { return }
+        let needed = ceil(themeLabel.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: 100_000, height: 100_000)).width
+                          ?? themeLabel.intrinsicContentSize.width)
+        var label = themeLabel.frame
+        label.size.width = needed
+        themeLabel.frame = label
+        themePopup.setFrameOrigin(NSPoint(x: label.maxX + 8, y: themePopup.frame.minY))
     }
 
     func applyMacRows() {

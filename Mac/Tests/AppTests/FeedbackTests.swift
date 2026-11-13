@@ -47,6 +47,27 @@ final class FeedbackTests: AppHostTestCase {
         XCTAssertTrue(panel.rows.contains { $0.name == "chapter.xhtml" })
     }
 
+    // MARK: - Options > Settings: the theme row starts at the margin
+
+    func testThemePopupFollowsItsLabel() throws {
+        let options = OptionsWindowController.shared
+        defer { if let w = options.window, w.isVisible { ModalProbe.close(w) } }
+        var page: OptionsSettingsPage?
+        XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { window in
+            options.selectPage(4)
+            window.contentView?.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            page = window.contentView?.subviews.compactMap { $0 as? NSTabView }.first?
+                .selectedTabViewItem?.viewController as? OptionsSettingsPage
+        })
+        let settings = try XCTUnwrap(page)
+        let label = settings.themeLabel.frame, popup = settings.themePopup.frame
+        let text = ceil(settings.themeLabel.intrinsicContentSize.width)
+        XCTAssertEqual(label.minX, settings.quickLookBox.frame.minX, accuracy: 4, "the row starts at the checkboxes' edge")
+        XCTAssertLessThanOrEqual(popup.minX - label.minX, text + 16, "the pop-up right after \"\(settings.themeLabel.stringValue)\"")
+        XCTAssertGreaterThan(popup.minX, label.minX + text, "no overlap")
+    }
+
     // MARK: - About: a build line unique to every compile
 
     func testBuildLine() {
