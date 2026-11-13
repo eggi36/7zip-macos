@@ -80,7 +80,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   sector data is read in place (the 2048 bytes of a raw Mode 1 / Mode 2 Form 1 sector; ECM
   rebuilds each sector's EDC / ECC), nothing is unpacked to disk first. An ISZ split into .i01,
   .i02 ... segments opens from its first file. The descriptor extensions can be associated with
-  7-Zip in Settings > System. Not supported: encrypted MDS 2.x and ISZ, CHD v5 and diff CHDs.
+  7-Zip in Settings > System. Quick Look previews the one-file images (NRG, CDI, CHD, CSO, CISO,
+  ZSO, ISZ, ECM); CUE, CCD, MDS and GDI keep their data in files next to them, which the
+  sandboxed preview cannot read. Not supported: encrypted MDS 2.x and ISZ, CHD v5 and diff CHDs.
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style

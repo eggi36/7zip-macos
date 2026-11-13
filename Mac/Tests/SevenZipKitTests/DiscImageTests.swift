@@ -761,4 +761,59 @@ final class DiscImageTests: XCTestCase {
         XCTAssertEqual(movie.subdata(in: 36..<40), Data("data".utf8))
         XCTAssertEqual(movie.dropFirst(44), movieRaw, "the raw sectors")
     }
+
+    // MARK: - Quick Look
+
+    /// The one-file disc images preview in Finder (the extension may read only the file itself):
+    /// a disc lists its tracks, a compressed image the files of the ISO inside.
+    func testQuickLookPreviewsOneFileImages() throws {
+        // NRG: the tracks
+        let raw = rawMode1(iso)
+        var nrg = raw + audio
+        let chunks = nrg.count
+        var dao = be32(0) + zeros(14) + Data([0, 0]) + Data([1, 2])
+        func entry(size: Int, mode: UInt8, index1: Int, end: Int) -> Data {
+            zeros(12) + be16(size) + Data([mode, 0, 0, 0]) + be64(index1) + be64(index1) + be64(end)
+        }
+        dao += entry(size: 2352, mode: 0x06, index1: 0, end: raw.count)
+        dao += entry(size: 2352, mode: 0x07, index1: raw.count, end: raw.count + audio.count)
+        nrg += Data("DAOX".utf8) + be32(dao.count) + dao + Data("END!".utf8) + be32(0)
+        nrg += Data("NER5".utf8) + be64(chunks)
+        try write(nrg, "preview.nrg")
+        let disc = ArchivePreviewBuilder.build(path: path("preview.nrg"))
+        XCTAssertEqual(disc.root.children.map(\.name).sorted(), ["Track01.iso", "Track02.wav"], "\(disc.status)")
+
+        // CSO: the ISO's own files
+        let parts = blocks(iso, 2048)
+        var body = Data(), index: [UInt32] = []
+        let start = 0x18 + (parts.count + 1) * 4
+        for part in parts {
+            index.append(UInt32(start + body.count))
+            body += deflate(part)
+        }
+        index.append(UInt32(start + body.count))
+        var cso = Data("CISO".utf8) + le32(0x18) + le64(iso.count) + le32(2048) + Data([1, 0]) + le16(0)
+        for v in index { cso += le32(Int(v)) }
+        try write(cso + body, "preview.cso")
+        let image = ArchivePreviewBuilder.build(path: path("preview.cso"))
+        XCTAssertTrue(image.root.children.contains { $0.name == "hello.txt" },
+                      "\(image.root.children.map(\.name)) \(image.status)")
+    }
+
+    /// The Quick Look extension declares the eight one-file disc types (not the ones whose data
+    /// is in a file next to the descriptor, which the sandboxed extension cannot read).
+    func testQuickLookDeclaresTheOneFileDiscTypes() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../QuickLook/Info.plist").standardizedFileURL
+        let plist = try XCTUnwrap(try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let ext = try XCTUnwrap(plist["NSExtension"] as? [String: Any])
+        let attributes = try XCTUnwrap(ext["NSExtensionAttributes"] as? [String: Any])
+        let types = try XCTUnwrap(attributes["QLSupportedContentTypes"] as? [String])
+        for e in ["nrg", "cdi", "chd", "cso", "ciso", "zso", "isz", "ecm"] {
+            XCTAssertTrue(types.contains("org.7-zip.\(e)-archive"), e)
+        }
+        for e in ["cue", "ccd", "mds", "gdi"] {
+            XCTAssertFalse(types.contains("org.7-zip.\(e)-archive"), "\(e) needs files the sandbox cannot open")
+        }
+    }
 }
