@@ -49,6 +49,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - A Finder path bar under each panel's list (*View ▸ Show / Hide Path Bar*, Option+Cmd+P): the
     folder's chain from its volume down with icons, archive folders included; a click opens that
     folder with the one you came from selected. The editable address field stays above.
+  - Form labels are right-aligned against the control they name ("Archive format:", "Update
+    mode:" ...), in every dialog and settings pane; labels above their field and label/value
+    pairs keep their place.
   - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
     window title, the window fitting each pane's height, and every change taking effect at once
     -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the

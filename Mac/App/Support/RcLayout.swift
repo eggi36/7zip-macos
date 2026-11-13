@@ -308,6 +308,7 @@ class RcFormView: NSView {
     /// none the control keeps its rect. Runs whenever the form is sized (OnSize re-places controls
     /// on their rects first) and when it is put in a window.
     func growTextIntoFreeSpace() {
+        undoMacLabelAlignment()
         // Undo the previous pass first (the text may have changed since: a language switch
         // relabels the Options pages in place), unless OnSize has re-placed the control.
         for (key, change) in grown {
@@ -381,7 +382,98 @@ class RcFormView: NSView {
                 control.font = NSFontManager.shared.convert(base, toSize: size)
             }
         }
+        applyMacLabelAlignment()
         lastSignature = textSignature()
+    }
+
+    // MARK: native-look: labels right-aligned against their control
+
+    /// What `applyMacLabelAlignment` changed: each label's frame and alignment before, its frame after.
+    private var alignedLabels: [ObjectIdentifier: (original: NSRect, applied: NSRect, alignment: NSTextAlignment)] = [:]
+
+    private func undoMacLabelAlignment() {
+        for (key, change) in alignedLabels {
+            guard let field = subviews.first(where: { ObjectIdentifier($0) == key }) as? NSTextField else { continue }
+            if field.frame == change.applied { field.frame = change.original }
+            field.alignment = change.alignment
+        }
+        alignedLabels = [:]
+    }
+
+    /// The control a label names: a pop-up, combo box, edit field or slider on the label's line
+    /// that starts just after the label's template rect -- not a control in another column, and
+    /// not the field under a label that stands above it.
+    static func labelPartner(of label: NSView, among views: [NSView]) -> NSView? {
+        let f = label.frame
+        let line = f.minY + min(f.height, RcPlace.lineHeight) / 2           // the first line's middle
+        func isInput(_ view: NSView) -> Bool {
+            view is NSPopUpButton || view is NSComboBox || view is NSSlider
+                || ((view as? NSTextField)?.isEditable ?? false)
+        }
+        func groupBox(of rect: NSRect) -> NSView? {
+            views.first { $0 is WinGroupBox && $0.frame.contains(rect) }
+        }
+        // A label with its field right under it is a label above its field.
+        let below = views.contains { other in
+            let o = other.frame
+            return other !== label && isInput(other) && o.minY >= f.maxY - 4
+                && o.minY <= f.maxY + RcPlace.lineHeight && o.minX < f.minX + 40 && o.maxX > f.minX
+        }
+        if below { return nil }
+        let box = groupBox(of: f)
+        var best: NSView?
+        for other in views where other !== label && isInput(other) {
+            let o = other.frame
+            // The nearest input right of where the label starts -- its rect may reach into it.
+            guard o.minY - 4 <= line, o.maxY + 4 >= line, o.minX >= f.minX + 8,
+                  groupBox(of: o) === box else { continue }
+            if best == nil || o.minX < best!.frame.minX { best = other }
+        }
+        return best
+    }
+
+    /// A static whose (first line of) text ends in a colon: the name of a control, not a value.
+    static func isColonLabel(_ field: NSTextField) -> Bool {
+        guard let first = field.stringValue.split(separator: "\n", omittingEmptySubsequences: false).first else { return false }
+        let text = first.trimmingCharacters(in: .whitespaces)
+        return text.hasSuffix(":") || text.hasSuffix("：")
+    }
+
+    /// A label with its value on the line under it ("Memory usage for Compressing:" over
+    /// "3048 MB / ..."): the pair reads as one block, left-aligned.
+    static func hasValueBelow(_ label: NSView, among views: [NSView]) -> Bool {
+        let f = label.frame
+        return views.contains { other in
+            guard other !== label, let field = other as? NSTextField, !field.isEditable, !field.isBezeled,
+                  !Self.isColonLabel(field) else { return false }        // the next label, not a value
+            let o = other.frame
+            return abs(o.minX - f.minX) <= 2 && o.minY >= f.maxY - 2 && o.minY <= f.maxY + RcPlace.lineHeight
+        }
+    }
+
+    /// native-look (HIG "Layout": a form's labels are right-aligned against their controls):
+    /// a static label that ends in a colon and stands left of the control it names on the same
+    /// line is set right-aligned, its right edge one gap before the control. The template keeps
+    /// the place of every control; only where the label's text sits changes. Classic: nothing.
+    func applyMacLabelAlignment() {
+        guard AppLook.isMac else { return }
+        let views = subviews.filter { !$0.isHidden }
+        var applied = alignedLabels
+        for case let field as NSTextField in views where !field.isEditable && !field.isBezeled && !field.isBordered {
+            guard field.alignment == .left || field.alignment == .natural, Self.isColonLabel(field),
+                  let partner = Self.labelPartner(of: field, among: views),
+                  !Self.hasValueBelow(field, among: views) else { continue }
+            let f = field.frame
+            let gap: CGFloat = 8
+            let maxX = partner.frame.minX - gap
+            let needed = ceil(field.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: 100_000, height: 100_000)).width ?? f.width)
+            guard maxX - f.minX >= min(needed, f.width) else { continue }
+            let r = NSRect(x: f.minX, y: f.minY, width: maxX - f.minX, height: f.height)
+            applied[ObjectIdentifier(field)] = (f, r, field.alignment)
+            field.frame = r
+            field.alignment = .right
+        }
+        alignedLabels = applied
     }
 }
 

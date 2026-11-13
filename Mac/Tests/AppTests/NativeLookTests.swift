@@ -449,6 +449,42 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
     }
 
+    // MARK: native-look: form labels
+
+    func testMacFormLabelsAlignRightAgainstTheirControl() throws {
+        func form(_ look: AppLook) -> (RcFormView, named: NSTextField, above: NSTextField, value: NSTextField) {
+            Settings.look = look
+            let form = RcFormView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+            func label(_ text: String, _ rect: NSRect) -> NSTextField {
+                let field = NSTextField(labelWithString: text)
+                field.frame = rect
+                form.addSubview(field)
+                return field
+            }
+            let named = label("Archive format:", NSRect(x: 10, y: 10, width: 120, height: 17))
+            let popup = NSPopUpButton(frame: NSRect(x: 180, y: 6, width: 150, height: 24))
+            form.addSubview(popup)
+            let above = label("Parameters:", NSRect(x: 10, y: 50, width: 300, height: 17))
+            form.addSubview(NSTextField(frame: NSRect(x: 10, y: 70, width: 300, height: 22)))
+            let value = label("Memory usage:", NSRect(x: 10, y: 120, width: 150, height: 17))
+            _ = label("2225 MB", NSRect(x: 10, y: 138, width: 150, height: 17))
+            form.addSubview(NSPopUpButton(frame: NSRect(x: 180, y: 120, width: 150, height: 24)))
+            form.growTextIntoFreeSpace()
+            return (form, named, above, value)
+        }
+        let mac = form(.mac)
+        XCTAssertEqual(mac.named.alignment, .right, "a label left of its control hugs it")
+        XCTAssertEqual(mac.named.frame.maxX, 172, accuracy: 0.5)
+        XCTAssertNotEqual(mac.above.alignment, .right, "a label above its field stays")
+        XCTAssertNotEqual(mac.value.alignment, .right, "a label over its value stays")
+        mac.0.growTextIntoFreeSpace()
+        XCTAssertEqual(mac.named.frame.maxX, 172, accuracy: 0.5, "a second pass changes nothing")
+
+        let classic = form(.classic)
+        XCTAssertNotEqual(classic.named.alignment, .right, "Classic keeps the template")
+        XCTAssertEqual(classic.named.frame.width, 120)
+    }
+
     // MARK: native-look: path bar
 
     func testMacPathBarClimbsThePath() throws {
