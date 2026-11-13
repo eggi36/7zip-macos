@@ -94,7 +94,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     Buttons Text* adds them).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
     Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
-    arrangement is saved. Up One Level can go next to Back / Forward. The View ▸ Toolbars submenu is
+    arrangement is saved. Up One Level can go next to Back / Forward. A Finder-style view switcher (Large Icons, Small Icons, List,
+    Details) can be added too; it shows and sets the focused panel's view. The View ▸ Toolbars submenu is
     gone: Customize Toolbar… adds and removes buttons, Large Buttons has no Mac counterpart, and
     Show Buttons Text is directly in the View menu.
 
@@ -107,6 +108,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - The About box shows the build: its number, when it was built and from which commit
   ("Build 402 (2026-11-13 21:50:07 1faab4b0c2)", "+" for uncommitted changes), so every compile
   can be told apart.
+- The address field has no Up button of its own any more: Up One Level is in the toolbar next to
+  Back / Forward (Backspace and Go ▸ Enclosing Folder still work).
 - The sorted column's header shows the sort direction, as in Finder (7-Zip on Windows shows none).
 - The leftovers of the Windows look are gone: the old 7-Zip logo, the Windows toolbar bitmaps, the
   `.ico` document icons and the scripts that converted them. The address bar's history list now

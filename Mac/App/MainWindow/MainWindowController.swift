@@ -229,6 +229,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.toolbarsMask = toolbarsMask
     }
 
+    /// After every event: the toolbar's view switcher shows the focused panel's mode (MacToolbar.swift).
+    func windowDidUpdate(_ notification: Notification) {
+        syncViewModeItems()
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard !isClosed else { return }
         refreshTimer?.invalidate()

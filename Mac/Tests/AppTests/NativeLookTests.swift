@@ -147,7 +147,7 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(toolbar.allowsUserCustomization, "right-click > Customize Toolbar...")
         XCTAssertTrue(toolbar.autosavesConfiguration)
         let allowed = controller.toolbarAllowedItemIdentifiers(toolbar)
-        for id in MainWindowController.macExtraItems {
+        for id in MainWindowController.macExtraItems where id != .szViewMode {   // a group, tested apart
             XCTAssertTrue(allowed.contains(id))
             let item = controller.toolbar(toolbar, itemForItemIdentifier: id, willBeInsertedIntoToolbar: false)
             XCTAssertNotNil(item?.image, "\(id.rawValue) has an SF Symbol")
@@ -160,6 +160,31 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == .szRefresh })
         controller.viewToolbarsShowButtonsText(nil)
         UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
+    }
+
+    /// The view switcher in Customize Toolbar...: four segments for 700-703, the focused panel's
+    /// mode selected, a click switching the panel, and the selection following Cmd-1 ... Cmd-4.
+    func testViewModeSwitcherInTheToolbar() throws {
+        let controller = try openWindow()
+        let toolbar = try XCTUnwrap(controller.window?.toolbar)
+        XCTAssertTrue(controller.toolbarAllowedItemIdentifiers(toolbar).contains(.szViewMode))
+        let group = try XCTUnwrap(controller.makeViewModeItem() as? NSToolbarItemGroup)
+        XCTAssertEqual(group.subitems.count, 4)
+        XCTAssertEqual(group.subitems.map(\.label), ["Large Icons", "Small Icons", "List", "Details"])
+        XCTAssertTrue(group.subitems.allSatisfy { $0.image != nil }, "an SF Symbol per segment")
+        XCTAssertEqual(group.selectionMode, .selectOne)
+        let panel = controller.focusedPanel
+        let saved = panel.listViewMode
+        defer { panel.setListViewMode(saved) }
+        panel.setListViewMode(3)
+        MainWindowController.selectViewMode(panel.listViewMode, in: [group])
+        XCTAssertEqual(group.selectedIndex, 3, "Details selected")
+        group.selectedIndex = 2
+        controller.viewModeChosen(group)
+        XCTAssertEqual(panel.listViewMode, 2, "a segment switches the panel")
+        panel.viewLargeIcons(nil)                                 // Cmd-1
+        MainWindowController.selectViewMode(panel.listViewMode, in: [group])   // what windowDidUpdate does
+        XCTAssertEqual(group.selectedIndex, 0, "the switcher follows the menu")
     }
 
     func testMacLookClickAnywhereInTheRowSelects() throws {

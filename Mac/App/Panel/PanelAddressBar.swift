@@ -1,70 +1,9 @@
-// PanelAddressBar.swift -- the panel's address band as 7zFM 26.03 draws it (Panel.cpp:440-580,
-// CreateToolbarEx + ComboBoxEx32 in a ReBar; 01 §1.2), measured on Windows 11 at 96 dpi
-// (ai/reports/recheck.md §2, recheck-data/win/fresh.txt and fresh-screen.png):
-//
-//   * the band: 24 px, white (the ReBar's band), no highlight for the active panel -- 7zFM marks
-//     the active panel only with the keyboard focus;
-//   * the Up button (ToolbarWindow32 1002, TBSTYLE_FLAT): @2,1 23 x 22, the comctl32
-//     VIEW_PARENTFOLDER bitmap (a folder with a green up arrow), flat with the toolbar's hover and
-//     pressed rectangles, disabled at the root (PanelItems.cpp:523);
-//   * a RBS_BANDBORDERS edge after it: a (180) and a (244,247,252) column at x 31 / 32, and a (220)
-//     line under it;
-//   * the combo (ComboBoxEx32 1003): from x 33 to the band's end, 24 px, a 1 px (141) border, white,
-//     the folder's 16 px icon 3 px in, the text 24 px in, a thin chevron near the right edge.
+// PanelAddressBar.swift -- the panel's address band (Panel.cpp:440-580, CreateToolbarEx +
+// ComboBoxEx32 in a ReBar; 01 §1.2): the editable address field (ComboBoxEx32 1003) across the
+// band, with the folder's icon inside and a chevron that opens the dropped list (feel3). 7zFM's Up
+// button (ToolbarWindow32 1002) is the toolbar's Up One Level next to Back / Forward here.
 
 import AppKit
-
-/// The Up button: flat, drawn here (no AppKit bezel).
-final class PanelUpButton: NSButton {
-    private var isHovered = false { didSet { if isHovered != oldValue { needsDisplay = true } } }
-    private var trackingArea: NSTrackingArea?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        isBordered = false
-        setButtonType(.momentaryChange)
-        refusesFirstResponder = true            // a toolbar button never takes the keyboard focus
-        title = ""
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    override var isFlipped: Bool { true }
-    override var intrinsicContentSize: NSSize { AppLook.upButtonRect.size }
-
-    override var isEnabled: Bool { didSet { needsDisplay = true } }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea { removeTrackingArea(trackingArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-                                  owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false }
-
-    override func draw(_ dirtyRect: NSRect) { drawMac() }
-
-    /// An SF Symbol chevron with AppKit's hover and press tints.
-    private func drawMac() {
-        let pressed = isHighlighted && isEnabled
-        if isEnabled, pressed || isHovered {
-            let path = NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6)
-            NSColor.labelColor.withAlphaComponent(pressed ? 0.16 : 0.08).setFill()
-            path.fill()
-        }
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        guard let symbol = NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) else { return }
-        MacSymbol.draw(symbol, tint: isEnabled ? .secondaryLabelColor : .tertiaryLabelColor,
-                       centeredIn: bounds)
-    }
-
-
-}
 
 /// The address combo's look: a ComboBoxEx32 border, the folder icon inside, the text 24 px in, a
 /// flat chevron. The behaviour (editing, the drop-down list) stays NSComboBox's.
