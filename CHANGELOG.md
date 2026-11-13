@@ -19,7 +19,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   name as the window title with its path below and a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. The theme follows the system's
-  Light / Dark until one is chosen. The pixel-exact copy of the Windows window ("Classic") and
+  Light / Dark until one is chosen (Options ▸ macOS ▸ Theme); this applies to everyone who kept the
+  Light default of 1.1.2–1.2.x, while an explicit choice of Light is kept. The pixel-exact copy of the Windows window ("Classic") and
   its switch in Options ▸ macOS are gone.
   - The dialogs look like Mac dialogs: the system font at its regular size, AppKit's own pop-up
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
@@ -97,6 +98,10 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
 ### Changed
 
+- The leftovers of the Windows look are gone: the old 7-Zip logo, the Windows toolbar bitmaps, the
+  `.ico` document icons and the scripts that converted them. The address bar's history list now
+  shows the system icon for an archive and highlights in the accent colour, and the selection
+  rectangle dragged over the file list is drawn as in Finder.
 - Updated the engine to 7-Zip 26.06. Upstream's summary: improved support for split files created
   by the Linux `split` utility (`file.aa`, `file.ab`, …), improved unpacking of Z archives and
   Mach-O files, and "some bugs and vulnerabilities were fixed" — among others the CAB, MSLZ, MUB,

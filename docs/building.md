@@ -7,7 +7,7 @@
 | macOS 14 (Sonoma) or newer | the app's deployment target |
 | Xcode 26 at `/Applications/Xcode.app` | every script sets `DEVELOPER_DIR=/Applications/Xcode.app` itself; change that one variable if Xcode lives elsewhere. Do not rely on `xcode-select`. |
 | [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) | `Mac/7-Zip.xcodeproj` is generated from `Mac/project.yml` and is not in git |
-| Python 3, `sips`, `iconutil` | only for regenerating icons (`Mac/scripts/make-icons.sh`); part of macOS and Xcode |
+| `iconutil` | only for regenerating icons (`Mac/scripts/make-mac-icons.sh`); part of macOS |
 
 Nothing else: no package manager, no third-party library. Builds are ad-hoc signed, so no Apple
 Developer account is needed.

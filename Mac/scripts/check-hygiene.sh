@@ -16,8 +16,7 @@
 #      sets SWIFT_TREAT_WARNINGS_AS_ERRORS: YES, SevenZipKit sets GCC_TREAT_WARNINGS_AS_ERRORS: YES
 #   4. Mac/VERSION is complete, and UPSTREAM_VERSION equals MY_VERSION in C/7zVersion.h
 #   5. CHANGELOG.md has a section for PORT_VERSION
-# Relative Markdown links and the generated icons have their own scripts (check-links.sh,
-# make-icons.sh); CI runs those next to this one.
+# Relative Markdown links have their own script (check-links.sh); CI runs it next to this one.
 # Exit: 0 clean, 1 a check failed, 2 bad usage.
 set -euo pipefail
 

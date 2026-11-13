@@ -169,123 +169,6 @@ enum WinMessageBox {
     }
 }
 
-// MARK: - geometry
-
-/// The box's client-area geometry in points (one Windows pixel each), top-left origin.
-struct WinMessageBoxLayout {
-
-    /// The text font: the dialogs' Segoe UI 9 pt stand-in (DialogMetrics.font, SF Pro 12.2).
-    static var font: NSFont { DialogMetrics.font }
-    /// Segoe UI 9 pt is about 3.5 % wider than Helvetica Neue 11 over 7zFM's messages (226 px for
-    /// "Are you sure you want to delete 'notes.md'?" against 218): widths were scaled by it so the
-    /// box had the Windows size and broke its lines where Windows does. A font wider than Segoe UI
-    /// (sffont: SF Pro 12.2, `DLU.scaleX` 1.10) is measured as it is, and the box's horizontal
-    /// metrics are stretched instead, as the dialogs' are.
-    static var segoeScale: CGFloat { DLU.scaleX > 1 ? 1 : 1.035 }
-    /// The widest line before a break (Windows px): 321 px still fits ("path"), a word that would
-    /// reach 332 px goes to the next line ("wide1").
-    static var wrapWidth: CGFloat { DLU.px(324) }
-    /// 13 px lines on Windows; a taller font (SF Pro 12.2: 11.8 + 2.6) gets its own glyph height.
-    static let lineHeight: CGFloat = max(13, ceil(font.ascender - font.descender))
-    /// The first baseline below the text's top (cap top 3 px down, cap height 8): 11, or the
-    /// font's ascender when it is taller (12 for SF Pro 12.2).
-    static let firstBaseline: CGFloat = max(11, font.ascender.rounded())
-    static let iconRect = NSRect(x: 21, y: 23, width: 32, height: 32)
-    static let iconBlock: CGFloat = 34
-    static var buttonSize: NSSize { NSSize(width: DLU.px(75), height: 23) }
-    static var buttonPitch: CGFloat { DLU.px(83) }
-    static let bandHeight: CGFloat = 42
-
-    let lines: [String]
-    let clientSize: NSSize
-    let textFrame: NSRect
-    let iconFrame: NSRect?
-    let bandTop: CGFloat
-    let buttonFrames: [NSRect]
-
-    /// The width Windows would give `s` in the message font.
-    static func width(_ s: String) -> CGFloat {
-        (s as NSString).size(withAttributes: [.font: font]).width * segoeScale
-    }
-
-    /// A custom button's width: the 75 px of MessageBox's buttons, or its title plus 2 x 12 px.
-    static func customButtonWidth(_ title: String) -> CGFloat {
-        max(buttonSize.width, ceil(width(title)) + 24)
-    }
-
-    init(text: String, caption: String, buttonCount: Int, hasIcon: Bool, customTitles: [String]? = nil) {
-        lines = Self.wrap(text, width: Self.wrapWidth)
-        let widest = lines.map(Self.width).max() ?? 0
-        let staticWidth = ceil(widest) + 2
-        let staticHeight = CGFloat(lines.count) * Self.lineHeight + 2
-        let textX: CGFloat = hasIcon ? 62 : 11
-        let rightMargin: CGFloat = hasIcon ? 28 : 30
-        let iconTaller = hasIcon && staticHeight < Self.iconBlock
-        let textY: CGFloat = iconTaller ? 23 + ceil((Self.iconBlock - staticHeight) / 2) : 23
-        let content = hasIcon ? max(staticHeight, Self.iconBlock) : staticHeight
-        bandTop = 23 + content + 21
-        let n = CGFloat(max(buttonCount, 1))
-        // The gap between two buttons (83 - 75 px); custom buttons keep it at their own widths.
-        let gap = Self.buttonPitch - Self.buttonSize.width
-        let widths: [CGFloat] = customTitles.map { $0.prefix(Int(n)).map(Self.customButtonWidth) }
-            ?? Array(repeating: Self.buttonSize.width, count: Int(n))
-        let buttonsWidth = customTitles == nil
-            ? (n * Self.buttonSize.width + (n - 1) * (gap + 0.5)).rounded()
-            : widths.reduce(0, +) + (n - 1) * gap
-        let width = max(textX + staticWidth + rightMargin,
-                        27 + buttonsWidth + 15,
-                        ceil(Self.width(caption)) + 54)
-        clientSize = NSSize(width: width, height: bandTop + Self.bandHeight)
-        // The static fills the width the box ended up with (askcancel: 243 px for a 169 px text).
-        textFrame = NSRect(x: textX, y: textY, width: width - textX - rightMargin, height: staticHeight)
-        iconFrame = hasIcon ? Self.iconRect : nil
-        let buttonY = bandTop + (iconTaller ? 10 : 9)
-        if customTitles == nil {
-            let lastX = width - 15 - Self.buttonSize.width
-            buttonFrames = (0..<Int(n)).map { i in
-                NSRect(x: lastX - CGFloat(Int(n) - 1 - i) * Self.buttonPitch, y: buttonY,
-                       width: Self.buttonSize.width, height: Self.buttonSize.height)
-            }
-        } else {
-            var x = width - 15 - buttonsWidth
-            buttonFrames = widths.map { w in
-                defer { x += w + gap }
-                return NSRect(x: x, y: buttonY, width: w, height: Self.buttonSize.height)
-            }
-        }
-    }
-
-    /// DrawText(DT_WORDBREAK | DT_EXPANDTABS) on an SS_EDITCONTROL static: "\n" ends a line, words
-    /// wrap at `width`, and a word wider than a line is broken between characters.
-    static func wrap(_ text: String, width: CGFloat) -> [String] {
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .replacingOccurrences(of: "\t", with: "        ")
-        var lines: [String] = []
-        for paragraph in normalized.components(separatedBy: "\n") {
-            var line = ""
-            for word in paragraph.components(separatedBy: " ") {
-                let candidate = line.isEmpty ? word : line + " " + word
-                if Self.width(candidate) <= width || (line.isEmpty && word.isEmpty) {
-                    line = candidate
-                    continue
-                }
-                if !line.isEmpty { lines.append(line) }
-                var rest = Substring(word)
-                while Self.width(String(rest)) > width, rest.count > 1 {
-                    var count = 1
-                    while count < rest.count, Self.width(String(rest.prefix(count + 1))) <= width { count += 1 }
-                    lines.append(String(rest.prefix(count)))
-                    rest = rest.dropFirst(count)
-                }
-                line = String(rest)
-            }
-            lines.append(line)
-        }
-        return lines
-    }
-}
-
 // MARK: - the window
 
 final class WinMessageBoxWindow: NSWindow {
@@ -294,7 +177,6 @@ final class WinMessageBoxWindow: NSWindow {
     let caption: String
     let boxButtons: WinMessageBox.Buttons
     let icon: WinMessageBox.Icon
-    let layout: WinMessageBoxLayout
     /// The alert's layout (NSAlert's metrics).
     let macLayout: MacMessageBoxLayout
     /// The window the box belongs to (nil only when the app shows no window).
@@ -311,8 +193,6 @@ final class WinMessageBoxWindow: NSWindow {
         boxButtons = buttons
         self.icon = icon
         ownerWindow = owner
-        layout = WinMessageBoxLayout(text: text, caption: caption, buttonCount: buttons.results.count,
-                                     hasIcon: icon != .none, customTitles: buttons.customTitles)
         macLayout = MacMessageBoxLayout(text: text, titles: buttons.results.map(buttons.title(of:)))
         // MB_YESNO has no Cancel: its close box is disabled (SC_CLOSE is not in its system menu).
         // native-look: an alert has no visible title bar (NSAlert: titled, full-size content, the

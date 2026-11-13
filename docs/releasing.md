@@ -186,8 +186,7 @@ When upstream publishes, say, 7-Zip 26.04 after port 1.0.0:
 - **Hygiene** (`Mac/scripts/check-hygiene.sh`, runnable locally): no committed screenshots, no
   personal `/Users/<name>` paths, warnings-as-errors still set for every port target and no warning
   in the port's code in the build logs, `Mac/VERSION` consistent with the engine, a CHANGELOG section
-  for the version. Next to it CI runs `check-links.sh` and `make-icons.sh` (the regenerated icons
-  must equal the committed ones).
+  for the version. Next to it CI runs `check-links.sh`.
 - **App-hosted tests** are not in CI: on the hosted runner's 1024 x 768 session they failed for
   reasons of the runner, not the app ([testing.md](testing.md#why-the-app-hosted-tests-do-not-run-on-github)).
   Run `Mac/scripts/test.sh -H` locally.

@@ -88,7 +88,7 @@ final class NativeLookTests: AppHostTestCase {
         }
         // the same selectors as the Classic buttons
         for item in toolbar.items {
-            guard let spec = MainWindowController.toolbarSpec(item.itemIdentifier, large: false) else { continue }
+            guard let spec = MainWindowController.toolbarSpec(item.itemIdentifier) else { continue }
             XCTAssertEqual(item.action, spec.action, item.itemIdentifier.rawValue)
             XCTAssertNotNil(item.image, "\(item.itemIdentifier.rawValue) has an SF Symbol")
         }
@@ -313,22 +313,17 @@ final class NativeLookTests: AppHostTestCase {
 
     func testRenderMacQuickLookPreview() throws {
         try SZCodecs.loadCodecs()
-        let saved = PreviewMetrics.isMac
-        defer { PreviewMetrics.isMac = saved }
-        for (isMac, name) in [(true, "mac")] {
-            PreviewMetrics.isMac = isMac
-            let url = URL(fileURLWithPath: TestPaths.fixture("test.7z"))
-            let preview = ArchivePreviewBuilder.build(path: url.path)
-            let view = ArchivePreviewView(frame: NSRect(x: 0, y: 0, width: 640, height: 300))
-            let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
-            window.contentView = view
-            view.show(preview, fileURL: url)
-            XCTAssertEqual(view.outlineView.rowHeight, isMac ? 22 : 19)
-            XCTAssertEqual(view.outlineView.usesAlternatingRowBackgroundColors, isMac)
-            window.orderFront(nil)
-            try writeWholeWindow(window, "quicklook-\(name)")
-            window.orderOut(nil)
-        }
+        let url = URL(fileURLWithPath: TestPaths.fixture("test.7z"))
+        let preview = ArchivePreviewBuilder.build(path: url.path)
+        let view = ArchivePreviewView(frame: NSRect(x: 0, y: 0, width: 640, height: 300))
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = view
+        view.show(preview, fileURL: url)
+        XCTAssertEqual(view.outlineView.rowHeight, 22)
+        XCTAssertTrue(view.outlineView.usesAlternatingRowBackgroundColors)
+        window.orderFront(nil)
+        try writeWholeWindow(window, "quicklook-mac")
+        window.orderOut(nil)
     }
 
     // MARK: native-look: Mac menus
@@ -433,7 +428,7 @@ final class NativeLookTests: AppHostTestCase {
     // MARK: native-look: path bar
 
     func testMacPathBarClimbsThePath() throws {
-        XCTAssertEqual(MacPathBar.parts(of: "/Users/a/b"), ["/", "/Users", "/Users/a", "/Users/a/b"])
+        XCTAssertEqual(MacPathBar.parts(of: "/Users/me/b"), ["/", "/Users", "/Users/me", "/Users/me/b"])
         XCTAssertEqual(MacPathBar.parts(of: "/Volumes/Disk/x"), ["/Volumes/Disk", "/Volumes/Disk/x"])
         XCTAssertEqual(MacPathBar.parts(of: ""), [])
         defer { Settings.removeKey(MacPathBar.key) }
@@ -667,11 +662,11 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertLessThan(ys[1], ys[2])
         XCTAssertTrue(box.styleMask.contains(.fullSizeContentView), "no visible title bar")
         XCTAssertEqual(box.titleVisibility, .hidden)
-        let two = WinMessageBoxWindow(text: "Cannot open the file as archive\n/Users/demo/Report.pdf", caption: "7-Zip",
+        let two = WinMessageBoxWindow(text: "Cannot open the file as archive\n/Users/me/Report.pdf", caption: "7-Zip",
                                       buttons: .okCancel, icon: .error, owner: nil)
         let twoLayout = two.macLayout
         XCTAssertEqual(twoLayout.messageText, "Cannot open the file as archive")
-        XCTAssertEqual(twoLayout.informativeText, "/Users/demo/Report.pdf")
+        XCTAssertEqual(twoLayout.informativeText, "/Users/me/Report.pdf")
         XCTAssertFalse(twoLayout.stacksButtons)
         XCTAssertGreaterThan(two.pushButtons[0].frame.minX, two.pushButtons[1].frame.minX, "the default sits rightmost")
         XCTAssertEqual(two.pushButtons[0].frame.width, two.pushButtons[1].frame.width, "equal widths")

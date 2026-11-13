@@ -282,16 +282,22 @@ final class PanelTableView: NSTableView {
         return result
     }
 
-    /// The dotted marquee (DrawFocusRect), drawn over the rows while the button is held.
+    /// The marquee, drawn over the rows while the button is held: a translucent grey fill with a
+    /// hairline border, as in Finder.
     private final class RubberBandView: NSView {
         override func draw(_ dirtyRect: NSRect) {
-            PanelSelectionStyle.drawFocusRectangle(bounds, onHighlight: false)
+            NSColor.labelColor.withAlphaComponent(0.1).setFill()
+            bounds.fill()
+            NSColor.labelColor.withAlphaComponent(0.35).setStroke()
+            let path = NSBezierPath(rect: bounds.insetBy(dx: 0.5, dy: 0.5))
+            path.lineWidth = 1
+            path.stroke()
         }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 
     /// The marquee: a click on the background clears the selection (Cmd / Shift keep it), a drag
-    /// past SM_CXDRAG / SM_CYDRAG (4 px) draws the dotted rectangle and selects the rows it meets,
+    /// past SM_CXDRAG / SM_CYDRAG (4 px) draws the rectangle and selects the rows it meets,
     /// live; Cmd toggles them against the previous selection (Ctrl on Windows), Shift adds them.
     /// The list scrolls when the pointer leaves it.
     private func trackRubberBand(from start: NSPoint, event: NSEvent) {

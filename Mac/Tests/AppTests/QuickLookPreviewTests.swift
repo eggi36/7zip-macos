@@ -4,7 +4,7 @@
 // the launch-time election.
 //
 // The renders are written to Mac/build/screenshots/quicklook-*.png (light and dark) and attached to
-// the result. They use the app's own icons (the host bundle carries the fm-*.ico frames), so they
+// the result. They use the app's own icon code, so they
 // show exactly what the extension draws. PlugInKit is never touched: every pluginkit call goes
 // through `FinderExtensionControl.runner`, replaced here.
 
@@ -73,7 +73,7 @@ final class QuickLookPreviewTests: AppHostTestCase {
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         let appearance = view.window?.appearance ?? NSApp.effectiveAppearance
         appearance.performAsCurrentDrawingAppearance {
-            ctx.setFillColor(WinChrome.window.cgColor)
+            ctx.setFillColor(NSColor.textBackgroundColor.cgColor)
         }
         ctx.fill(CGRect(x: 0, y: 0, width: size.width * scale, height: size.height * scale))
         var parts: [NSView] = [view.summaryField, view.noticeIcon, view.noticeField, view.hairline]

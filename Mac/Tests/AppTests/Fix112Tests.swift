@@ -3,7 +3,7 @@
 //   1. a header click sorts whatever settings were saved: with Show ".." on, every folder that
 //      implements IFolderCompare (the file system, every archive) dropped the click;
 //   2. Options > macOS > Reset All Settings (the decision, the wipe, nothing saved afterwards);
-//   3. the theme defaults to Light.
+//   3. the theme defaults to System (Light in 1.1.2-1.2.x).
 
 import AppKit
 import SevenZipKit
@@ -278,7 +278,7 @@ final class Fix112Tests: AppHostTestCase {
         // the app's own named domain has no such layer.)
         let kept: Set<String> = Set(saved.keys.filter(SettingsReset.isPreserved)).union(["FM.FirstLaunchIntegration"])
         XCTAssertEqual(Set(onDiskDomain().keys), kept, "only the preserved keys are left")
-        XCTAssertNil(onDiskDomain()["FM.Theme"], "the theme is back at its default (Light)")
+        XCTAssertNil(onDiskDomain()["FM.Theme"], "the theme is back at its default (System)")
         XCTAssertTrue(SZSettings.writesSuspended)
 
         // What the quitting instance does next must not reach the domain.

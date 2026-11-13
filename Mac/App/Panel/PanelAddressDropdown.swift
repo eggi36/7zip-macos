@@ -88,7 +88,6 @@ extension AddressDropdown {
             var isDirectory: ObjCBool = false
             let path = entry.path.count > 1 && entry.path.hasSuffix("/") ? String(entry.path.dropLast()) : entry.path
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
-                if !isDirectory.boolValue, let archive = PanelArchiveIcons.icon(forName: path, large: false) { return archive }
                 return sized(NSWorkspace.shared.icon(forFile: path))
             }
             return sized(Icons.folder)

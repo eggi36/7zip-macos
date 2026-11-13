@@ -172,7 +172,7 @@ extension MainWindowController: NSToolbarDelegate {
         if let extra = Self.macExtraSpec(itemIdentifier) {
             (label, action) = extra
             item.isNavigational = itemIdentifier == .szBack || itemIdentifier == .szForward
-        } else if let spec = Self.toolbarSpec(itemIdentifier, large: false) {
+        } else if let spec = Self.toolbarSpec(itemIdentifier) {
             (label, action) = (spec.label, spec.action)
         } else {
             return nil

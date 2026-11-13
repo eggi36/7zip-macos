@@ -330,17 +330,15 @@ final class NavGapsTests: AppHostTestCase {
         _ = attach(try XCTUnwrap(controller.window), "navgaps-02-status-sections")
     }
 
-    /// The 7-Zip toolbar bitmaps, large and small; no commands when both toolbars are off; AppKit's thin splitter.
+    /// Every toolbar command has its symbol; no commands when both toolbars are off; AppKit's thin splitter.
     func testToolbarBitmapsAndVisibility() throws {
         let savedMask = Settings.toolbarsMask
         defer { Settings.toolbarsMask = savedMask }
         Settings.toolbarsMask = 0xF
         let controller = makeWindow()
+        // Every command has its SF Symbol.
         for id in [NSToolbarItem.Identifier.szAdd, .szExtract, .szTest, .szCopy, .szMove, .szDelete, .szInfo] {
-            let large = try XCTUnwrap(MainWindowController.toolbarBitmap(id, large: true), "\(id)")
-            let small = try XCTUnwrap(MainWindowController.toolbarBitmap(id, large: false), "\(id)")
-            XCTAssertEqual(large.size, NSSize(width: 48, height: 36))
-            XCTAssertEqual(small.size, NSSize(width: 24, height: 24))
+            XCTAssertNotNil(MainWindowController.macToolbarSymbol(id), "\(id)")
         }
         // Both logical toolbars off: no command in the window's toolbar; one back on: its commands.
         controller.window?.contentView?.layoutSubtreeIfNeeded()

@@ -4,22 +4,20 @@
 //   7z · LZMA2:12 · Solid · Folders: 2 · Files: 4 · 3 043 -> 296 bytes (10%)   the summary line
 //   (!) ...and 12 345 more -- open in 7-Zip                                  a note, when needed
 //   ---------------------------------------------------------------------- hairline
-//   | Name                    |      Size | Packed Size | Modified |          SysHeader32, 24 px
-//   | > [] sub                |     3 010 |             | 2024-... |          rows 19 px, 16 px icons
+//   | Name                    |      Size | Packed Size | Modified |          the system header
+//   | > [] sub                |     3 010 |             | 2024-... |          rows 22 pt, 16 pt icons
 //
 // Quick Look's own title bar already names the file and offers "Open with 7-Zip", so the preview
 // has no title, icon or button of its own (qlfix): one summary line in the terms of 7zFM's
 // Properties (01 §3.11) on the list's own background, a note line when there is something to say,
 // a hairline, then the list.
 //
-// The list is the panel's Details view in miniature (01 §3.2 / §3.12, reports/listfeel.md): the
-// same 19 pt rows and 24 pt header, the same font (SF Pro 12.2, `ListFontChoice`; tabular digits
-// in the number and time columns), the same cell text (`Formatting.size`, `Formatting.displayName`,
-// the engine's ConvertPropertyToString2 for times), the same icons (`PanelArchiveIcons`' pixel-
-// sharp 16 px frames for the extensions 7-Zip registers, `Icons` by extension for the others), the
-// same colours (`WinChrome`) and the Windows 11 selection fill (COLOR_HIGHLIGHT 0,120,212 with
-// white text, reports/selcolors.md). The archive's folders open as an outline -- the one thing the
-// panel does differently (it enters a folder instead), because a preview cannot navigate.
+// The list is the panel's Details view in miniature (01 §3.2 / §3.12): the system font, header,
+// stripes and selection, the same cell text (`Formatting.size`, `Formatting.displayName`, the
+// engine's ConvertPropertyToString2 for times; tabular digits in the number and time columns) and
+// the system's file icons by extension (`Icons`). The archive's folders open as an outline -- the
+// one thing the panel does differently (it enters a folder instead), because a preview cannot
+// navigate.
 //
 // Light and dark: the view follows the app's theme when the app has pushed it
 // (`QuickLookPreferences`), else the system's appearance. Every colour is dynamic.
@@ -37,23 +35,20 @@ import SevenZipKit
 
 /// Geometry of the preview (the panel's, PanelMetrics: rows 19, header 24, icon 16 at x 4).
 enum PreviewMetrics {
-    /// The list draws with AppKit's metrics, font, header, selection, stripes and the system's file
-    /// icons, as the app's file list does. (The Windows-style list is kept behind `false` for the
-    /// render tests that compare the two.)
-    static var isMac = true
-
-    static var rowHeight: CGFloat { isMac ? 22 : 19 }
-    static var headerHeight: CGFloat { isMac ? 28 : 24 }
+    /// AppKit's metrics, font, header, selection, stripes and the system's file icons, as the
+    /// app's file list draws them.
+    static let rowHeight: CGFloat = 22
+    static let headerHeight: CGFloat = 28
     static let iconSize: CGFloat = 16
     static let subitemPadding: CGFloat = 6
     static let bandPadding: CGFloat = 12
     static let summaryRowHeight: CGFloat = 17
     static let minimumColumnWidth: CGFloat = 100
 
-    static var font: NSFont { isMac ? NSFont.systemFont(ofSize: NSFont.systemFontSize) : ListFontChoice.current }
+    static var font: NSFont { NSFont.systemFont(ofSize: NSFont.systemFontSize) }
     /// The list's background and text: the system's in the Mac look, Windows' in Classic.
-    static var background: NSColor { isMac ? .textBackgroundColor : WinChrome.window }
-    static var text: NSColor { isMac ? .labelColor : WinChrome.text }
+    static var background: NSColor { .textBackgroundColor }
+    static var text: NSColor { .labelColor }
     static var digitsFont: NSFont { ListFontChoice.withTabularDigits(font) }
     static var boldFont: NSFont { NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
 
@@ -209,7 +204,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
     let noticeIcon = NSImageView()
     let noticeField = NSTextField(wrappingLabelWithString: "")
     /// The hairline between the summary and the header (the header's own divider grey).
-    let hairline = PreviewFillView(color: PreviewHeaderCell.divider)
+    let hairline = PreviewFillView(color: .separatorColor)
     let outlineView = PreviewOutlineView()
     let scrollView = NSScrollView()
 
@@ -236,7 +231,7 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         addSubview(scrollView)
 
         summaryField.font = PreviewMetrics.digitsFont
-        summaryField.textColor = PreviewMetrics.isMac ? .secondaryLabelColor : WinChrome.text
+        summaryField.textColor = .secondaryLabelColor
         summaryField.lineBreakMode = .byTruncatingTail
         summaryField.cell?.truncatesLastVisibleLine = true
         summaryField.setAccessibilityIdentifier("quickLookSummary")
@@ -252,15 +247,13 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
     }
 
     private func configureOutline() {
-        let isMac = PreviewMetrics.isMac
-        outlineView.headerView = isMac ? NSTableHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
-                                       : PreviewHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
+        outlineView.headerView = NSTableHeaderView(frame: NSRect(x: 0, y: 0, width: 100, height: PreviewMetrics.headerHeight))
         outlineView.rowHeight = PreviewMetrics.rowHeight
         outlineView.rowSizeStyle = .custom
         outlineView.intercellSpacing = NSSize(width: 0, height: 0)
         outlineView.backgroundColor = PreviewMetrics.background
         outlineView.gridStyleMask = []
-        outlineView.usesAlternatingRowBackgroundColors = isMac
+        outlineView.usesAlternatingRowBackgroundColors = true
         outlineView.style = .plain
         outlineView.indentationPerLevel = 16
         outlineView.autoresizesOutlineColumn = false
@@ -272,14 +265,8 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         outlineView.setAccessibilityIdentifier("quickLookList")
         for column in Column.allCases {
             let tableColumn = NSTableColumn(identifier: column.identifier)
-            if isMac {
-                tableColumn.headerCell.stringValue = column.title
-                tableColumn.headerCell.alignment = column.alignment
-            } else {
-                let header = PreviewHeaderCell(textCell: column.title)
-                header.alignment = column.alignment
-                tableColumn.headerCell = header
-            }
+            tableColumn.headerCell.stringValue = column.title
+            tableColumn.headerCell.alignment = column.alignment
             tableColumn.title = column.title
             tableColumn.minWidth = 24
             tableColumn.maxWidth = 2000
@@ -436,14 +423,10 @@ final class ArchivePreviewView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         return cell
     }
 
-    /// PanelIcons' rule for an archive item (no real icons inside an archive): 7-Zip's own 16 px
-    /// frame for the extensions it registers, the system's icon by extension otherwise, the folder
-    /// icon for folders.
+    /// An archive item's icon (there are no real ones inside an archive): the system's icon by
+    /// extension, the folder icon for folders, as the panel shows them.
     static func icon(for node: ArchivePreviewNode) -> NSImage {
-        if node.isDirectory { return Icons.folder }
-        if PreviewMetrics.isMac { return Icons.icon(forName: node.name, isDirectory: false) }   // native-look
-        return PanelArchiveIcons.icon(forName: node.name, large: false)
-            ?? Icons.icon(forName: node.name, isDirectory: false)
+        node.isDirectory ? Icons.folder : Icons.icon(forName: node.name, isDirectory: false)
     }
 }
 
@@ -470,64 +453,8 @@ final class PreviewOutlineView: NSOutlineView {
     override var acceptsFirstResponder: Bool { true }
 }
 
-/// The header (SysHeader32 with the list's font, 24 pt), as PanelHeaderCell draws it.
-final class PreviewHeaderView: NSTableHeaderView {
-    override func draw(_ dirtyRect: NSRect) {
-        // Bounds, not dirtyRect: the view does not clip to its bounds (see the file comment).
-        WinChrome.window.setFill()
-        bounds.fill()
-        super.draw(dirtyRect)
-        PreviewHeaderCell.bottomLine.setFill()
-        NSRect(x: bounds.minX, y: bounds.maxY - 1, width: bounds.width, height: 1).fill()
-    }
-}
-
-/// A header item: the title in the list font, 6 pt from the edge it is aligned to, its baseline
-/// 16 pt down the 24 pt header, a 1 px divider at the right edge (PanelHeaderCell, recheck §2).
-/// No stored references (NSCell copies bitwise, see `CellCopy`): the font and colours are static.
-final class PreviewHeaderCell: NSTableHeaderCell {
-    static let divider = WinChrome.dynamic(WinChrome.gray(229), .separatorColor)
-    static let bottomLine = WinChrome.dynamic(WinChrome.gray(229), .separatorColor)
-
-    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        WinChrome.window.setFill()
-        cellFrame.fill()
-        Self.divider.setFill()
-        NSRect(x: cellFrame.maxX - 1, y: cellFrame.minY, width: 1, height: cellFrame.height).fill()
-        drawInterior(withFrame: cellFrame, in: controlView)
-    }
-
-    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
-        let font = PreviewMetrics.font
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = alignment
-        paragraph.lineBreakMode = .byTruncatingTail
-        let text = NSAttributedString(string: stringValue, attributes: [
-            .font: font, .foregroundColor: WinChrome.text, .paragraphStyle: paragraph,
-        ])
-        let inset = PreviewMetrics.subitemPadding
-        let rect = NSRect(x: cellFrame.minX + inset, y: cellFrame.minY, width: max(0, cellFrame.width - 2 * inset - 1),
-                          height: cellFrame.height)
-        // Baseline 16 pt down the 24 pt header (flipped header view).
-        let baseline: CGFloat = 16
-        let origin = NSPoint(x: rect.minX, y: rect.minY + baseline - font.ascender)
-        text.draw(with: NSRect(origin: origin, size: NSSize(width: rect.width, height: ceil(font.ascender - font.descender))),
-                  options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
-    }
-}
-
-/// The selection as the Windows 11 list draws it: COLOR_HIGHLIGHT (0,120,212), white text
-/// (PanelSelectionStyle.highlight / highlightText, reports/selcolors.md).
+/// A row: AppKit's selection; the cells turn their text white on it.
 final class PreviewRowView: NSTableRowView {
-    static let highlight = NSColor(srgbRed: 0, green: 120 / 255, blue: 212 / 255, alpha: 1)
-
-    override func drawSelection(in dirtyRect: NSRect) {
-        if PreviewMetrics.isMac { super.drawSelection(in: dirtyRect); return }      // native-look
-        guard selectionHighlightStyle != .none else { return }
-        Self.highlight.setFill()
-        bounds.fill()
-    }
-
     override var interiorBackgroundStyle: NSView.BackgroundStyle { isSelected ? .emphasized : .normal }
 }
 
