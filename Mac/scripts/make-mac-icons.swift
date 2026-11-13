@@ -7,8 +7,8 @@
 // Draws everything with Core Graphics -- no SF Symbols (Apple's licence keeps them out of app
 // icons) and no third-party art:
 //
-//   * the app icon: a light macOS squircle with the archive icons' grey zipper and "7-Zip" in blue
-//     (the zipper alone at 16 and 32 px);
+//   * the app icon: a light macOS squircle with the archive icons' grey zipper, its pull in the
+//     7-Zip blue -- no lettering, as the HIG asks of app icons;
 //   * one document icon per format: macOS's own archive icon (`UTType.archive`, the grey sheet with
 //     the zipper that Finder shows for compressed files) with the extension under the zipper in
 //     the grey, size and place of the label on macOS's ZIP icon (measured: caps 84 of 1024 units,
@@ -54,10 +54,11 @@ func render(_ pixels: Int, _ draw: (CGFloat) -> Void) -> Data {
 
 /// macOS-style zipper (as on the system's archive icon): a capsule pull with a round hole, then
 /// alternating rounded teeth under it. `k` scales the 1024-unit design.
-func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColor, hole: NSColor, teeth: Int) {
+func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColor, hole: NSColor, teeth: Int,
+                      pullColor: NSColor? = nil) {
     let pullW = 150 * k, pullH = 300 * k
     let pull = NSRect(x: cx - pullW / 2, y: top - pullH, width: pullW, height: pullH)
-    color.setFill()
+    (pullColor ?? color).setFill()
     NSBezierPath(roundedRect: pull, xRadius: pullW / 2, yRadius: pullW / 2).fill()
     hole.setFill()
     let d = pullW * 0.42
@@ -72,9 +73,9 @@ func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColo
     }
 }
 
-/// The app icon (the user's choice, variant A): a light tile like Apple's utilities, the grey
-/// zipper of the archive icons, "7-Zip" in blue under it; at 16 and 32 px the zipper alone,
-/// larger, since the name could not be read.
+/// The app icon (the user's choice, variant A, without the "7-Zip" lettering the HIG advises
+/// against): a light tile like Apple's utilities and the grey zipper of the archive icons, centred,
+/// with its pull in the 7-Zip blue so it is not mistaken for Archive Utility.
 func drawAppIcon(_ pixels: CGFloat) {
     // Big Sur grid: an 824-unit squircle in the 1024 canvas, with the system's soft shadow.
     let body = NSRect(x: 100, y: 100, width: 824, height: 824)
@@ -92,16 +93,9 @@ func drawAppIcon(_ pixels: CGFloat) {
     rgb(0xD0D4DA).setStroke()
     squircle.lineWidth = pixels <= 32 ? 12 : 3
     squircle.stroke()
-
-    if pixels <= 32 {
-        drawSystemZipper(cx: 512, top: 860, scale: 1.05, color: rgb(0x8E9198), hole: rgb(0xF4F5F7), teeth: 4)
-        return
-    }
-    drawSystemZipper(cx: 512, top: 850, scale: 0.8, color: rgb(0x9C9FA6), hole: rgb(0xF4F5F7), teeth: 4)
-    let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 140, weight: .bold),
-                                                     .foregroundColor: rgb(0x2A63E6)]
-    let width = ("7-Zip" as NSString).size(withAttributes: attributes).width
-    ("7-Zip" as NSString).draw(at: NSPoint(x: 512 - width / 2, y: 150), withAttributes: attributes)
+    // The zipper is 617 units tall at scale 1 (pull 300, gap 60, four teeth); centred at 1.05.
+    drawSystemZipper(cx: 512, top: 836, scale: 1.05, color: rgb(0x9C9FA6), hole: rgb(0xF4F5F7), teeth: 4,
+                     pullColor: rgb(0x2A63E6))
 }
 
 // MARK: - document icons

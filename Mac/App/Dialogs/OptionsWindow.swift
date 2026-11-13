@@ -64,7 +64,7 @@ class OptionsPageBase: NSViewController, OptionsPage {
     func changed() {
         guard !initMode else { return }
         wasChanged = true
-        owner?.pageDidChange()
+        owner?.pageControlDidChange()
     }
 
     func clearChanged() { wasChanged = false }
@@ -180,7 +180,7 @@ enum OptionsUI {
 
 // MARK: - The window
 
-final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTabViewDelegate {
+final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTabViewDelegate, NSToolbarDelegate {
 
     /// native-look: rebuilt when the look changed since it was built and it is not on screen.
     static var shared: OptionsWindowController {
@@ -199,11 +199,11 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     // a wider dialog font keeps Windows' proportions; at scale 1 they are the pixels above.
     static var pageWidth: CGFloat { DLU.x(316) }
     static var clientSize: NSSize {
-        // native-look: AppKit's bezel tab view needs a margin around the page.
-        AppLook.isMac ? NSSize(width: pageWidth + 44, height: 590) : NSSize(width: pageWidth + 20, height: 550)
+        // native-look: a Settings window -- the page with a 20 pt margin and a strip for Help.
+        AppLook.isMac ? NSSize(width: pageWidth + 40, height: 481 + 10 + 44) : NSSize(width: pageWidth + 20, height: 550)
     }
-    /// native-look: the Mac look's NSTabView (tabs on top, bezel) holding the pages.
-    static var macTabViewRect: NSRect { NSRect(x: 12, y: 10, width: pageWidth + 20, height: 528) }
+    /// native-look: the Mac look's page area (no tabs; the toolbar switches the pages).
+    static var macPageRect: NSRect { NSRect(x: 20, y: 10, width: pageWidth, height: 481) }
     static var tabControlRect: NSRect { NSRect(x: 6, y: 7, width: pageWidth + 8, height: 507) }
     static var pageRect: NSRect { NSRect(x: 10, y: 29, width: pageWidth, height: 481) }
     static var pageSize: NSSize { pageRect.size }
@@ -223,6 +223,19 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     static var applyRect: NSRect { AppLook.isMac ? buttonRect(2) : buttonRect(1) }       // ID_APPLY_NOW 12321
     static var helpRect: NSRect { buttonRect(0) }                                        // IDHELP
 
+    /// native-look: the toolbar symbol of each page (System Settings style pane switcher).
+    private static func macSymbol(_ page: OptionsPageBase) -> String {
+        switch page.pageID {
+        case 2200: return "archivebox"                          // IDD_SYSTEM: file associations
+        case 2300: return "contextualmenu.and.cursorarrow"      // IDD_MENU: the "7-Zip" context menu
+        case 2400: return "folder"                              // IDD_FOLDERS
+        case 2103: return "square.and.pencil"                   // IDD_EDIT
+        case 2500: return "gearshape"                           // IDD_SETTINGS
+        case 2101: return "globe"                               // IDD_LANG
+        default: return "paintpalette"                          // macOS page
+        }
+    }
+
     private let tabView = NSTabView()
     private let tabControl = OptionsTabControl(frame: OptionsWindowController.tabControlRect)
     private var pages: [OptionsPageBase] = []
@@ -234,8 +247,9 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     init() {
         // Not resizable: a property sheet has a fixed frame (user finding 14).
+        // native-look: a Settings window can be minimised (HIG "Settings").
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: Self.clientSize),
-                              styleMask: [.titled, .closable],
+                              styleMask: AppLook.isMac ? [.titled, .closable, .miniaturizable] : [.titled, .closable],
                               backing: .buffered, defer: false)
         window.title = Lang.text(2100, "Options")     // IDS_OPTIONS 2100
         if !AppLook.isMac { window.backgroundColor = WinChrome.face }   // COLOR_BTNFACE (recheck §2); native-look: AppKit's
@@ -282,14 +296,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             OptionsLanguagePage(),    // IDD_LANG 2101
             OptionsMacPage(),         // macOS addition (theme): Theme, Show grid lines
         ]
-        if look == .mac {
-            tabView.tabViewType = .topTabsBezelBorder
-            tabView.frame = Self.macTabViewRect
-        } else {
-            tabView.tabViewType = .noTabsNoBorder
-            tabView.drawsBackground = false
-            tabView.frame = Self.pageRect
-        }
+        tabView.tabViewType = .noTabsNoBorder
+        tabView.drawsBackground = false
+        // native-look: no tab strip; the window's toolbar switches the pages.
+        tabView.frame = look == .mac ? Self.macPageRect : Self.pageRect
         for page in pages {
             page.owner = self
             let item = NSTabViewItem(viewController: page)
@@ -311,25 +321,132 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         cancelButton.keyEquivalent = "\u{1b}"
         applyButton.isEnabled = false
 
-        if look != .mac { content.addSubview(tabControl) }
-        content.addSubview(tabView)
-        for (button, rect) in [(okButton, Self.okRect), (cancelButton, Self.cancelRect),
-                               (applyButton, Self.applyRect), (helpButton, Self.helpRect)] {
-            content.addSubview(button)
-            RcPlace.button(button, rect)
-        }
         if look == .mac {
-            helpButton.setAccessibilityLabel(helpButton.title)
-            helpButton.toolTip = helpButton.title
-            helpButton.title = ""
-            helpButton.bezelStyle = .helpButton
-            let size = helpButton.intrinsicContentSize
-            helpButton.frame = NSRect(x: 20, y: Self.okRect.midY - size.height / 2, width: size.width, height: size.height)
+            buildMacChrome(content)
+        } else {
+            content.addSubview(tabControl)
+            content.addSubview(tabView)
+            for (button, rect) in [(okButton, Self.okRect), (cancelButton, Self.cancelRect),
+                                   (applyButton, Self.applyRect), (helpButton, Self.helpRect)] {
+                content.addSubview(button)
+                RcPlace.button(button, rect)
+            }
         }
         window.contentView = content
         window.setContentSize(Self.clientSize)
         window.contentMinSize = Self.clientSize
         window.contentMaxSize = Self.clientSize
+    }
+
+    // MARK: native-look: a Mac Settings window
+    //
+    // HIG "Settings": a toolbar of panes, the window title is the pane's name, and a change takes
+    // effect at once -- no OK, Cancel or Apply. The pages are the same; only the commit differs:
+    // every changed() applies the page right away (text fields when their editing ends), and a
+    // page that refuses its value (OnApply -> PSNRET_INVALID) stays on screen with its message.
+
+    private func buildMacChrome(_ content: NSView) {
+        guard let window else { return }
+        content.addSubview(tabView)
+        content.addSubview(helpButton)                                       // IDHELP
+        helpButton.setAccessibilityLabel(helpButton.title)
+        helpButton.toolTip = helpButton.title
+        helpButton.title = ""
+        helpButton.bezelStyle = .helpButton
+        let size = helpButton.intrinsicContentSize
+        helpButton.frame = NSRect(x: Self.clientSize.width - 20 - size.width,
+                                  y: Self.macPageRect.maxY + (Self.clientSize.height - Self.macPageRect.maxY - size.height) / 2,
+                                  width: size.width, height: size.height)
+        let toolbar = NSToolbar(identifier: "sz.options.mac")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconAndLabel
+        toolbar.allowsUserCustomization = false
+        window.toolbarStyle = .preference
+        window.toolbar = toolbar
+        NotificationCenter.default.addObserver(self, selector: #selector(macTextDidEndEditing(_:)),
+                                               name: NSControl.textDidEndEditingNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(macAppWillTerminate(_:)),
+                                               name: NSApplication.willTerminateNotification, object: nil)
+    }
+
+    private func macItemID(_ index: Int) -> NSToolbarItem.Identifier { .init("sz.options.page.\(index)") }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        pages.indices.map(macItemID)
+    }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarAllowedItemIdentifiers(toolbar)
+    }
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarAllowedItemIdentifiers(toolbar)
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard let index = pages.indices.first(where: { macItemID($0) == itemIdentifier }) else { return nil }
+        let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+        let title = pageTitle(pages[index])
+        item.label = title
+        item.paletteLabel = title
+        item.image = NSImage(systemSymbolName: Self.macSymbol(pages[index]), accessibilityDescription: title)
+        item.tag = index
+        item.target = self
+        item.action = #selector(macPaneSelected(_:))
+        return item
+    }
+
+    @objc private func macPaneSelected(_ sender: NSToolbarItem) {
+        selectPage(sender.tag)
+    }
+
+    /// The window title names the pane on screen (HIG), and the toolbar marks it.
+    private func syncMacPane() {
+        guard look == .mac, let window, let item = tabView.selectedTabViewItem,
+              let index = tabView.tabViewItems.firstIndex(of: item) else { return }
+        window.title = pageTitle(pages[index])
+        window.toolbar?.selectedItemIdentifier = macItemID(index)
+        fitMacWindow(to: pages[index], animate: window.isVisible)
+    }
+
+    /// The pane's height: its lowest visible control plus the margin and the Help strip. The
+    /// window takes it with its top edge kept, as System Settings-style windows do; the page view
+    /// keeps the template's full size (the content view is flipped, so the part below is clipped).
+    func macContentHeight(for page: OptionsPageBase) -> CGFloat {
+        let bottom = page.view.subviews.filter { !$0.isHidden }.map(\.frame.maxY).max() ?? Self.macPageRect.height
+        return min(Self.clientSize.height, max(220, Self.macPageRect.minY + ceil(bottom) + 10 + 44))
+    }
+
+    private func fitMacWindow(to page: OptionsPageBase, animate: Bool) {
+        guard let window else { return }
+        let height = macContentHeight(for: page)
+        let size = NSSize(width: Self.clientSize.width, height: height)
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        window.contentMinSize = size
+        window.contentMaxSize = size
+        window.setFrame(frame, display: true, animate: animate)
+        let help = helpButton.frame.size
+        helpButton.frame.origin = NSPoint(x: Self.clientSize.width - 20 - help.width, y: height - 22 - help.height / 2)
+    }
+
+    /// native-look: commit what changed; a text field commits when its editing ends.
+    private func macApplyNow() {
+        guard let window, window.isVisible else { return }
+        if let editor = window.firstResponder as? NSTextView, editor.isFieldEditor { return }
+        applyChangedPages()
+    }
+
+    @objc private func macTextDidEndEditing(_ note: Notification) {
+        guard let field = note.object as? NSView, field.window === window,
+              pages.contains(where: { $0.pageIsChanged }) else { return }
+        // After AppKit has finished ending the edit (the field editor is gone then).
+        DispatchQueue.main.async { [weak self] in self?.macApplyNow() }
+    }
+
+    @objc private func macAppWillTerminate(_ note: Notification) {
+        guard window?.isVisible == true else { return }
+        window?.makeFirstResponder(nil)
+        applyChangedPages()
     }
 
     private func configure(_ button: NSButton, _ title: String, _ action: Selector) {
@@ -381,10 +498,17 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         tabView.selectTabViewItem(at: index)
         tabControl.select(index)
         window?.title = Lang.text(2100, "Options")
+        syncMacPane()
     }
 
     func pageDidChange() {
         applyButton.isEnabled = pages.contains { $0.pageIsChanged }
+    }
+
+    /// A control on a page changed (OptionsPageBase.changed()). native-look: applied at once.
+    func pageControlDidChange() {
+        pageDidChange()
+        if look == .mac { macApplyNow() }
     }
 
     /// The Language page switched language: re-label this window, the menu bar and the toolbars
@@ -399,6 +523,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             helpButton.toolTip = Lang.text(409, "Help")
             helpButton.setAccessibilityLabel(helpButton.toolTip)
             for (item, page) in zip(tabView.tabViewItems, pages) { item.label = pageTitle(page) }
+            for item in window?.toolbar?.items ?? [] where pages.indices.contains(item.tag) {
+                item.label = pageTitle(pages[item.tag])
+                item.paletteLabel = item.label
+            }
         } else {
             helpButton.title = Lang.text(409, "Help")
         }
@@ -408,6 +536,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             page.loadViewIfNeeded()
             page.withoutChangeTracking { page.relabelPage() }
         }
+        syncMacPane()
         OptionsPostApply.reloadLangItems()
     }
 
@@ -463,9 +592,24 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         guard let item = tabViewItem, let index = tabView.tabViewItems.firstIndex(of: item) else { return }
         tabControl.select(index)
         Settings.optionsLastPage = index
+        syncMacPane()
+    }
+
+    func tabView(_ tabView: NSTabView, shouldSelect tabViewItem: NSTabViewItem?) -> Bool {
+        // native-look: a field being edited commits before its pane goes away.
+        if look == .mac, let window, window.firstResponder is NSTextView {
+            window.makeFirstResponder(nil)
+            applyChangedPages()
+        }
+        return true
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if look == .mac {
+            // native-look: closing commits; a refused value keeps the window open on its page.
+            sender.makeFirstResponder(nil)
+            return applyChangedPages()
+        }
         for page in pages where page.pageIsChanged { page.clearChanged() }
         pageDidChange()
         return true

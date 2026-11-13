@@ -255,11 +255,21 @@ final class NativeLookTests: AppHostTestCase {
             let optionsWindow = try XCTUnwrap(options.window)
             XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { _ in })
             options.selectPage(options.pageCount - 1)
-            let tabView = try XCTUnwrap(optionsWindow.contentView?.subviews.compactMap { $0 as? NSTabView }.first,
-                                        "the Mac look uses AppKit's tab view")
-            XCTAssertEqual(tabView.tabViewType, .topTabsBezelBorder)
+            let tabView = try XCTUnwrap(optionsWindow.contentView?.subviews.compactMap { $0 as? NSTabView }.first)
+            XCTAssertEqual(tabView.tabViewType, .noTabsNoBorder, "a Settings window: the toolbar switches the panes")
             XCTAssertEqual(tabView.selectedTabViewItem?.label, "macOS")
-            XCTAssertFalse(tabView.tabViewItems.contains { $0.label.isEmpty })
+            let toolbar = try XCTUnwrap(optionsWindow.toolbar)
+            XCTAssertEqual(optionsWindow.toolbarStyle, .preference)
+            XCTAssertEqual(toolbar.items.count, options.pageCount)
+            XCTAssertFalse(toolbar.items.contains { $0.label.isEmpty || $0.image == nil })
+            XCTAssertEqual(toolbar.selectedItemIdentifier, toolbar.items.last?.itemIdentifier)
+            XCTAssertEqual(optionsWindow.title, "macOS", "the title names the pane")
+            XCTAssertEqual(optionsWindow.contentLayoutRect.height,
+                           options.macContentHeight(for: try XCTUnwrap(tabView.selectedTabViewItem?.viewController as? OptionsPageBase)),
+                           accuracy: 1, "the window fits the pane")
+            let buttonTitles = (optionsWindow.contentView?.subviews ?? []).compactMap { ($0 as? NSButton)?.title }
+            XCTAssertFalse(buttonTitles.contains("OK") || buttonTitles.contains("Cancel") || buttonTitles.contains("Apply"),
+                           "changes apply at once")
             try writeWholeWindow(optionsWindow, "options-macos-\(theme.rawValue)")
             options.selectPage(4)
             try writeWholeWindow(optionsWindow, "options-settings-\(theme.rawValue)")
@@ -364,6 +374,27 @@ final class NativeLookTests: AppHostTestCase {
                        "Classic: Space calculates the folder size, as 7zFM does")
     }
 
+    func testMacSettingsApplyAtOnce() throws {
+        Settings.look = .mac
+        let wasGrid = Settings.showGrid
+        defer {
+            Settings.showGrid = wasGrid
+            if let w = OptionsWindowController.shared.window, w.isVisible { ModalProbe.close(w) }
+        }
+        let options = OptionsWindowController.shared
+        XCTAssertEqual(options.look, .mac)
+        var page: OptionsMacPage?
+        XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { window in
+            options.selectPage(options.pageCount - 1)
+            page = window.contentView?.subviews.compactMap { $0 as? NSTabView }.first?
+                .selectedTabViewItem?.viewController as? OptionsMacPage
+            page?.gridBox.performClick(nil)                       // while the window is up
+        })
+        let macPage = try XCTUnwrap(page)
+        XCTAssertEqual(Settings.showGrid, !wasGrid, "the checkbox took effect without OK or Apply")
+        XCTAssertFalse(macPage.pageIsChanged, "nothing left to apply")
+    }
+
     func testMacMessageBoxKeepsTheAnswersInMacOrder() throws {
         Settings.look = .mac
         let box = WinMessageBoxWindow(text: "Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
@@ -371,9 +402,22 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertNotNil(box.macLayout)
         XCTAssertEqual(box.pushButtons.map(\.title), ["Yes", "No", "Cancel"], "same answers")
         XCTAssertTrue(box.defaultButtonCell === box.pushButtons.first?.cell, "Yes stays the default")
-        let xs = box.pushButtons.map(\.frame.minX)
-        XCTAssertGreaterThan(xs[0], xs[1], "the default sits rightmost")
-        XCTAssertGreaterThan(xs[1], xs[2])
+        let layout = try XCTUnwrap(box.macLayout)
+        XCTAssertEqual(layout.messageText, "Are you sure you want to delete 'notes.md'?", "one line: all of it is the bold message")
+        XCTAssertTrue(layout.stacksButtons, "three answers stack, as NSAlert does")
+        let ys = box.pushButtons.map(\.frame.minY)                    // flipped: the default on top
+        XCTAssertLessThan(ys[0], ys[1])
+        XCTAssertLessThan(ys[1], ys[2])
+        XCTAssertTrue(box.styleMask.contains(.fullSizeContentView), "no visible title bar")
+        XCTAssertEqual(box.titleVisibility, .hidden)
+        let two = WinMessageBoxWindow(text: "Cannot open the file as archive\n/Users/demo/Report.pdf", caption: "7-Zip",
+                                      buttons: .okCancel, icon: .error, owner: nil)
+        let twoLayout = try XCTUnwrap(two.macLayout)
+        XCTAssertEqual(twoLayout.messageText, "Cannot open the file as archive")
+        XCTAssertEqual(twoLayout.informativeText, "/Users/demo/Report.pdf")
+        XCTAssertFalse(twoLayout.stacksButtons)
+        XCTAssertGreaterThan(two.pushButtons[0].frame.minX, two.pushButtons[1].frame.minX, "the default sits rightmost")
+        XCTAssertEqual(two.pushButtons[0].frame.width, two.pushButtons[1].frame.width, "equal widths")
         Settings.look = .classic
         let classic = WinMessageBoxWindow(text: "x", caption: "c", buttons: .ok, icon: .none, owner: nil)
         XCTAssertNil(classic.macLayout)

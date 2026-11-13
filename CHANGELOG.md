@@ -24,11 +24,17 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   keeping their size, panels and folders. Classic is the Windows window, unchanged.
   - The dialogs follow the look too: the system font at its regular size, AppKit's own pop-up
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
-    Cancel left of OK and Help as the round "?" button at the left. Options gets AppKit's tabs.
-    Every control stays where the Windows layout puts it, so nothing moves out of reach.
-  - Messages and questions are Mac alerts: the app icon (a caution sign for errors and warnings)
-    beside the selectable message, the default button rightmost, centred over their window. The
-    answers, keys and Esc behaviour are unchanged.
+    Cancel left of OK and Help as the round "?" button at the left. Every control stays where
+    the Windows layout puts it, so nothing moves out of reach.
+  - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
+    window title, the window fitting each pane's height, and every change taking effect at once
+    -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the
+    window on its pane with the message). Help is the "?" at the bottom right.
+  - Messages and questions are Mac alerts laid out like NSAlert: no title bar, the app icon at the
+    top (a caution sign badged with it for errors and warnings), the first line as the bold
+    message and the rest as the informative text, equal-width buttons -- side by side with the
+    default rightmost, or stacked with the default on top when there are three -- centred over
+    their window. The answers, keys and Esc behaviour are unchanged.
   - View ▸ Large Icons shows Finder's 64 pt icons with names on up to two lines and Finder's
     selection; Small Icons and List get the Mac row height. The address bar's history list opens
     as a macOS menu. About 7-Zip shows the app icon with the version and credits centred.
@@ -41,7 +47,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style
-  of Apple's utilities with the same grey zipper and "7-Zip" in blue. The Classic look's file list keeps 7-Zip's Windows
+  of Apple's utilities with the same grey zipper, its pull in 7-Zip blue, and no lettering (as the
+  HIG asks of app icons). The Classic look's file list keeps 7-Zip's Windows
   icons. `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
   - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
     name and icon, unless *Full row select* is on).
