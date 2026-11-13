@@ -562,6 +562,32 @@ final class NativeLookTests: AppHostTestCase {
         window.toolbar = nil
     }
 
+    /// A box answered while it is a sheet leaves no sheet session behind: the window takes the
+    /// next sheet and nothing stays modal (answering used to order the sheet out before endSheet).
+    func testAnsweredAlertSheetEndsItsSession() throws {
+        let controller = try openWindow()
+        let window = try XCTUnwrap(controller.window)
+        window.makeKeyAndOrderFront(nil)
+        defer { window.toolbar = nil }
+        for way in 0..<3 {
+            var parent: NSWindow?
+            XCTAssertTrue(ModalProbe.present({
+                _ = WinMessageBox.run("Specify command", caption: "7-Zip", buttons: .okCancel, icon: .none, owner: window)
+            }) { box in
+                parent = box.sheetParent
+                guard let box = box as? WinMessageBoxWindow else { return }
+                switch way {
+                case 0: box.performClose(nil)
+                case 1: box.cancelOperation(nil)
+                default: box.pushButtons[0].performClick(nil)
+                }
+            })
+            XCTAssertTrue(parent === window, "the box is a sheet of its window")
+            XCTAssertNil(NSApp.modalWindow, "way \(way): no modal session left")
+            XCTAssertNil(window.attachedSheet, "way \(way): the sheet is gone")
+        }
+    }
+
     /// The window with its sheet drawn in place.
     private func writeSheet(_ sheet: NSWindow, on window: NSWindow, _ name: String) throws {
         func image(_ w: NSWindow) throws -> NSBitmapImageRep {

@@ -121,6 +121,11 @@ final class NavGapsTests: AppHostTestCase {
     private func makeWindow() -> MainWindowController {
         Settings.numPanels = 1
         UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)")
+        // Toolbars with one identifier mirror item changes; windows other classes left open have
+        // other arrangements, so they drop out of this class's toggles.
+        for window in NSApp.windows where window.toolbar?.identifier == MainWindowController.macToolbarIdentifier {
+            window.toolbar = nil
+        }
         let controller = MainWindowController()
         controllers.append(controller)
         controller.window?.setContentSize(NSSize(width: 1000, height: 700))

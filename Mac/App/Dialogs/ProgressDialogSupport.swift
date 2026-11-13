@@ -452,7 +452,10 @@ extension DialogKit {
         if window.isVisible { window.orderOut(nil) }
         parent.beginSheet(window) { _ in }
         let response = runModal(for: window)
-        if window.sheetParent != nil || parent.attachedSheet === window { parent.endSheet(window) }
+        // Always: a sheet that something ordered out is no longer attached, but AppKit still
+        // holds its sheet session until endSheet (a stale one blocks the window).
+        parent.endSheet(window)
+        if window.isVisible { window.orderOut(nil) }
         return response
     }
 }

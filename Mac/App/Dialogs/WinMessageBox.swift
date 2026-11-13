@@ -403,7 +403,9 @@ final class WinMessageBoxWindow: NSWindow {
         guard result == nil else { return }
         result = answer
         if NSApp.modalWindow === self { NSApp.stopModal(withCode: NSApplication.ModalResponse(rawValue: answer.rawValue)) }
-        orderOut(nil)
+        // A sheet is taken down by its parent's endSheet (DialogKit.runModal(for:asSheet:));
+        // ordering it out here would detach it and leave AppKit's sheet session behind.
+        if sheetParent == nil { orderOut(nil) }
     }
 
     /// Shows the box modally and returns the answer. A session ended from outside (the test reset)

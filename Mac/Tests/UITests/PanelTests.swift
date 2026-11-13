@@ -201,7 +201,7 @@ final class PanelTests: SevenZipUITestCase {
         launch(seed: .values([SettingsDomain.Key.panelPath0: scratch]))
         let panel = sevenZip.panel(0)
         XCTAssertTrue(panel.waitForRow(named: "alpha.txt"))
-        XCTAssertTrue(sevenZip.selectMenuItem("File", "Create Folder"))
+        XCTAssertTrue(sevenZip.selectMenuItem("File", "New Folder"))
         guard let dialog = sevenZip.waitForDialog(title: "Create Folder") else {
             return XCTFail("no Create Folder dialog")
         }
@@ -214,7 +214,7 @@ final class PanelTests: SevenZipUITestCase {
         XCTAssertTrue(panel.waitForRow(named: "made-by-test"), "listing: \(panel.names)")
 
         panel.select("made-by-test")
-        XCTAssertTrue(sevenZip.selectMenuItem("File", "Delete"))
+        XCTAssertTrue(sevenZip.selectMenuItem("File", "Move to Trash"))
         XCTAssertTrue(waitFor("folder went to the Trash") { !panel.hasRow(named: "made-by-test") },
                       "a file-system delete to the Trash asks nothing (01 §3.11); listing: \(panel.names)")
     }
@@ -239,7 +239,7 @@ final class PanelTests: SevenZipUITestCase {
         let panel = sevenZip.panel(0)
         XCTAssertTrue(panel.waitForRow(named: "test.7z"))
         panel.select("test.7z")
-        XCTAssertTrue(sevenZip.selectMenuItem("File", "Properties"))
+        XCTAssertTrue(sevenZip.selectMenuItem("File", "Get Info"))
         guard let dialog = sevenZip.waitForDialog(title: "Properties") else {
             return XCTFail("no Properties dialog")
         }

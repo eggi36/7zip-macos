@@ -198,14 +198,14 @@ final class NewWindowUITests: SevenZipUITestCase {
 
     // MARK: - File > New Window
 
-    /// The key equivalent (Option+Cmd+N; Cmd+N stays Create File, IDM_CREATE_FILE Ctrl+N) and the
-    /// menu item each open a window.
+    /// The key equivalent (Cmd+N, as in Finder; New File has Option+Cmd+N) and the menu item each
+    /// open a window.
     func testNewWindowShortcutAndMenuItem() {
         launch()
         XCTAssertTrue(waitForManagerWindows(1))
         sevenZip.panel(0).focusList()
-        app.typeKey("n", modifierFlags: [.command, .option])
-        XCTAssertTrue(waitForManagerWindows(2), "Option+Cmd+N must open a window")
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(waitForManagerWindows(2), "Cmd+N must open a window")
         XCTAssertTrue(sevenZip.selectMenuItem("File", "New Window"))
         XCTAssertTrue(waitForManagerWindows(3), "File > New Window must open a window")
         screenshot("02-new-window")
