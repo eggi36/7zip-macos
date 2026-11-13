@@ -68,6 +68,14 @@
 				<string>com.apple.xar-archive</string>
 				<string>org.7-zip.squashfs-archive</string>
 				<string>org.7-zip.apfs-archive</string>
+				<string>org.7-zip.nrg-archive</string>
+				<string>org.7-zip.cdi-archive</string>
+				<string>org.7-zip.chd-archive</string>
+				<string>org.7-zip.cso-archive</string>
+				<string>org.7-zip.ciso-archive</string>
+				<string>org.7-zip.zso-archive</string>
+				<string>org.7-zip.isz-archive</string>
+				<string>org.7-zip.ecm-archive</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
