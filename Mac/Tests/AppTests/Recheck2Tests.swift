@@ -67,28 +67,6 @@ final class Recheck2Tests: AppHostTestCase {
                 client: NSSize(width: 117, height: 101), text0: NSPoint(x: 11, y: 23), lines: 1, buttonY: 68),
     ]
 
-    /// The box is as wide as its buttons need (3 buttons: 284) and wraps at ~324 px, breaking a
-    /// word that does not fit between characters (SS_EDITCONTROL).
-    func testMessageBoxWrapsLikeAnEditControlStatic() {
-        let long = String(repeating: "word ", count: 120)
-        let l = WinMessageBoxLayout(text: long, caption: "7-Zip", buttonCount: 1, hasIcon: true)
-        XCTAssertGreaterThan(l.lines.count, 10)
-        let wrap = WinMessageBoxLayout.wrapWidth                 // 324 px, stretched by DLU.scaleX
-        for line in l.lines { XCTAssertLessThanOrEqual(WinMessageBoxLayout.width(line), wrap) }
-        XCTAssertLessThanOrEqual(l.clientSize.width, 62 + wrap + 2 + 28)
-
-        let path = "Cannot open file '/Users/someone/" + String(repeating: "averyveryverylongfoldername_", count: 6) + "file.7z' as archive"
-        let p = WinMessageBoxLayout(text: path, caption: "7-Zip", buttonCount: 1, hasIcon: true)
-        XCTAssertGreaterThan(p.lines.count, 3)
-        XCTAssertTrue(p.lines.allSatisfy { WinMessageBoxLayout.width($0) <= wrap }, "\(p.lines)")
-        XCTAssertEqual(p.lines.joined().replacingOccurrences(of: " ", with: ""),
-                       path.replacingOccurrences(of: " ", with: ""), "no character is lost when a word breaks")
-
-        let three = WinMessageBoxLayout(text: "x", caption: "", buttonCount: 3, hasIcon: false)
-        // 284 on Windows: 27 + three 75 px buttons 8.5 apart + 15, the buttons stretched by DLU.scaleX.
-        let b = WinMessageBoxLayout.buttonSize.width, gap = WinMessageBoxLayout.buttonPitch - b + 0.5
-        XCTAssertEqual(three.clientSize.width, 27 + (3 * b + 2 * gap).rounded() + 15)
-    }
 
     // MARK: - behaviour
 

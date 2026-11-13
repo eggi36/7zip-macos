@@ -176,40 +176,6 @@ enum PanelMetrics {
     }
 }
 
-/// A header item (SysHeader32 with the list's font): its text 6 px from the edge it is aligned to,
-/// as 7zFM's header draws it ("Name" from x 6, "Size" ending 6 px before the divider); AppKit's
-/// header cell keeps only 3 pt (listfeel.md §2).
-final class PanelHeaderCell: WinHeaderCell {   // datecols: its title in the list font
-    static let extraInset: CGFloat = 3
-    static let baselineShift: CGFloat = 5
-    /// The Windows 11 header divider: 1 px (229) at the item's right edge - 1, the header's full
-    /// 24 px (recheck §2; AppKit draws a short one in the middle).
-    static let divider = WinChrome.dynamic(WinChrome.gray(229), .separatorColor)
-
-    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        WinChrome.window.setFill()
-        cellFrame.fill()
-        Self.divider.setFill()
-        NSRect(x: cellFrame.maxX - 1, y: cellFrame.minY, width: 1, height: cellFrame.height).fill()
-        drawInterior(withFrame: cellFrame, in: controlView)
-    }
-
-    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
-        var frame = cellFrame
-        // The text's baseline 16 px down the 24 px header, as SysHeader32 centres Segoe UI 9
-        // ("Name" ink rows 7..15, recheck §2); AppKit's cell put it 5 px higher.
-        frame.origin.y += Self.baselineShift
-        switch alignment {
-        case .right: frame.size.width -= Self.extraInset
-        case .center: break
-        default:
-            frame.origin.x += Self.extraInset
-            frame.size.width -= Self.extraInset
-        }
-        super.drawInterior(withFrame: frame, in: controlView)
-    }
-}
-
 extension PanelViewController {
 
     /// One Details column (InitColumns / AddColumn): the property's title, width and alignment.

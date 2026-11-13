@@ -514,7 +514,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     // MARK: - Toolbar (App.cpp CreateToolbar / AddButton / ReloadToolbars, 01 §1.3)
 
     /// The button for an item: its label (IDS_* via LangString) and the selector it sends.
-    static func toolbarSpec(_ id: NSToolbarItem.Identifier, large: Bool) -> FMToolbarItemSpec? {
+    static func toolbarSpec(_ id: NSToolbarItem.Identifier) -> FMToolbarItemSpec? {
         let (label, action): (String, Selector)
         switch id {
         case .szAdd: (label, action) = (Lang.text(7200, "Add"), #selector(MenuActions.toolbarAddToArchive(_:)))          // kMenuCmdID_Toolbar_Add 1070, IDS_ADD
@@ -526,21 +526,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         case .szInfo: (label, action) = (Lang.text(7206, "Info"), #selector(MenuActions.fileProperties(_:)))              // IDM_PROPERTIES 551, IDS_BUTTON_INFO
         default: return nil
         }
-        // AddButton: the 7-Zip bitmaps, 48x36 IDB_* with "Large Buttons", else the 24x24 IDB_*2
-        // (01 §1.3, §9 #15), RGB(255,0,255) masked.
-        return FMToolbarItemSpec(identifier: id.rawValue, label: label,
-                                 image: toolbarBitmap(id, large: large), action: action)
-    }
-
-    /// The toolbar bitmap for an item: IDB_ADD 100 ... IDB_INFO 106 (48x36) or IDB_ADD2 150 ...
-    /// IDB_INFO2 156 (24x24), converted from CPP/7zip/UI/FileManager/*.bmp into the asset catalog.
-    static func toolbarBitmap(_ id: NSToolbarItem.Identifier, large: Bool) -> NSImage? {
-        let names: [NSToolbarItem.Identifier: String] = [
-            .szAdd: "add", .szExtract: "extract", .szTest: "test", .szCopy: "copy",
-            .szMove: "move", .szDelete: "delete", .szInfo: "info",
-        ]
-        guard let name = names[id] else { return nil }
-        return NSImage(named: "toolbar-\(name)-\(large ? "large" : "small")")
+        return FMToolbarItemSpec(identifier: id.rawValue, label: label, action: action)
     }
 
     /// ReloadToolbars: the archive buttons, then the standard ones, back to back; labels per

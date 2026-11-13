@@ -30,7 +30,7 @@ final class PanelUpButton: NSButton {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     override var isFlipped: Bool { true }
-    override var intrinsicContentSize: NSSize { WinChrome.upButtonRect.size }
+    override var intrinsicContentSize: NSSize { AppLook.upButtonRect.size }
 
     override var isEnabled: Bool { didSet { needsDisplay = true } }
 
@@ -158,7 +158,7 @@ final class AddressComboBox: NSComboBox {
     var onDropDown: (() -> Void)?
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: WinChrome.bandHeight)
+        NSSize(width: NSView.noIntrinsicMetric, height: AppLook.bandHeight)
     }
 
     /// The arrow's 18 px at the right edge.

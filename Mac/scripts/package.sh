@@ -153,7 +153,6 @@ for part in \
   "Contents/PlugIns/QuickActionExtract.appex" \
   "Contents/PlugIns/QuickActionCompress.appex" \
   "Contents/PlugIns/QuickLook.appex" \
-  "Contents/PlugIns/QuickLook.appex/Contents/Resources/fm-7z.ico" \
   "Contents/Frameworks/SevenZipKit.framework/Resources/Lang/en.ttt" \
   "Contents/Frameworks/SevenZipKit.framework/Resources/Lang/de.txt" \
   "Contents/Resources/SFX/7z.sfx" \

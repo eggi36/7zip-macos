@@ -95,6 +95,10 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
 ### Changed
 
+- The leftovers of the Windows look are gone: the old 7-Zip logo, the Windows toolbar bitmaps, the
+  `.ico` document icons and the scripts that converted them. The address bar's history list now
+  shows the system icon for an archive and highlights in the accent colour, and the selection
+  rectangle dragged over the file list is drawn as in Finder.
 - Updated the engine to 7-Zip 26.06. Upstream's summary: improved support for split files created
   by the Linux `split` utility (`file.aa`, `file.ab`, …), improved unpacking of Z archives and
   Mach-O files, and "some bugs and vulnerabilities were fixed" — among others the CAB, MSLZ, MUB,

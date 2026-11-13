@@ -131,11 +131,9 @@ final class OptionsSystemPage: OptionsPageBase, NSTableViewDataSource, NSTableVi
 
     private static var iconCache: [String: NSImage] = [:]
 
-    /// The 7-Zip icon of the row's format, drawn exactly as the panel list draws it (docicons2):
-    /// the `.ico`'s 16 x 16 frame, enlarged by whole pixels nearest-neighbour on Retina
-    /// (`PanelArchiveIcons`, sffont). Windows draws `assoc.GetIconIndex()` from 7z.dll
-    /// (SystemPage.cpp:95), an ImageList of small (16 px) icons from ExtractIconExW. Falls back to
-    /// the bundled `doc-<name>.icns`, then to the system's icon for the type.
+    /// The 7-Zip icon of the row's format (Windows draws `assoc.GetIconIndex()` from 7z.dll,
+    /// SystemPage.cpp:95): the bundled `doc-<name>.icns` that Finder shows too, else the system's
+    /// icon for the type.
     static func formatIcon(for type: SevenZipFileType) -> NSImage? {
         let name = "doc-" + type.iconFileName
         // The bundled macOS-style document icon (what Finder shows).

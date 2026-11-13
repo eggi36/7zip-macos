@@ -1,22 +1,13 @@
-// PanelAddressPopup.swift -- the address bar's dropped list as 7zFM 26.03 draws it (feel3, the
-// user's finding 6: "Windows shows icons for each entry, highlights the row under the mouse, and
-// its rows are taller").
+// PanelAddressPopup.swift -- the address bar's dropped list (feel3, the user's finding 6: icons
+// for each entry, the row under the mouse highlighted).
 //
-// 7zFM's address bar is a ComboBoxEx32 (Panel.cpp:521-536); its dropped list is a ComboLBox the
-// width of the combo, right under it, whose items are the CBN_DROPDOWN entries of
-// PanelFolderChange.cpp:627-760 (AddComboBoxItem: an image from the system image list and an
-// indent). Measured at 96 dpi (feel3-data/win/addr-dropped.png, addr-hover1/4.png, log.txt):
-//
-//   * the list: the combo's x and width, its top on the combo's bottom; a 1 px (0,120,215) border,
-//     white, 18 px items (LB_GETITEMHEIGHT 18), no scroll bar for the usual 10-20 entries;
-//   * an item: the 16 x 16 icon 4 px + 10 px per indent level from the list's left edge, 1 px below
-//     the item's top; the name (Segoe UI 9) 20 px after the icon's left edge, its baseline 14 px
-//     below the item's top;
-//   * nothing is highlighted when the list opens (CB_GETCURSEL -1); the item under the mouse is
-//     highlighted (0,120,215) from 2 px inside the list's left edge to 2 px before its right edge,
-//     its text white, with the dotted focus rectangle on it; the highlight follows the mouse;
-//   * a click on an item binds its path at once (CBN_SELENDOK) and focuses the file list; Esc or a
-//     click elsewhere closes the list; Up / Down move the highlight and Enter picks it.
+// 7zFM's address bar is a ComboBoxEx32 (Panel.cpp:521-536); its dropped list holds the
+// CBN_DROPDOWN entries of PanelFolderChange.cpp:627-760 (AddComboBoxItem: an icon and an indent).
+// Here it is drawn as a macOS menu: the combo's width, right under it, 22 pt rows inside a 5 pt
+// padding on the menu material, the item under the mouse in the accent colour. Nothing is
+// highlighted when the list opens (CB_GETCURSEL -1); a click on an item binds its path at once
+// (CBN_SELENDOK) and focuses the file list; Esc or a click elsewhere closes the list; Up / Down
+// move the highlight and Enter picks it.
 //
 // NSComboBox's own list can show neither icons nor a hover highlight, so the list is drawn here
 // and the combo keeps only the edit (AddressComboBox opens this list from its arrow).
@@ -31,8 +22,6 @@ struct AddressPopupItem {
 }
 
 enum AddressPopupMetrics {
-    // native-look: the Mac look draws the list as a macOS menu -- 22 pt rows inside a 5 pt padding
-    // on the menu material, rounded corners, a rounded accent highlight.
     static var rowHeight: CGFloat { 22 }
     static var border: CGFloat { 5 }
     static var iconX: CGFloat { 10 }
@@ -42,8 +31,8 @@ enum AddressPopupMetrics {
     static var baseline: CGFloat { 16 }
     static let maxVisibleRows = 30
 
-    static let highlight = WinChrome.dynamic(WinChrome.rgb(0, 120, 215), .selectedContentBackgroundColor)
-    static let highlightText = WinChrome.dynamic(.white, .alternateSelectedControlTextColor)
+    static let highlight = NSColor.selectedContentBackgroundColor
+    static let highlightText = NSColor.alternateSelectedControlTextColor
 }
 
 /// The list's content: draws the rows, follows the mouse.

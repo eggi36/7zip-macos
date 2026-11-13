@@ -38,9 +38,7 @@ enum PanelIcons {
                 return resized(image, size)
             }
         }
-        // By extension: 7-Zip's own per-format icon for the extensions it registers (the shell's
-        // DefaultIcon 7z.dll,<index>; PanelArchiveIcons, feel3), else the system's.
-        // native-look: the Mac look shows the system's document icon for every file, as Finder does.
+        // By extension: the system's document icon for every file, as Finder shows it.
         return resized(Icons.icon(forName: row.name, isDirectory: row.isDirectory), size)
     }
 

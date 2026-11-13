@@ -42,10 +42,8 @@ respective translators:
 
 Icons
 -----
-The app icon, the document icons and the toolbar images are converted from the original 7-Zip
-icon and bitmap files in the upstream source tree: CPP/7zip/Archive/Icons/*.ico and
-CPP/7zip/UI/FileManager/*.ico (by Mac/scripts/make-icons.sh), and the toolbar bitmaps
-CPP/7zip/UI/FileManager/*.bmp.
+The app icon and the document icons are drawn for macOS by Mac/scripts/make-mac-icons.sh; the
+toolbar uses SF Symbols. No icon or bitmap file of the upstream source tree is bundled.
 
 AI assistance
 -------------

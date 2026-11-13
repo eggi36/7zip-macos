@@ -252,7 +252,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         // (recheck §2): 23 px with a 1 px (215) line on top, COLOR_BTNFACE, the GUI font in black,
         // a part's text 2 px in, 1 px (215) dividers at a part's right edge - 1 on rows 2..21.
         statusLabel.font = PanelMetrics.statusFont
-        statusLabel.textColor = WinChrome.text
+        statusLabel.textColor = .labelColor
         statusLabel.lineBreakMode = .byTruncatingMiddle
         Bidi.makeLeftToRight(statusLabel)
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -300,15 +300,15 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             pathBar.topAnchor.constraint(equalTo: root.topAnchor),
             pathBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             pathBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            pathBar.heightAnchor.constraint(equalToConstant: WinChrome.bandHeight),
-            upButton.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: WinChrome.upButtonRect.minX),
-            upButton.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: WinChrome.upButtonRect.minY),
-            upButton.widthAnchor.constraint(equalToConstant: WinChrome.upButtonRect.width),
-            upButton.heightAnchor.constraint(equalToConstant: WinChrome.upButtonRect.height),
-            pathCombo.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: WinChrome.comboX),
-            pathCombo.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor, constant: -WinChrome.comboInset.width),
-            pathCombo.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: WinChrome.comboInset.height),
-            pathCombo.heightAnchor.constraint(equalToConstant: WinChrome.bandHeight - 2 * WinChrome.comboInset.height),
+            pathBar.heightAnchor.constraint(equalToConstant: AppLook.bandHeight),
+            upButton.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: AppLook.upButtonRect.minX),
+            upButton.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: AppLook.upButtonRect.minY),
+            upButton.widthAnchor.constraint(equalToConstant: AppLook.upButtonRect.width),
+            upButton.heightAnchor.constraint(equalToConstant: AppLook.upButtonRect.height),
+            pathCombo.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: AppLook.comboX),
+            pathCombo.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor, constant: -AppLook.comboInset.width),
+            pathCombo.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: AppLook.comboInset.height),
+            pathCombo.heightAnchor.constraint(equalToConstant: AppLook.bandHeight - 2 * AppLook.comboInset.height),
             listFrame.topAnchor.constraint(equalTo: pathBar.bottomAnchor),
             listFrame.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             listFrame.trailingAnchor.constraint(equalTo: root.trailingAnchor),
@@ -335,7 +335,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             status.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             status.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             status.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            status.heightAnchor.constraint(equalToConstant: WinChrome.statusHeight - 1),
+            status.heightAnchor.constraint(equalToConstant: AppLook.statusHeight - 1),
             statusLabel.widthAnchor.constraint(lessThanOrEqualToConstant: Self.statusSectionEdges[0] - 2),
             statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: status.trailingAnchor, constant: -2),
             statusLabel.firstBaselineAnchor.constraint(equalTo: status.topAnchor, constant: textBaseline),

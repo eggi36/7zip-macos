@@ -17,8 +17,7 @@
 //     macOS version; it is Apple's artwork -- fine for your own build, not for redistribution.
 //
 // Writes Mac/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png, Mac/Resources/Icons/
-// doc-<name>.icns (through `iconutil`), Mac/Resources/Assets.xcassets/doc-<name>.imageset/
-// doc-<name>_256.png / _512.png, and the contact sheet Mac/build/screenshots/icons-mac-sheet.png.
+// doc-<name>.icns (through `iconutil`) and the contact sheet Mac/build/screenshots/icons-mac-sheet.png.
 
 import AppKit
 import Foundation
@@ -206,11 +205,6 @@ for doc in docIcons {
     try task.run()
     task.waitUntilExit()
     guard task.terminationStatus == 0 else { fatalError("iconutil failed for \(doc.name)") }
-    let imageset = assets + "/doc-\(doc.name).imageset"
-    if fm.fileExists(atPath: imageset) {
-        try write(render(256) { drawDocIcon(doc, $0) }, imageset + "/doc-\(doc.name)_256.png")
-        try write(render(512) { drawDocIcon(doc, $0) }, imageset + "/doc-\(doc.name)_512.png")
-    }
 }
 print("document icons: \(docIcons.count) .icns")
 

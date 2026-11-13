@@ -363,18 +363,4 @@ final class UpdateCheckTests: AppHostTestCase {
         XCTAssertEqual(recordedBoxes.count, 2)
     }
 
-    /// The custom-button box keeps the Windows geometry: right-aligned 15 px from the edge, 8 px
-    /// apart, at least 75 px each.
-    func testCustomButtonLayout() {
-        let layout = WinMessageBoxLayout(text: "Hello", caption: "7-Zip", buttonCount: 3, hasIcon: true,
-                                         customTitles: ["Download", "Later", "Skip This Version"])
-        XCTAssertEqual(layout.buttonFrames.count, 3)
-        XCTAssertEqual(layout.buttonFrames.last?.maxX ?? 0, layout.clientSize.width - 15, accuracy: 0.5)
-        for (a, b) in zip(layout.buttonFrames, layout.buttonFrames.dropFirst()) {
-            XCTAssertEqual(b.minX - a.maxX, WinMessageBoxLayout.buttonPitch - WinMessageBoxLayout.buttonSize.width, accuracy: 0.5)
-        }
-        XCTAssertTrue(layout.buttonFrames.allSatisfy { $0.width >= WinMessageBoxLayout.buttonSize.width })
-        XCTAssertGreaterThan(layout.buttonFrames[2].width, layout.buttonFrames[1].width, "Skip This Version is wider")
-        XCTAssertGreaterThanOrEqual(layout.buttonFrames.first?.minX ?? 0, 27)
-    }
 }

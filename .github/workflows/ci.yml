@@ -51,14 +51,6 @@ jobs:
         run: Mac/scripts/check-hygiene.sh
       - name: Relative Markdown links
         run: Mac/scripts/check-links.sh
-      - name: Icons are regenerated from the upstream .ico files and match what is committed
-        run: |
-          Mac/scripts/make-icons.sh
-          if ! git diff --quiet -- Mac/Resources || [ -n "$(git status --porcelain --untracked-files=all -- Mac/Resources)" ]; then
-            echo "::error::Mac/scripts/make-icons.sh changed the committed icons; run it and commit the result."
-            git status --short -- Mac/Resources
-            exit 1
-          fi
 
   build:
     name: Build (universal Debug + Release, disk image)

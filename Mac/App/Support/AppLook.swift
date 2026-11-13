@@ -8,9 +8,8 @@
 
 import AppKit
 
-/// The address band and the status bar. Kept out of WinChrome.swift, which the Quick Look
-/// extension compiles too.
-extension WinChrome {
+/// The address band and the status bar.
+enum AppLook {
     // The address bar is a 32 pt strip with a 24 pt rounded field inset by 4 pt top and bottom and
     // 8 pt on the right, the Up button a 24 pt square 8 pt in.
 
