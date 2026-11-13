@@ -99,8 +99,8 @@ final class MacLookUITests: SevenZipUITestCase {
         XCTAssertTrue(panel.waitForRow(named: "keep-me.txt"))
         panel.select("keep-me.txt")
         app.typeKey(.delete, modifierFlags: [.command, .option])       // File > Delete Immediately…
-        // An NSAlert-style sheet: AX reports it as a dialog attached to the main window.
-        let sheet = sevenZip.window.dialogs.firstMatch
+        // An NSAlert-style sheet attached to the main window (AX role Sheet).
+        let sheet = sevenZip.window.sheets.firstMatch
         let asked = sheet.waitForExistence(timeout: 15)
         if !asked { sevenZip.dumpTree("maclook-delete") }
         XCTAssertTrue(asked, "the confirmation is not a sheet")
