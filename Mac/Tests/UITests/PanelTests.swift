@@ -266,7 +266,7 @@ final class PanelTests: SevenZipUITestCase {
         // CascadedMenu (default on): the 7-Zip commands are one "7-Zip" submenu at the top
         // (ContextMenu.cpp:1013-1020), the File-menu items follow it directly.
         XCTAssertEqual(titles.first, "7-Zip", "context menu: \(titles)")
-        for expected in ["Rename", "Delete", "Properties", "Open Inside *", "CRC", "Link..."] {
+        for expected in ["Rename", "Move to Trash", "Get Info", "Open Inside *", "CRC", "Link..."] {
             XCTAssertTrue(titles.contains(expected), "context menu has no '\(expected)': \(titles)")
         }
         let sevenZipItem = menu.menuItems["7-Zip"]

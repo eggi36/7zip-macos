@@ -21,9 +21,16 @@ final class NewWindowUITests: SevenZipUITestCase {
 
     // MARK: - helpers
 
-    /// The file-manager windows: their title is the focused panel's path (CApp::RefreshTitle).
+    /// The file-manager windows: titled after the focused panel's folder with its path as the
+    /// subtitle, as Finder does -- "name – /enclosing/path" to accessibility ("/" at the root).
     private var managerWindows: XCUIElementQuery {
-        app.windows.matching(NSPredicate(format: "title BEGINSWITH '/'"))
+        app.windows.matching(NSPredicate(format: "title CONTAINS ' – /' OR title BEGINSWITH '/'"))
+    }
+
+    /// The title of a window showing the fixtures folder: "Fixtures – /path/to/Tests".
+    private var fixturesTitle: String {
+        let path = TestPaths.fixtures as NSString
+        return path.lastPathComponent + " – " + path.deletingLastPathComponent
     }
 
     private func waitForManagerWindows(_ count: Int, timeout: TimeInterval = 20) -> Bool {
@@ -77,7 +84,7 @@ final class NewWindowUITests: SevenZipUITestCase {
         XCTAssertTrue(waitForManagerWindows(2), "a reopen must open a new window, found \(managerWindows.count)")
         // Both start at the saved path, as two 7zFM launches would.
         let titles = managerWindows.allElementsBoundByIndex.map(\.title)
-        XCTAssertEqual(titles.filter { $0.hasPrefix(TestPaths.fixtures) }.count, 2, "\(titles)")
+        XCTAssertEqual(titles.filter { $0 == fixturesTitle }.count, 2, "\(titles)")
         screenshot("01-reopen-second-window")
         XCTAssertTrue(try sendReopen())
         XCTAssertTrue(waitForManagerWindows(3))
@@ -97,7 +104,8 @@ final class NewWindowUITests: SevenZipUITestCase {
         }, "no visible window after the reopen")
         // Un-minimizing the window (AppKit's own reaction to a reopen) would leave one window; a
         // new one makes two. The Window menu lists every window, minimized ones included.
-        let listed = sevenZip.itemTitles(in: "Window").filter { $0.hasPrefix("/") }
+        // Each window is listed as "folder (/enclosing/path)", Finder style.
+        let listed = sevenZip.itemTitles(in: "Window").filter { $0.contains(" (/") || $0.hasPrefix("/") }
         sevenZip.closeOpenMenus()
         XCTAssertEqual(listed.count, 2, "the reopen must open a new window, not un-minimize: \(listed)")
         screenshot("05-reopen-after-minimize")
@@ -160,7 +168,8 @@ final class NewWindowUITests: SevenZipUITestCase {
         XCTAssertTrue(waitFor("the window back on screen") {
             self.managerWindows.allElementsBoundByIndex.contains { $0.isHittable }
         }, "a Dock click must restore the minimized window")
-        let listed = sevenZip.itemTitles(in: "Window").filter { $0.hasPrefix("/") }
+        // Each window is listed as "folder (/enclosing/path)", Finder style.
+        let listed = sevenZip.itemTitles(in: "Window").filter { $0.contains(" (/") || $0.hasPrefix("/") }
         sevenZip.closeOpenMenus()
         XCTAssertEqual(listed.count, 1, "a Dock click must restore, not open a window: \(listed)")
         screenshot("07-dock-click-restores")
@@ -224,7 +233,7 @@ final class NewWindowUITests: SevenZipUITestCase {
             self.managerWindows.allElementsBoundByIndex.contains { $0.title.contains("test.7z") }
         })
         let titles = managerWindows.allElementsBoundByIndex.map(\.title)
-        XCTAssertTrue(titles.contains { !$0.contains("test.7z") && $0.hasPrefix(TestPaths.fixtures) },
+        XCTAssertTrue(titles.contains { $0 == fixturesTitle },
                       "the first window must keep its folder: \(titles)")
         screenshot("03-archive-own-window")
     }

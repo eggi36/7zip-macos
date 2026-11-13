@@ -305,6 +305,14 @@ final class DialogWindow: NSWindow {
         DialogKit.center(self, over: owner)
     }
 
+    /// Attached as a sheet it is the window's sheet to accessibility too, not a free-standing
+    /// dialog: the modal session it runs in would otherwise list it twice, and UI automation then
+    /// takes the second entry for an alert covering the sheet.
+    override func accessibilityRole() -> NSAccessibility.Role? { sheetParent != nil ? .sheet : super.accessibilityRole() }
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? { sheetParent != nil ? nil : super.accessibilitySubrole() }
+    /// A sheet shows no title bar, but VoiceOver (and UI automation) still names it by its caption.
+    override func accessibilityTitle() -> String? { super.accessibilityTitle().flatMap { $0.isEmpty ? nil : $0 } ?? title }
+
     /// The plain AppKit behaviour, for a dialog with no owner at all.
     func centerOnScreen() {
         super.center()
@@ -435,6 +443,10 @@ extension DialogKit {
     /// mode, or a dialog owned by a progress window, the benchmark or nothing.
     static func sheetParent(for window: NSWindow) -> NSWindow? {
         guard !GMode.isActive else { return nil }
+        // Another window's modal session is running (an operation's progress window asking for a
+        // password or an overwrite): a sheet of the main window would sit behind that window, out
+        // of reach. The dialog is then a window of its own, ordered in front of it.
+        if let modal = NSApp.modalWindow, modal !== window { return nil }
         let hint = (window as? DialogWindow)?.owner ?? (window as? WinMessageBoxWindow)?.ownerWindow
         guard let owner = owner(for: window, parent: hint), owner.isVisible, !owner.isMiniaturized,
               owner.attachedSheet == nil else { return nil }

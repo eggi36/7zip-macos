@@ -486,7 +486,9 @@ final class WinMessageBoxWindow: NSWindow {
 
     override var canBecomeKey: Bool { true }
 
-    override func accessibilitySubrole() -> NSAccessibility.Subrole? { .dialog }
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? { sheetParent != nil ? nil : .dialog }
+    override func accessibilityRole() -> NSAccessibility.Role? { sheetParent != nil ? .sheet : super.accessibilityRole() }
+    override func accessibilityTitle() -> String? { super.accessibilityTitle().flatMap { $0.isEmpty ? nil : $0 } ?? title }
 }
 
 /// native-look: the Mac look's alert geometry, measured from NSAlert on macOS 27: 260 pt wide, a

@@ -145,7 +145,7 @@ final class FinderIntegrationTests: SevenZipUITestCase {
         }
         // "no document windows" (03 section 6.4): the file manager, whose title is the panel's
         // path, is never on screen.
-        XCTAssertEqual(app.windows.matching(NSPredicate(format: "title BEGINSWITH '/'")).count, 0)
+        XCTAssertEqual(app.windows.matching(NSPredicate(format: "title CONTAINS ' – /' OR title BEGINSWITH '/'")).count, 0)
         screenshot("10-command-mode-argv")
         XCTAssertTrue(sevenZip.dismissDialog(dialog, button: "Cancel"))
         // Cancel is E_ABORT, which ends the command-mode process.

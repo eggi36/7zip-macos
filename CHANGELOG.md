@@ -28,7 +28,7 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - Dialogs about a window's content open as sheets of that window, as the HIG asks: Add to
     Archive, Extract, Copy, Move, Rename, Create Folder, Split, Link, the password and overwrite
     questions and every message box -- while a progress window, the benchmark or a 7zG command
-    owns them they stay windows of their own. Each still answers the code that asked, so nothing
+    owns them, or another dialog is open, they stay windows of their own, in front. Each still answers the code that asked, so nothing
     else changes. The one-field dialog (Rename, Create Folder, Comment, Select) shows its caption
     as a bold heading, since a sheet has no title bar.
   - The menus use the Mac's names and shortcuts: *Settings…* (Cmd+,), *About* and *Check for
