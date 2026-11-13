@@ -100,8 +100,8 @@ grammar remains available to the command line (`7-Zip.app/Contents/MacOS/7-Zip a
 ## Resources
 
 `Mac/Resources/`: `Lang/`, `SFX/`, `Help/` (from the official release, see
-[building.md](building.md#bundled-assets)), `Icons/` (the document icons) and `Assets.xcassets` (the app
-icon), both drawn by `Mac/scripts/make-mac-icons.sh`, `Info.plist` files and entitlements.
+[building.md](building.md#bundled-assets)), `Icons/` (the document icons) and `AppIcon.icon` (the app
+icon, an Icon Composer icon with a Dark-mode look), both drawn by `Mac/scripts/make-mac-icons.sh`, `Info.plist` files and entitlements.
 
 The detailed design notes and the per-component APIs are in [`ai/architecture.md`](../ai/architecture.md)
 and [`ai/api/`](../ai/api/).
