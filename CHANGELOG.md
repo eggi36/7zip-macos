@@ -89,6 +89,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   of Apple's utilities with the same grey zipper, its pull in 7-Zip blue, and no lettering (as the
   HIG asks of app icons). `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
   - A click anywhere on a row selects it, as in Finder.
+  - A fresh install shows the toolbar's symbols without labels, as Mac apps do (*View ▸ Toolbars
+    ▸ Show Buttons Text* adds them).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
     Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
     arrangement is saved. View ▸ Toolbars adds or removes the archive and standard groups in place.

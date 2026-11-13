@@ -320,10 +320,13 @@ enum Settings {
     }
 
     /// Toolbars mask: bit0 labels, bit1 large buttons, bit2 standard toolbar, bit3 archive
-    /// toolbar; bit31 = "never saved" (kDefaultToolbarMask = bit31 | 8 | 4 | 1).
+    /// toolbar; bit31 = "never saved". 7zFM's kDefaultToolbarMask is bit31 | 8 | 4 | 1; a fresh
+    /// install here shows the toolbar's symbols without labels, as Mac apps do (View > Toolbars >
+    /// Show Buttons Text turns them on).
+    static let defaultToolbarsMask: UInt32 = 0x8000_0000 | 8 | 4
     static var toolbarsMask: UInt32 {
         get {
-            guard hasKey(Key.toolbars) else { return 0x8000_0000 | 8 | 4 | 1 }
+            guard hasKey(Key.toolbars) else { return defaultToolbarsMask }
             return UInt32(truncatingIfNeeded: integer(Key.toolbars))
         }
         set { setInteger(Int(Int32(truncatingIfNeeded: newValue)), Key.toolbars) }

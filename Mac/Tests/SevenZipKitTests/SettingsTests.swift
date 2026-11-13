@@ -87,7 +87,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings.language, "")
         XCTAssertEqual(Settings.listMode(0), 3)                       // details
         XCTAssertEqual(Settings.numPanels, 1)                         // kNumDefaultPanels
-        XCTAssertEqual(Settings.toolbarsMask, 0x8000_0000 | 8 | 4 | 1) // kDefaultToolbarMask
+        XCTAssertEqual(Settings.toolbarsMask, 0x8000_0000 | 8 | 4)    // kDefaultToolbarMask without labels
         XCTAssertEqual(Settings.folderShortcuts.count, 10)
         XCTAssertTrue(Settings.folderHistory.isEmpty)
 
