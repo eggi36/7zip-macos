@@ -359,10 +359,12 @@ extension PanelIconView: NSCollectionViewDataSource, NSCollectionViewDelegate {
         guard let panel else { return }
         if let last = indexPaths.map({ $0.item }).max() { panel.noteClickedRow(last) }
         panel.refreshStatusBar()
+        panel.refreshQuickLookIfShown()                           // an open preview follows, as in Details
     }
 
     func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt indexPaths: Set<IndexPath>) {
         panel?.refreshStatusBar()
+        panel?.refreshQuickLookIfShown()
     }
 
     // MARK: Drag source (CPanel::OnDrag) -- the Details table's code path, per item

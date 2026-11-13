@@ -836,6 +836,8 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         } else {
             view.window?.makeFirstResponder(iconView.collectionView)
         }
+        // Another first responder: an open Quick Look panel is bound to this list again.
+        refreshQuickLookIfShown()
     }
 
     // MARK: - Flat view (ChangeFlatMode, Panel.cpp:894-903)

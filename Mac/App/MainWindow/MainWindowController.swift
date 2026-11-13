@@ -413,6 +413,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     func setFocusedPanel(_ index: Int) {
         focusedPanelIndex = index
         for (i, panel) in panels.enumerated() { panel.isActive = i == index }
+        focusedPanel.refreshQuickLookIfShown()      // an open preview shows the other panel's selection
         refreshTitle()
     }
 

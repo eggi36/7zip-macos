@@ -114,8 +114,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - View ▸ Show Buttons Text is gone; the toolbar's right-click menu switches the labels.
 - **Quick Look inside archives**: Space on files inside an archive previews them, as Finder does;
   they are extracted to a temporary folder, which is removed when you leave the archive or quit.
-- An open Quick Look panel follows the selection again after switching windows (Mission Control,
-  Cmd-Tab); it used to keep showing the previous file.
+- An open Quick Look panel follows the selection in every view: in Large Icons, Small Icons and
+  List it kept showing the first file, and after switching the view, the panel or the window
+  (Mission Control, Cmd-Tab) it could stay on the previous one.
 - **A raw .bin opens without its .cue**: its data track as Track01.iso (the cue sheet stays the way
   to see the separate tracks).
 - **GameCube disc images** (.gcm, and GameCube .iso files) open: the files of the disc under
