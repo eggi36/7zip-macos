@@ -210,4 +210,106 @@ final class DiscImageTests: XCTestCase {
             """.utf8), "clone.ccd")
         try checkDataAndAudio(path("clone.ccd"))
     }
+
+    // MARK: - binary helpers
+
+    private func le16(_ v: Int) -> Data { withUnsafeBytes(of: UInt16(v).littleEndian) { Data($0) } }
+    private func le32(_ v: Int) -> Data { withUnsafeBytes(of: UInt32(truncatingIfNeeded: v).littleEndian) { Data($0) } }
+    private func le64(_ v: Int) -> Data { withUnsafeBytes(of: UInt64(v).littleEndian) { Data($0) } }
+    private func be16(_ v: Int) -> Data { withUnsafeBytes(of: UInt16(v).bigEndian) { Data($0) } }
+    private func be32(_ v: Int) -> Data { withUnsafeBytes(of: UInt32(truncatingIfNeeded: v).bigEndian) { Data($0) } }
+    private func be64(_ v: Int) -> Data { withUnsafeBytes(of: UInt64(v).bigEndian) { Data($0) } }
+    private func zeros(_ n: Int) -> Data { Data(count: n) }
+
+    // MARK: - MDS/MDF
+
+    /// An Alcohol 1.x descriptor: header, one session, two track blocks with extra blocks, and
+    /// a footer naming "*.mdf".
+    func testMdsWithDataAndAudio() throws {
+        let raw = rawMode1(iso)
+        try write(raw + audio, "alcohol.mdf")
+        let dataSectors = raw.count / 2352, audioSectors = audio.count / 2352
+        // offsets: header 0x58, session 0x58 (0x18), tracks 0x70 (2 x 0x50), extras 0x110 (2 x 8),
+        // footer 0x120 (0x10), name 0x130
+        var mds = Data("MEDIA DESCRIPTOR".utf8) + Data([1, 3]) + le16(0) + le16(1) + zeros(4) + le16(0)
+        mds += zeros(8) + le32(0) + zeros(24) + le32(0) + zeros(12) + le32(0x58) + le32(0)
+        XCTAssertEqual(mds.count, 0x58)
+        mds += le32(-150) + le32(dataSectors + audioSectors) + le16(1) + Data([2, 0]) + le16(1) + le16(2) + le32(0) + le32(0x70)
+        func track(mode: UInt8, point: UInt8, extra: Int, start: Int, offset: Int) -> Data {
+            var t = Data([mode, 0, 0x14, 0, point, 0, 0, 0, 0, 0, 0, 0]) + le32(extra) + le16(2352)
+            t += zeros(18) + le32(start) + le64(offset) + le32(1) + le32(0x120) + zeros(24)
+            return t
+        }
+        mds += track(mode: 0xAA, point: 1, extra: 0x110, start: 0, offset: 0)
+        mds += track(mode: 0xA9, point: 2, extra: 0x118, start: dataSectors, offset: raw.count)
+        mds += le32(0) + le32(dataSectors) + le32(0) + le32(audioSectors)
+        mds += le32(0x130) + le32(0) + le32(0) + le32(0)
+        mds += Data("*.mdf".utf8) + Data([0])
+        try write(mds, "alcohol.mds")
+        try checkDataAndAudio(path("alcohol.mds"))
+    }
+
+    // MARK: - NRG
+
+    /// A Nero 2 image: the sectors, then a DAOX chunk for both tracks, SINF, END! and the
+    /// "NER5" footer pointing at the chunks.
+    func testNrgWithDataAndAudio() throws {
+        let raw = rawMode1(iso)
+        var nrg = raw + audio
+        let chunks = nrg.count
+        var dao = be32(0) + zeros(14) + Data([0, 0]) + Data([1, 2])
+        func entry(size: Int, mode: UInt8, index1: Int, end: Int) -> Data {
+            zeros(12) + be16(size) + Data([mode, 0, 0, 0]) + be64(index1) + be64(index1) + be64(end)
+        }
+        dao += entry(size: 2352, mode: 0x06, index1: 0, end: raw.count)
+        dao += entry(size: 2352, mode: 0x07, index1: raw.count, end: raw.count + audio.count)
+        nrg += Data("DAOX".utf8) + be32(dao.count) + dao
+        nrg += Data("SINF".utf8) + be32(4) + be32(2)
+        nrg += Data("END!".utf8) + be32(0)
+        nrg += Data("NER5".utf8) + be64(chunks)
+        try write(nrg, "nero.nrg")
+        try checkDataAndAudio(path("nero.nrg"))
+    }
+
+    /// Nero 1 (DAOI, 32-bit offsets, "NERO" footer) with the ISO as cooked 2048-byte sectors.
+    func testNrgVersion1Cooked() throws {
+        var nrg = iso
+        let chunks = nrg.count
+        var dao = be32(0) + zeros(14) + Data([0, 0]) + Data([1, 1])
+        dao += zeros(12) + be16(2048) + Data([0, 0, 0, 0]) + be32(0) + be32(0) + be32(iso.count)
+        nrg += Data("DAOI".utf8) + be32(dao.count) + dao
+        nrg += Data("END!".utf8) + be32(0)
+        nrg += Data("NERO".utf8) + be32(chunks)
+        try write(nrg, "old.nrg")
+        XCTAssertEqual(try list(path("old.nrg")).map(\.name), ["Track01.iso"])
+        XCTAssertEqual(data(try extract(path("old.nrg")), "Track01.iso"), iso)
+    }
+
+    // MARK: - CDI
+
+    /// A DiscJuggler 3.5 image: both tracks' sectors (data with a 150-sector pregap), then the
+    /// descriptor and the version / header-size footer.
+    func testCdiWithDataAndAudio() throws {
+        let raw = rawMode1(iso)
+        let pregap = Data(count: 150 * 2352)
+        var cdi = pregap + raw + audio
+        let header = cdi.count
+        let mark = Data([0, 0, 1, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF])
+        func track(pregapSectors: Int, sectors: Int, mode: Int) -> Data {
+            var t = le32(0) + mark + mark + zeros(4) + Data([4]) + Data("t.wv".utf8)
+            t += zeros(11 + 4 + 4) + le32(0) + zeros(2) + le32(pregapSectors) + le32(sectors) + zeros(6)
+            t += le32(mode) + zeros(12) + le32(0) + le32(pregapSectors + sectors) + zeros(16) + le32(2)
+            t += zeros(29) + zeros(5) + le32(0)
+            return t
+        }
+        var desc = le16(1) + le16(2)
+        desc += track(pregapSectors: 150, sectors: raw.count / 2352, mode: 1)
+        desc += track(pregapSectors: 0, sectors: audio.count / 2352, mode: 0)
+        desc += zeros(4 + 8 + 1)
+        cdi += desc
+        let total = cdi.count + 8
+        cdi += le32(0x8000_0006) + le32(total - header)
+        try write(cdi, "juggler.cdi")
+        try checkDataAndAudio(path("juggler.cdi"))
+    }
 }
