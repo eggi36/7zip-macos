@@ -139,7 +139,36 @@ final class NewWindowUITests: SevenZipUITestCase {
             throw XCTSkip("the Dock shows \(count) tiles titled \(name) (an installed 7-Zip is kept or "
                           + "recent in the Dock); not clicking one that may launch it")
         }
-        return query.firstMatch
+        let tile = query.firstMatch
+        revealDock(showing: tile)
+        return tile
+    }
+
+    /// An auto-hidden Dock keeps its tiles off screen until the pointer reaches its edge: move
+    /// the pointer to the edge the tile is beyond (left, bottom or right) and wait for it.
+    private func revealDock(showing tile: XCUIElement) {
+        guard !tile.isHittable, let screen = NSScreen.main?.frame else { return }
+        let frame = tile.frame                         // XCUITest coordinates: origin top left
+        let point: CGPoint
+        if frame.maxX <= screen.minX + 1 {
+            point = CGPoint(x: screen.minX, y: frame.midY)
+        } else if frame.minX >= screen.maxX - 1 {
+            point = CGPoint(x: screen.maxX - 1, y: frame.midY)
+        } else {
+            point = CGPoint(x: frame.midX, y: screen.height - 1)
+        }
+        // The menu bar's top-left corner is the screen's (XCUITest coordinates), a fixed anchor.
+        let origin = app.menuBars.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let edge = origin.withOffset(CGVector(dx: point.x - origin.screenPoint.x, dy: point.y - origin.screenPoint.y))
+        // The Dock shows on a movement that reaches the edge; a jump straight onto it is not
+        // always one, so come in from 40 pt away, a few times.
+        let inward = CGVector(dx: point.x <= screen.minX ? 40 : (point.x >= screen.maxX - 1 ? -40 : 0),
+                              dy: point.x <= screen.minX || point.x >= screen.maxX - 1 ? 0 : -40)
+        for _ in 0..<4 where !tile.isHittable {
+            edge.withOffset(inward).hover()
+            edge.hover()
+            _ = waitFor("the Dock shown", timeout: 2) { tile.isHittable }
+        }
     }
 
     /// A click on the Dock tile sends the reopen event from the Dock: the open window is shown,
