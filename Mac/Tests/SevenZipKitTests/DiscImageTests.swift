@@ -483,4 +483,75 @@ final class DiscImageTests: XCTestCase {
         try write(z + body, "packed.iso.zisofs")
         try checkSingleISO(path("packed.iso.zisofs"), format: "zisofs")
     }
+
+    // MARK: - ECM
+
+    /// The EDC of a CD sector, bit by bit (independent of the handler's table).
+    private func edc(_ d: Data) -> UInt32 {
+        var crc: UInt32 = 0
+        for byte in d {
+            crc ^= UInt32(byte)
+            for _ in 0..<8 { crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xD801_8001 : crc >> 1 }
+        }
+        return crc
+    }
+
+    /// An ECM record header: type and count - 1, 5 bits then 7 per byte.
+    private func ecmHeader(type: Int, count: UInt32) -> Data {
+        var n = count &- 1
+        var out = Data([UInt8(type) | UInt8((n & 0x1F) << 2)])
+        n >>= 5
+        while n != 0 {
+            out[out.count - 1] |= 0x80
+            out.append(UInt8(n & 0x7F))
+            n >>= 7
+        }
+        return out
+    }
+
+    /// Mode 1 sectors (address + data stored), 5 Mode 2 Form 1 sectors (subheader + data
+    /// stored) and raw audio bytes; the handler rebuilds sync, header and EDC / ECC.
+    func testEcmRebuildsTheSectors() throws {
+        let raw = rawMode1(iso)
+        let mode1 = raw.count / 2352
+        var ecm = Data("ECM".utf8) + Data([0])
+        ecm += ecmHeader(type: 1, count: UInt32(mode1))
+        for i in 0..<mode1 {
+            let s = raw.subdata(in: (i * 2352)..<((i + 1) * 2352))
+            ecm += s.subdata(in: 12..<15) + s.subdata(in: 16..<2064)
+        }
+        let form1 = 5
+        let sub = Data([0, 0, 0x08, 0])
+        ecm += ecmHeader(type: 2, count: UInt32(form1))
+        for i in 0..<form1 { ecm += sub + Data(repeating: UInt8(0x40 + i), count: 2048) }
+        ecm += ecmHeader(type: 0, count: UInt32(audio.count))
+        ecm += audio
+        ecm += Data([0xFC, 0xFF, 0xFF, 0xFF, 0x3F]) + le32(0)      // end of records, image EDC
+        try write(ecm, "game.bin.ecm")
+
+        let folder = try SZFolder.folder(forPath: path("game.bin.ecm"), formatHint: "ECM", passwordDelegate: nil)
+        try folder.loadItems()
+        XCTAssertEqual(folder.itemCount, 1)
+        XCTAssertEqual(folder.nameOfItem(at: 0), "game.bin")
+        let total = mode1 * 2352 + form1 * 2336 + audio.count
+        XCTAssertEqual(folder.sizeOfItem(at: 0), UInt64(total))
+        let bin = data(try extract(path("game.bin.ecm")), "game.bin")
+        XCTAssertEqual(bin.count, total)
+        for i in [0, 1, mode1 / 2, mode1 - 1] {
+            let s = bin.subdata(in: (i * 2352)..<((i + 1) * 2352))
+            XCTAssertEqual(s.prefix(12), Data([0] + [UInt8](repeating: 0xFF, count: 10) + [0]), "sync \(i)")
+            XCTAssertEqual(s[15], 1, "mode \(i)")
+            XCTAssertEqual(s.subdata(in: 12..<15), raw.subdata(in: (i * 2352 + 12)..<(i * 2352 + 15)), "address \(i)")
+            XCTAssertEqual(s.subdata(in: 16..<2064), iso.subdata(in: (i * 2048)..<((i + 1) * 2048)), "data \(i)")
+            let stored = s.subdata(in: 0x810..<0x814).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            XCTAssertEqual(UInt32(littleEndian: stored), edc(s.prefix(0x810)), "EDC \(i)")
+            XCTAssertFalse(s.subdata(in: 0x81C..<0x930).allSatisfy { $0 == 0 }, "ECC \(i)")
+        }
+        let f1 = bin.subdata(in: (mode1 * 2352)..<(mode1 * 2352 + 2336))
+        XCTAssertEqual(f1.prefix(8), sub + sub, "the subheader, written twice")
+        XCTAssertEqual(f1.subdata(in: 8..<2056), Data(repeating: 0x40, count: 2048))
+        let f1edc = f1.subdata(in: 0x808..<0x80C).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        XCTAssertEqual(UInt32(littleEndian: f1edc), edc(f1.prefix(0x808)), "Form 1 EDC")
+        XCTAssertEqual(bin.suffix(audio.count), audio)
+    }
 }
