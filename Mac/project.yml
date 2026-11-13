@@ -639,10 +639,14 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Resources/App.entitlements
     # Every build gets a stamp of its own for the About box (PortVersion.buildStamp): the time it
     # was built and the commit, "+" when the working tree had changes. Runs on every build, after
-    # Info.plist is processed and before signing.
+    # Info.plist is processed (its input) and before signing.
     postBuildScripts:
       - name: Build stamp
         basedOnDependencyAnalysis: false
+        # The processed Info.plist as input: without it the phase could run before
+        # ProcessInfoPlistFile, which then wrote the plist again without the stamp (a Release build).
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         script: |
           plist="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
           root="$SRCROOT/.."
