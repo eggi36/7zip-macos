@@ -38,36 +38,29 @@ final class ListFeelInputTests: SevenZipUITestCase {
         row.cells.allElementsBoundByIndex.sorted { $0.frame.minX < $1.frame.minX }
     }
 
-    /// FullRow off (the default), measured on 7zFM: a drag that starts on a Size cell is the
-    /// background's -- a dotted rubber band, not an item drag -- and selects the rows whose icon or
-    /// name it crosses, nothing when it stays over the other columns; a click on a Size cell
-    /// clears the selection; a click on a name selects it.
-    func testRubberBandFromTheOtherColumns() throws {
+    /// As in Finder's list: the whole row is the item, so a click on any of its cells selects it,
+    /// and the rubber band starts on the empty list below the rows and selects every row it
+    /// crosses, whichever column it crosses them in.
+    func testRubberBandFromTheEmptyList() throws {
         let scratch = try makeScratch()
         launch(seed: .values([SettingsDomain.Key.panelPath0: scratch]))
         let panel = sevenZip.panel(0)
-        XCTAssertTrue(panel.waitForRow(named: "d.txt"))
-        let a = cells(of: panel.row(named: "a.txt")), d = cells(of: panel.row(named: "d.txt"))
-        XCTAssertGreaterThan(a.count, 2)
-        XCTAssertGreaterThan(d.count, 2)
+        XCTAssertTrue(panel.waitForRow(named: "notes.md"))
+        let b = cells(of: panel.row(named: "b.bin"))
+        XCTAssertGreaterThan(b.count, 2)
         let mid = CGVector(dx: 0.5, dy: 0.5)
 
-        // Over the Size and Modified cells only: the band meets no item.
-        a[1].coordinate(withNormalizedOffset: mid).press(forDuration: 0.2, thenDragTo: d[2].coordinate(withNormalizedOffset: mid))
-        XCTAssertTrue(waitFor("nothing selected") { selected(panel).hasPrefix("0 / ") }, "status \(panel.status)")
-        XCTAssertTrue(panel.waitForRow(named: "a.txt"), "the drag moved an item")
-
-        // From the Size cell of a.txt back to d.txt's icon: a.txt, b.bin, c.txt and d.txt.
-        let icon = d[0].coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 10, dy: 0))
-        a[1].coordinate(withNormalizedOffset: mid).press(forDuration: 0.2, thenDragTo: icon)
+        // From the empty list under the rows up into b.bin's Size cell: b.bin, c.txt, d.txt and
+        // notes.md (the folder "sub" and a.txt sit above it).
+        let empty = panel.table.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.95))
+        empty.click(forDuration: 0.2, thenDragTo: b[1].coordinate(withNormalizedOffset: mid))
         XCTAssertTrue(waitFor("four selected") { selected(panel).hasPrefix("4 / ") }, "status \(panel.status)")
         screenshot("input-rubber-band")
 
-        // A click on a Size cell is a click on the background: the selection goes.
-        a[1].click()
+        // A click on the empty list clears the selection; a click on a Size cell selects its row.
+        empty.click()
         XCTAssertTrue(waitFor("cleared") { selected(panel).hasPrefix("0 / ") }, "status \(panel.status)")
-        // A click on the name selects.
-        panel.select("b.bin")
+        b[1].click()
         XCTAssertTrue(waitFor("b.bin selected") { selected(panel).hasPrefix("1 / ") }, "status \(panel.status)")
     }
 
