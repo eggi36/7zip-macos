@@ -74,7 +74,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         } else {
             window.backgroundColor = WinChrome.face      // COLOR_BTNFACE (recheck §2)
         }
-        window.tabbingMode = .disallowed
+        if AppLook.isMac {
+            // native-look: the windows can be tabs of one another (File > New Tab, the tab bar's
+            // "+", Window > Merge All Windows); .automatic follows System Settings' tab preference.
+            window.tabbingMode = .automatic
+            window.tabbingIdentifier = Self.tabbingIdentifier
+        } else {
+            window.tabbingMode = .disallowed
+        }
         // The controller owns the window; with several windows opening and closing
         // (`MainWindows`), AppKit's extra release on close would free it under the controller.
         window.isReleasedWhenClosed = false
@@ -804,5 +811,19 @@ final class PanelSplitView: NSSplitView {
         if isMacLook { super.drawDivider(in: rect); return }
         WinChrome.face.setFill()
         rect.fill()
+    }
+}
+
+// MARK: - native-look: window tabs
+
+extension MainWindowController {
+
+    static let tabbingIdentifier = "sz.fileManager"
+
+    /// File > New Tab and the tab bar's "+" (the responder-chain action AppKit sends): a new
+    /// window from the saved settings, as File > New Window, but as a tab of this one.
+    override func newWindowForTab(_ sender: Any?) {
+        guard AppLook.isMac, let window else { return }
+        MainWindows.openTab(next: window)
     }
 }

@@ -9,12 +9,13 @@ import Foundation
 import SevenZipKit
 
 enum MacTerm: String {
-    case settings, newFolder, newFile, getInfo, moveToTrash, deleteImmediately, closeWindow
+    case settings, newTab, newFolder, newFile, getInfo, moveToTrash, deleteImmediately, closeWindow
     case go, enclosingFolder, sortBy, customizeToolbar, showToolbar, help
 
     private var table: [String: String] {
         switch self {
         case .settings: return ["en": "Settings…", "de": "Einstellungen …"]
+        case .newTab: return ["en": "New Tab", "de": "Neuer Tab"]
         case .newFolder: return ["en": "New Folder", "de": "Neuer Ordner"]
         case .newFile: return ["en": "New File", "de": "Neue Datei"]
         case .getInfo: return ["en": "Get Info", "de": "Informationen"]

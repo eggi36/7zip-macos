@@ -43,6 +43,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     German; other languages keep their translation of the Windows name.
   - *Edit ▸ Undo Move to Trash* (Cmd+Z) puts trashed files and folders back where they were, and
     *Redo* (Shift+Cmd+Z) trashes them again, as in the Finder.
+  - Windows can be tabs: *File ▸ New Tab* (Cmd+T), the tab bar's **+** and the Window menu's tab
+    commands (*Merge All Windows*, *Move Tab to New Window* ...); a new tab starts from the saved
+    settings like a new window. System Settings' "Prefer tabs" is followed.
   - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
     window title, the window fitting each pane's height, and every change taking effect at once
     -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the

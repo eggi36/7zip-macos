@@ -60,6 +60,19 @@ enum MainWindows {
         return controller
     }
 
+    /// native-look: File > New Tab -- a new window from the saved settings, added as a tab of
+    /// `window` (window tabs are a macOS addition, 7zFM has none).
+    @discardableResult
+    static func openTab(next window: NSWindow) -> MainWindowController {
+        let controller = MainWindowController()
+        register(controller)
+        if let tab = controller.window {
+            window.addTabbedWindow(tab, ordered: .above)
+            tab.makeKeyAndOrderFront(nil)
+        }
+        return controller
+    }
+
     /// Adds a controller that was created elsewhere. It leaves the list when its window closes.
     static func register(_ controller: MainWindowController) {
         guard !controllers.contains(where: { $0 === controller }) else { return }

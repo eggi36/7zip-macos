@@ -142,6 +142,11 @@ enum MainMenu {
                              action: #selector(a.fileNewWindow(_:)))
         // native-look: Cmd+N opens a window, as in Finder; Create File moves to Option+Cmd+N.
         macify(newWindow, key: "n", mods: [.command], keepWindowsKey: false)
+        if AppLook.isMac {
+            // native-look: window tabs (HIG "Windows": tabs), Cmd+T as in Finder and Safari.
+            menu.addItem(NSMenuItem(title: MacTerm.newTab.title, action: #selector(NSResponder.newWindowForTab(_:)),
+                                    keyEquivalent: "t"))
+        }
         menu.addItem(.separator())
         addFileCommands(to: menu)
         // The 7-Zip Explorer commands (CPanel::CreateSevenZipMenu) are not a fixed part of this

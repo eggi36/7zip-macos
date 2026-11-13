@@ -449,6 +449,33 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
     }
 
+    // MARK: native-look: window tabs
+
+    func testMacWindowsOpenAsTabs() throws {
+        let controller = try openWindow(look: .mac)
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(window.tabbingIdentifier, MainWindowController.tabbingIdentifier)
+        window.tabbingMode = .preferred        // TestAnimations turns tabbing off for every test window
+        let menu = MainMenu.build()
+        let newTab = try XCTUnwrap(allItems(menu).first { $0.action == #selector(NSResponder.newWindowForTab(_:)) })
+        XCTAssertEqual(newTab.title, "New Tab")
+        XCTAssertEqual(newTab.keyEquivalent, "t")
+        XCTAssertEqual(newTab.keyEquivalentModifierMask, [.command])
+
+        controller.newWindowForTab(nil)
+        let tabs = window.tabbedWindows ?? []
+        XCTAssertEqual(tabs.count, 2, "the new window is a tab of the first")
+        let tab = try XCTUnwrap(tabs.first { $0 !== window })
+        XCTAssertTrue(tab.windowController is MainWindowController)
+        XCTAssertTrue(MainWindows.controllers.contains { $0.window === tab })
+        tab.toolbar = nil
+        tab.close()
+
+        let classic = try openWindow(look: .classic)
+        XCTAssertEqual(classic.window?.tabbingMode, .disallowed, "Classic: no tabs, as 7zFM")
+        XCTAssertFalse(allItems(MainMenu.build()).contains { $0.action == #selector(NSResponder.newWindowForTab(_:)) })
+    }
+
     // MARK: native-look: undo Move to Trash
 
     func testMacUndoPutsTrashedItemsBack() throws {
