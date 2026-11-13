@@ -491,7 +491,7 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(MacPathBar.parts(of: "/Users/a/b"), ["/", "/Users", "/Users/a", "/Users/a/b"])
         XCTAssertEqual(MacPathBar.parts(of: "/Volumes/Disk/x"), ["/Volumes/Disk", "/Volumes/Disk/x"])
         XCTAssertEqual(MacPathBar.parts(of: ""), [])
-        defer { UserDefaults.standard.removeObject(forKey: "Mac.ShowPathBar") }
+        defer { Settings.removeKey(MacPathBar.key) }
         MacPathBar.isShown = true
 
         let controller = try openWindow(look: .mac)

@@ -97,6 +97,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         }
         window.delegate = self
         TestAnimations.apply(to: window)
+        // native-look: File > New Tab still works under the test harness. Nothing tabs on its own
+        // there: TestAnimations turns NSWindow.allowsAutomaticWindowTabbing off for the process.
+        if AppLook.isMac { window.tabbingMode = .automatic }
         // Signal 2 of the test-support contract: the reset generation, "0" before the first reset.
         // Only under SZ_TEST_SUPPORT, so a shipped window's accessibility value is untouched.
         if TestSupport.isEnabled {

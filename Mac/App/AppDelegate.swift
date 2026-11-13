@@ -165,6 +165,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// File > Close Window when the key window is not a main window (Settings, About, a viewer):
+    /// the main window's controller answers fileExit: itself, everything else closes here --
+    /// Cmd+W closes whatever window is in front, as in every Mac app.
+    @objc func fileExit(_ sender: Any?) {
+        NSApp.keyWindow?.performClose(sender)
+    }
+
     /// native-look: View > Show / Hide Path Bar (Option+Cmd+P, as Finder).
     @objc func toggleMacPathBar(_ sender: Any?) {
         MacPathBar.isShown.toggle()

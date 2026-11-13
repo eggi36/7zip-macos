@@ -12,12 +12,13 @@ import AppKit
 /// Whether the path bars are shown: one setting for every panel and window, as in Finder.
 enum MacPathBar {
     static let didChange = Notification.Name("SZMacPathBarDidChange")
-    private static let key = "Mac.ShowPathBar"
+    /// `FM.ShowPathBar` (macOS only), in the app's settings domain like every other setting.
+    static let key = "FM.ShowPathBar"
 
     static var isShown: Bool {
-        get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+        get { Settings.bool(key, default: true) }
         set {
-            UserDefaults.standard.set(newValue, forKey: key)
+            Settings.setBool(newValue, key)
             NotificationCenter.default.post(name: didChange, object: nil)
         }
     }
