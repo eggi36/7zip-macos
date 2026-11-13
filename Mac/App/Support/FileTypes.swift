@@ -8,7 +8,8 @@
 // (resource.rc:6-32).
 //
 // NOTE: 03 section 3.1 and PROGRESS section 7.2 say "39 extensions"; the 26.03 resource string
-// actually holds 40 (the prose miscounts its own table). All 40 are listed here.
+// actually holds 40 (the prose miscounts its own table). All 40 are listed here, then the 12
+// disc-image extensions of the formats this port adds (Iso7z's list).
 //
 // Plain data on purpose: no AppKit, no engine calls. The `finder` scope generates the
 // CFBundleDocumentTypes / UTImportedTypeDeclarations entries from `FileTypes.all`; the Options >
@@ -102,6 +103,20 @@ enum FileTypes {
         SevenZipFileType(ext: "xar", iconIndex: 19, format: "Xar"),
         SevenZipFileType(ext: "squashfs", iconIndex: 24, format: "SquashFS"),
         SevenZipFileType(ext: "apfs", iconIndex: 25, format: "APFS"),
+        // Disc images after Iso7z (Mac/Core/Handlers): the descriptor or container extensions,
+        // not the generic .bin / .img their data files use. ISO's icon.
+        SevenZipFileType(ext: "cue", iconIndex: 8, format: "CUE"),
+        SevenZipFileType(ext: "ccd", iconIndex: 8, format: "CCD"),
+        SevenZipFileType(ext: "gdi", iconIndex: 8, format: "GDI"),
+        SevenZipFileType(ext: "mds", iconIndex: 8, format: "MDS"),
+        SevenZipFileType(ext: "nrg", iconIndex: 8, format: "NRG"),
+        SevenZipFileType(ext: "cdi", iconIndex: 8, format: "CDI"),
+        SevenZipFileType(ext: "chd", iconIndex: 8, format: "CHD"),
+        SevenZipFileType(ext: "cso", iconIndex: 8, format: "CSO"),
+        SevenZipFileType(ext: "ciso", iconIndex: 8, format: "CSO"),
+        SevenZipFileType(ext: "zso", iconIndex: 8, format: "ZSO"),
+        SevenZipFileType(ext: "isz", iconIndex: 8, format: "ISZ"),
+        SevenZipFileType(ext: "ecm", iconIndex: 8, format: "ECM"),
     ]
 
     /// Icon resource index -> `CPP/7zip/Archive/Icons/<name>.ico` (resource.rc:6-32).

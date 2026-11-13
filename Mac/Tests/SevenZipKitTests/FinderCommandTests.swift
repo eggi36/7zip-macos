@@ -860,7 +860,7 @@ final class FinderCommandTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(FileTypes.all.count, 40, "the association list has 40 extensions")
+        XCTAssertEqual(FileTypes.all.count, 52, "the association list: 7z.dll's 40 extensions and 12 disc images")
         for type in FileTypes.all {
             let expectedIcon = "doc-" + (FileTypes.iconNames[type.iconIndex] ?? "?")
             XCTAssertEqual(iconByExtension[type.ext], expectedIcon,
@@ -891,7 +891,7 @@ final class FinderCommandTests: XCTestCase {
         }
         // 7z is the one extension macOS itself declares as org.7-zip.7-zip-archive.
         let imported7zip = ours.filter { $0.uti != "org.7-zip.7-zip-archive" }
-        XCTAssertEqual(imported7zip.count, 23, "23 of the 40 extensions need an imported type")
+        XCTAssertEqual(imported7zip.count, 35, "35 of the 52 extensions need an imported type")
         for entry in imported7zip {
             let declaration = declared[entry.uti]
             XCTAssertNotNil(declaration, "\(entry.ext) needs an imported type declaration")
@@ -901,7 +901,7 @@ final class FinderCommandTests: XCTestCase {
             XCTAssertEqual(declaration?["UTTypeConformsTo"] as? [String],
                            ["public.data", "public.archive"])
         }
-        XCTAssertEqual(declared.count, 23)
+        XCTAssertEqual(declared.count, 35)
     }
 
     func testURLSchemeAndServicesAreDeclared() throws {
