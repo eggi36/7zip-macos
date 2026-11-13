@@ -198,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `g_App.Save()` and `SaveWindowInfo`. `finishAll` is idempotent, so the manager's own
         // willTerminate observer finds nothing left to do.
         TempOpenManager.shared.finishAll()
+        ArchivePreviewStore.shared.removeAll()     // Quick Look copies of archive items
         // g_App.Save() + SaveWindowInfo (FM.cpp:1028-1047) for every open window, backmost first,
         // so the frontmost one's state is what the next launch reads (MainWindows.swift).
         MainWindows.saveAllForTermination()

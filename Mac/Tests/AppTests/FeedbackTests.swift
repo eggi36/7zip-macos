@@ -47,6 +47,61 @@ final class FeedbackTests: AppHostTestCase {
         XCTAssertTrue(panel.rows.contains { $0.name == "chapter.xhtml" })
     }
 
+    // MARK: - Quick Look inside an archive
+
+    /// Space on a file inside a zip previews a temp copy of it; the copy goes when the panel
+    /// leaves the archive.
+    func testQuickLookInsideAnArchiveShowsATempCopy() throws {
+        let fm = FileManager.default
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("sz-ql-\(UUID().uuidString)")
+        let src = dir + "/src"
+        try fm.createDirectory(atPath: src + "/sub", withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: dir) }
+        try Data("look at me\n".utf8).write(to: URL(fileURLWithPath: src + "/note.txt"))
+        let ditto = Process()
+        ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        ditto.arguments = ["-c", "-k", src, dir + "/box.zip"]
+        try ditto.run()
+        ditto.waitUntilExit()
+
+        let savedPanels = Settings.numPanels, savedPath = Settings.panelPath(0), savedMode = Settings.listMode(0)
+        Settings.numPanels = 1
+        Settings.setListMode(3, 0)
+        let controller = MainWindowController()
+        controller.showWindow(nil)
+        defer {
+            controller.window?.close()
+            Settings.numPanels = savedPanels
+            Settings.setPanelPath(savedPath, 0)
+            Settings.setListMode(savedMode, 0)
+        }
+        let panel = controller.focusedPanel
+        var bound = false
+        panel.navigate(to: dir) { _ in bound = true }
+        XCTAssertTrue(wait(for: "the folder") { bound })
+        panel.openRow(try XCTUnwrap(panel.rows.first { $0.name == "box.zip" }), insideOnly: false, formatHint: nil)
+        XCTAssertTrue(wait(for: "inside box.zip") { panel.currentPath.hasSuffix("box.zip/") })
+
+        let index = try XCTUnwrap(panel.rows.firstIndex { $0.name == "note.txt" })
+        panel.tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        panel.prepareArchivePreviews()
+        let paths = panel.quickLookPaths
+        XCTAssertEqual(paths.count, 1)
+        let copy = try XCTUnwrap(paths.first)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: copy)), Data("look at me\n".utf8))
+        // a folder is not extracted for a preview
+        let sub = try XCTUnwrap(panel.rows.firstIndex { $0.name == "sub" })
+        panel.tableView.selectRowIndexes(IndexSet(integer: sub), byExtendingSelection: false)
+        panel.prepareArchivePreviews()
+        XCTAssertTrue(panel.quickLookPaths.isEmpty)
+        // back on disk: the copy is gone
+        bound = false
+        panel.navigate(to: dir) { _ in bound = true }
+        XCTAssertTrue(wait(for: "back on disk") { bound })
+        panel.prepareArchivePreviews()
+        XCTAssertFalse(fm.fileExists(atPath: copy), "the temp copy is removed")
+    }
+
     // MARK: - Options > Settings: the theme row starts at the margin
 
     func testThemePopupFollowsItsLabel() throws {
