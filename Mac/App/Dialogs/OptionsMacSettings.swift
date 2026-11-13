@@ -1,11 +1,9 @@
-// OptionsMacPage.swift -- Options > macOS: a macOS addition, no Windows counterpart (7zFM's
-// property sheet has six pages, OptionsDialog.cpp:13-20). The last tab, after Language, so the
-// six Windows pages keep their order and their layout untouched (reports/theme.md).
+// OptionsMacSettings.swift -- the macOS additions on Options > Settings (IDD_SETTINGS 2500). 7zFM
+// has no theme, Quick Look or reset; until 1.3.0 they were a "macOS" tab after Language, and the
+// user had them moved onto the Settings page, under its own controls (OptionsSettingsPage.swift).
+// The rows, in dialog units on the 316 x 296 DLU page, below IDD_SETTINGS' last row (y 158):
 //
-// The page is laid out like the others: a template in dialog units on the 316 x 296 DLU page
-// (IDD_* MY_PAGE size), placed with the same `RcPlace` rules, in the dialog font. Its controls:
-//
-//   Theme:  [Light v]           label + CBS_DROPDOWNLIST row, as "Archive format:" in IDD_COMPRESS
+//   Theme:  [System v]          label + CBS_DROPDOWNLIST row, as "Archive format:" in IDD_COMPRESS
 //                               (LTEXT 2 DLU under the combo's top). `AppTheme`, FM.Theme.
 //   [x] Quick Look preview for archives  quicklook: the preview extension's PlugInKit election
 //                               (`QuickLookExtensionControl`, default on), lang 9970. Read from
@@ -18,54 +16,32 @@
 //                               changes are dropped with everything else.
 //
 // Apply / OK write what changed; the theme takes effect at once (`AppTheme` follows FM.Theme).
-// "Show grid lines" is only on the Settings page (IDX_SETTINGS_SHOW_GRID 2505), where Windows has it.
 
 import Cocoa
 
 extension RcDialog {
-    /// A template that is not in the generated `RcTemplates` (a macOS-only page).
+    /// A template that is not in the generated `RcTemplates` (a page with macOS rows).
     init(template: RcTemplate) { self.template = template }
 }
 
-final class OptionsMacPage: OptionsPageBase {
+/// The macOS rows' control IDs and template places (macOS only, outside every 7-Zip ID block).
+enum OptionsMacSettings {
+    static let themeLabel = 9900        // LTEXT "Theme:"
+    static let themeCombo = 9910        // COMBOBOX, CBS_DROPDOWNLIST
+    static let quickLook = 9935         // checkbox, lang 9970 "Quick Look preview for archives" (quicklook)
+    static let resetAll = 9940          // PUSHBUTTON, lang 9960 "Reset All Settings..." (fix112)
 
-    // No IDD_* resource: pageID 0 makes the tab title the fallback (OptionsWindowController.pageTitle).
-    override var pageID: UInt32 { 0 }
-    override var fallbackTitle: String { "macOS" }
-    override var helpTopic: String { "fm/options.htm" }
+    static let controls: [RcControl] = [
+        RcControl(id: themeLabel, kind: .ltext, x: 8, y: 184, width: 76, height: 8, text: "Theme:"),
+        RcControl(id: themeCombo, kind: .comboList, x: 88, y: 182, width: 120, height: 64, text: ""),
+        RcControl(id: quickLook, kind: .check, x: 8, y: 202, width: 300, height: 10, text: "Quick Look preview for archives"),
+        RcControl(id: resetAll, kind: .push, x: 8, y: 220, width: 100, height: 14, text: "Reset All Settings..."),
+    ]
+}
 
-    /// Control IDs of this page's own template (macOS only).
-    enum ID {
-        static let themeLabel = 9900        // LTEXT "Theme:"
-        static let themeCombo = 9910        // COMBOBOX, CBS_DROPDOWNLIST
-        static let resetAll = 9940          // PUSHBUTTON, lang 9960 "Reset All Settings..." (fix112)
-        static let quickLook = 9935         // checkbox, lang 9970 "Quick Look preview for archives" (quicklook)
-    }
+extension OptionsSettingsPage {
 
-    /// The page template in DLUs, in the IDD_SETTINGS style (m = 8, rows from y 8).
-    static let template = RcTemplate(id: -9900, caption: "macOS", width: 316, height: 296, resizable: false, controls: [
-        RcControl(id: ID.themeLabel, kind: .ltext, x: 8, y: 10, width: 76, height: 8, text: "Theme:"),
-        RcControl(id: ID.themeCombo, kind: .comboList, x: 88, y: 8, width: 120, height: 64, text: ""),
-        RcControl(id: ID.quickLook, kind: .check, x: 8, y: 30, width: 300, height: 10, text: "Quick Look preview for archives"),
-        RcControl(id: ID.resetAll, kind: .push, x: 8, y: 50, width: 100, height: 14, text: "Reset All Settings..."),
-    ])
-
-    override var rc: RcDialog { RcDialog(template: Self.template) }
-
-    let themeLabel = RcPlace.makeLabel(AppTheme.labelText)
-    let themePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private(set) var resetButton: NSButton!
-    private(set) var quickLookBox: NSButton!
-    /// The preview extension's state as `pluginkit` last reported it (nil while checking).
-    private(set) var quickLookState: QuickLookExtensionControl.State?
-    /// The appex this copy carries; nil disables the box. Tests inject a path.
-    var quickLookAppexPath: String? = QuickLookExtensionControl.embeddedAppexPath
-    private var quickLookChanged = false
-    private var themeChanged = false
-
-    override func loadView() {
-        super.loadView()
-        let rc = self.rc
+    func loadMacRows(_ rc: RcDialog) {
         themePopup.removeAllItems()
         for theme in AppTheme.allCases {
             themePopup.addItem(withTitle: theme.title)
@@ -75,26 +51,54 @@ final class OptionsMacPage: OptionsPageBase {
         themePopup.action = #selector(themeChosen(_:))
         themePopup.setAccessibilityIdentifier("optionsTheme")
         themeLabel.setAccessibilityIdentifier("optionsThemeLabel")
-        form.add(themeLabel, rc, ID.themeLabel)
-        form.add(themePopup, rc, ID.themeCombo)
+        form.add(themeLabel, rc, OptionsMacSettings.themeLabel)
+        form.add(themePopup, rc, OptionsMacSettings.themeCombo)
         quickLookBox = OptionsUI.checkbox(PreviewLangID.checkbox, "Quick Look preview for archives",
                                           self, #selector(quickLookClicked(_:)))
         quickLookBox.setAccessibilityIdentifier("optionsMacQuickLook")
-        form.add(quickLookBox, rc, ID.quickLook)
+        form.add(quickLookBox, rc, OptionsMacSettings.quickLook)
         resetButton = NSButton(title: SettingsReset.buttonTitle, target: self, action: #selector(resetAllClicked(_:)))
         resetButton.bezelStyle = .rounded
         resetButton.setAccessibilityIdentifier("optionsMacResetAll")
-        form.add(resetButton, rc, ID.resetAll)
+        form.add(resetButton, rc, OptionsMacSettings.resetAll)
     }
 
-    // MARK: OnInit
-
-    override func pageDidLoad() {
+    func macPageDidLoad() {
         selectTheme(Settings.theme)
         themeChanged = false
         quickLookChanged = false
         refreshQuickLookState()
-        relabelPage()
+    }
+
+    func relabelMacRows() {
+        themeLabel.stringValue = AppTheme.labelText
+        for (i, theme) in AppTheme.allCases.enumerated() { themePopup.item(at: i)?.title = theme.title }
+        themePopup.needsDisplay = true
+        quickLookBox.title = Lang.text(PreviewLangID.checkbox, "Quick Look preview for archives")
+        resetButton.title = SettingsReset.buttonTitle
+    }
+
+    func applyMacRows() {
+        if themeChanged {
+            Settings.theme = selectedTheme             // AppTheme applies it at once
+            themeChanged = false
+        }
+        applyQuickLook()
+    }
+
+    // MARK: Theme
+
+    var selectedTheme: AppTheme {
+        (themePopup.selectedItem?.representedObject as? String).flatMap(AppTheme.init(rawValue:)) ?? Settings.defaultTheme
+    }
+
+    func selectTheme(_ theme: AppTheme) {
+        themePopup.selectItem(at: AppTheme.allCases.firstIndex(of: theme) ?? 0)
+    }
+
+    @objc func themeChosen(_ sender: Any?) {
+        themeChanged = true
+        changed()
     }
 
     // MARK: Quick Look (quicklook scope)
@@ -152,42 +156,12 @@ final class OptionsMacPage: OptionsPageBase {
         }
     }
 
-    override func relabelPage() {
-        themeLabel.stringValue = AppTheme.labelText
-        for (i, theme) in AppTheme.allCases.enumerated() { themePopup.item(at: i)?.title = theme.title }
-        themePopup.needsDisplay = true
-        quickLookBox.title = Lang.text(PreviewLangID.checkbox, "Quick Look preview for archives")
-        resetButton.title = SettingsReset.buttonTitle
-    }
-
-    var selectedTheme: AppTheme {
-        (themePopup.selectedItem?.representedObject as? String).flatMap(AppTheme.init(rawValue:)) ?? Settings.defaultTheme
-    }
-
-    func selectTheme(_ theme: AppTheme) {
-        themePopup.selectItem(at: AppTheme.allCases.firstIndex(of: theme) ?? 0)
-    }
-
-    @objc func themeChosen(_ sender: Any?) {
-        themeChanged = true
-        changed()
-    }
+    // MARK: Reset All Settings
 
     /// Reset All Settings... (fix112): Yes empties the domain and restarts; No leaves everything,
     /// the sheet's unapplied changes included.
     @objc func resetAllClicked(_ sender: Any?) {
         SettingsReset.confirmAndRun(owner: view.window)
-    }
-
-    // MARK: OnApply
-
-    override func applyPage() -> Bool {
-        if themeChanged {
-            Settings.theme = selectedTheme             // AppTheme applies it at once
-            themeChanged = false
-        }
-        applyQuickLook()
-        return true
     }
 }
 

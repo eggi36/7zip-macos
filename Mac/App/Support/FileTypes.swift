@@ -117,6 +117,7 @@ enum FileTypes {
         SevenZipFileType(ext: "zso", iconIndex: 8, format: "ZSO"),
         SevenZipFileType(ext: "isz", iconIndex: 8, format: "ISZ"),
         SevenZipFileType(ext: "ecm", iconIndex: 8, format: "ECM"),
+        SevenZipFileType(ext: "gcm", iconIndex: 8, format: "GCM"),     // GameCube (DiscRaw.cpp)
     ]
 
     /// Icon resource index -> `CPP/7zip/Archive/Icons/<name>.ico` (resource.rc:6-32).

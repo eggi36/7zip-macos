@@ -112,10 +112,6 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
         let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
         XCTAssertTrue(ids.contains(.szAdd) && ids.contains(.szInfo), "both groups: \(ids)")
-        let menu = MainMenu.build()
-        let text = try XCTUnwrap(allItems(menu).first { $0.action == #selector(MenuActions.viewToolbarsShowButtonsText(_:)) })
-        _ = controller.validateMenuItem(text)
-        XCTAssertEqual(text.state, .off, "View > Show Buttons Text is off")
     }
 
     func testMacLookFollowsToolbarMenus() throws {
@@ -125,15 +121,12 @@ final class NativeLookTests: AppHostTestCase {
         let controller = try openWindow()
         let window = try XCTUnwrap(controller.window)
         XCTAssertEqual(window.toolbar?.displayMode, .iconAndLabel)
-        controller.viewToolbarsShowButtonsText(nil)              // text off
-        XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
+        window.toolbar?.displayMode = .iconOnly                  // the toolbar's right-click menu
+        controller.syncMaskFromMacToolbar()
         XCTAssertEqual(Settings.toolbarsMask & (8 | 4 | 1), 8 | 4, "the mask follows the toolbar")
-        controller.viewToolbarsShowButtonsText(nil)              // and back on
-        XCTAssertEqual(window.toolbar?.displayMode, .iconAndLabel)
-        // View > Toolbars is gone; Show Buttons Text is in the View menu itself.
+        // View > Toolbars and Show Buttons Text are gone from the menu.
         let view = try XCTUnwrap(MainMenu.build().items.first { $0.submenu?.title == "View" }?.submenu)
-        XCTAssertTrue(view.items.contains { $0.action == #selector(MenuActions.viewToolbarsShowButtonsText(_:)) })
-        XCTAssertFalse(view.items.contains { $0.tag == 733 || $0.title == "Toolbars" })
+        XCTAssertFalse(view.items.contains { $0.tag == 733 || $0.tag == 753 || $0.title == "Toolbars" })
         // Back, Forward and Up One Level are the navigational items next to the title.
         let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
         XCTAssertEqual(Array(ids.prefix(3)), [.szBack, .szForward, .szUp])
@@ -154,11 +147,11 @@ final class NativeLookTests: AppHostTestCase {
             XCTAssertNotNil(item?.action)
             XCTAssertFalse(item?.label.hasSuffix("...") ?? true)
         }
-        // a customised item survives a View > Show Buttons Text change: the toolbar is edited in place
+        // a customised item survives a label change: the toolbar is edited in place
         toolbar.insertItem(withItemIdentifier: .szRefresh, at: 3)
-        controller.viewToolbarsShowButtonsText(nil)
+        toolbar.displayMode = toolbar.displayMode == .iconOnly ? .iconAndLabel : .iconOnly
+        controller.syncMaskFromMacToolbar()
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == .szRefresh })
-        controller.viewToolbarsShowButtonsText(nil)
         UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
     }
 
@@ -260,20 +253,19 @@ final class NativeLookTests: AppHostTestCase {
             options.selectPage(options.pageCount - 1)
             let tabView = try XCTUnwrap(optionsWindow.contentView?.subviews.compactMap { $0 as? NSTabView }.first)
             XCTAssertEqual(tabView.tabViewType, .noTabsNoBorder, "a Settings window: the toolbar switches the panes")
-            XCTAssertEqual(tabView.selectedTabViewItem?.label, "macOS")
+            XCTAssertEqual(tabView.selectedTabViewItem?.label, "Language", "the last pane; no macOS pane any more")
             let toolbar = try XCTUnwrap(optionsWindow.toolbar)
             XCTAssertEqual(optionsWindow.toolbarStyle, .preference)
             XCTAssertEqual(toolbar.items.count, options.pageCount)
             XCTAssertFalse(toolbar.items.contains { $0.label.isEmpty || $0.image == nil })
             XCTAssertEqual(toolbar.selectedItemIdentifier, toolbar.items.last?.itemIdentifier)
-            XCTAssertEqual(optionsWindow.title, "macOS", "the title names the pane")
+            XCTAssertEqual(optionsWindow.title, "Language", "the title names the pane")
             XCTAssertEqual(optionsWindow.contentLayoutRect.height,
                            options.macContentHeight(for: try XCTUnwrap(tabView.selectedTabViewItem?.viewController as? OptionsPageBase)),
                            accuracy: 1, "the window fits the pane")
             let buttonTitles = (optionsWindow.contentView?.subviews ?? []).compactMap { ($0 as? NSButton)?.title }
             XCTAssertFalse(buttonTitles.contains("OK") || buttonTitles.contains("Cancel") || buttonTitles.contains("Apply"),
                            "changes apply at once")
-            try writeWholeWindow(optionsWindow, "options-macos-\(theme.rawValue)")
             options.selectPage(4)
             try writeWholeWindow(optionsWindow, "options-settings-\(theme.rawValue)")
             options.selectPage(0)                                   // System: the format icons
@@ -665,11 +657,11 @@ final class NativeLookTests: AppHostTestCase {
         }
         let wanted: AppTheme = Settings.theme == .dark ? .light : .dark
         let options = OptionsWindowController.shared
-        var page: OptionsMacPage?
+        var page: OptionsSettingsPage?
         XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { window in
-            options.selectPage(options.pageCount - 1)
+            options.selectPage(4)                                 // Settings: the macOS rows
             page = window.contentView?.subviews.compactMap { $0 as? NSTabView }.first?
-                .selectedTabViewItem?.viewController as? OptionsMacPage
+                .selectedTabViewItem?.viewController as? OptionsSettingsPage
             page?.selectTheme(wanted)                             // while the window is up
             page?.themeChosen(nil)
         })

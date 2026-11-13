@@ -10,11 +10,10 @@
 // switcher for Large Icons / Small Icons / List / Details), and AppKit saves the arrangement
 // and the icon / label mode for every window (`sz.main.mac`).
 //
-// View > Show Buttons Text (IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753) switches between icon and
-// label and icon only, and its check mark shows what the toolbar does (`syncMaskFromMacToolbar`).
-// 7zFM's Archive Toolbar / Standard Toolbar / Large Buttons are not in the menu: Customize
-// Toolbar... adds and removes buttons, and macOS sizes toolbar icons itself. The Toolbars setting
-// still records which groups a toolbar holds, and a fresh one starts with them.
+// 7zFM's View > Toolbars is not in the menu: Customize Toolbar... adds and removes buttons, the
+// toolbar's right-click menu switches the labels (Icon and Text / Icon Only), and macOS sizes
+// toolbar icons itself. The Toolbars setting still records what a toolbar holds (the groups and
+// the labels, `syncMaskFromMacToolbar`), and a fresh one starts with them.
 //
 // Back, Forward and Up One Level are navigational items: they sit next to the title, and
 // Customize Toolbar... can put Up One Level there (01 §1.3: Up is the address bar's button on
@@ -46,8 +45,9 @@ extension NSToolbarItem.Identifier {
 /// menu, Cmd-1 ... Cmd-4 and a focus change between the panels.
 enum ViewModeToolbarItem {
     /// Index = 7zFM's _listViewMode: 0 large icons, 1 small icons, 2 list, 3 details.
-    static let symbols: [[String]] = [["square.grid.2x2"], ["square.grid.3x3"], ["list.bullet"],
-                                      ["tablecells", "list.bullet.rectangle"]]
+    /// Details is Finder's list view (rows with columns), so it gets Finder's list symbol.
+    static let symbols: [[String]] = [["square.grid.2x2"], ["square.grid.3x3"],
+                                      ["tablecells", "list.bullet.rectangle"], ["list.bullet"]]
     static var titles: [String] {
         [Lang.text(700, "Large Icons"), Lang.text(701, "Small Icons"), Lang.text(702, "List"),
          Lang.text(703, "Details")].map { Lang.stripMnemonic($0).components(separatedBy: "\t")[0] }
@@ -159,12 +159,6 @@ extension MainWindowController: NSToolbarDelegate {
         if Self.macStandardGroup.contains(where: ids.contains) { result |= 4 }
         if toolbar.displayMode != .iconOnly { result |= 1 }
         return result
-    }
-
-    /// View > Show Buttons Text in the Mac look.
-    func toggleMacToolbarText() {
-        guard let toolbar = window?.toolbar else { return }
-        toolbar.displayMode = toolbar.displayMode == .iconOnly ? .iconAndLabel : .iconOnly
     }
 
     /// The view switcher (`ViewModeToolbarItem`).

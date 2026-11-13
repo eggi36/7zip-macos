@@ -7,6 +7,10 @@
 // under it keep their template places. "Show system menu" is kept with its Windows caption: on
 // macOS it adds Finder's own commands to the panel context menu (01 section 9 #2). Every control
 // sits on the IDD_SETTINGS template's rect (dlgfeel).
+//
+// Under the template's controls the macOS additions that used to be a tab of their own (the
+// user's request; OptionsMacSettings.swift): Theme, "Quick Look preview for archives" and Reset
+// All Settings..., in rows of the same 8-DLU margin.
 
 import Cocoa
 import SevenZipKit
@@ -16,6 +20,26 @@ final class OptionsSettingsPage: OptionsPageBase {
     override var pageID: UInt32 { 2500 }                      // IDD_SETTINGS
     override var fallbackTitle: String { "Settings" }
     override var helpTopic: String { "FM/options.htm#settings" }
+
+    /// IDD_SETTINGS plus the macOS rows (`OptionsMacSettings.controls`).
+    static let template: RcTemplate = {
+        let base = RcTemplates.template(2500)
+        return RcTemplate(id: base.id, caption: base.caption, width: base.width, height: base.height,
+                          resizable: base.resizable, controls: base.controls + OptionsMacSettings.controls)
+    }()
+    override var rc: RcDialog { RcDialog(template: Self.template) }
+
+    // The macOS rows (OptionsMacSettings.swift).
+    let themeLabel = RcPlace.makeLabel(AppTheme.labelText)
+    let themePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var resetButton: NSButton!
+    var quickLookBox: NSButton!
+    /// The preview extension's state as `pluginkit` last reported it (nil while checking).
+    var quickLookState: QuickLookExtensionControl.State?
+    /// The appex this copy carries; nil disables the box. Tests inject a path.
+    var quickLookAppexPath: String? = QuickLookExtensionControl.embeddedAppexPath
+    var quickLookChanged = false
+    var themeChanged = false
 
     /// The seven CFmSettings checkboxes, in SettingsPage2.rc order.
     private struct Flag {
@@ -102,6 +126,7 @@ final class OptionsSettingsPage: OptionsPageBase {
         memStepper.controlSize = .small
         memStepper.frame = NSRect(x: editRect.maxX - 18, y: editRect.minY - 1, width: 18, height: 22)
         form.add(memUnit, rc, 103)
+        loadMacRows(rc)
     }
 
     // MARK: OnInit
@@ -119,6 +144,7 @@ final class OptionsSettingsPage: OptionsPageBase {
         fmChanged = false
         memChanged = false
         enableMemControls()
+        macPageDidLoad()
         relabelPage()
     }
 
@@ -127,6 +153,7 @@ final class OptionsSettingsPage: OptionsPageBase {
         memLabel.stringValue = Lang.text(7816, "Maximum amount of RAM memory usage allowed to unpack archives:")
         // IDT_SETTINGS_MEM_GB 103 becomes "GB / <RAM> GB (RAM)" once the RAM size is known.
         memUnit.stringValue = ramGB > 0 ? "GB / \(ramGB) GB (RAM)" : "GB"
+        relabelMacRows()
     }
 
     private func enableMemControls() {
@@ -175,6 +202,7 @@ final class OptionsSettingsPage: OptionsPageBase {
             }
             memChanged = false
         }
+        applyMacRows()
         return true
     }
 }

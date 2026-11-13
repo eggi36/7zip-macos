@@ -1,4 +1,4 @@
-// SettingsReset.swift -- Options > macOS > "Reset All Settings..." (fix112, a macOS addition: 7zFM
+// SettingsReset.swift -- Options > Settings > "Reset All Settings..." (fix112, a macOS addition: 7zFM
 // has no such command; on Windows the equivalent is deleting HKCU\Software\7-Zip by hand).
 //
 // After the user confirms, the app
@@ -22,7 +22,7 @@
 // Not touched: the user's files and archives, the temporary 7zO*/7zE* folders (the next launch's
 // `TempOpenJanitor` sweeps them as after any quit), and the Finder integration's PlugInKit state --
 // the Finder extension and the Quick Actions stay enabled or disabled exactly as they are.
-// quicklook: the Quick Look preview extension is the exception: its checkbox (Options > macOS) is a
+// quicklook: the Quick Look preview extension is the exception: its checkbox (Options > Settings) is a
 // setting with a default (on), so the reset elects it "use" again (`QuickLookExtensionControl`).
 // Its first-launch marker `FM.QuickLookFirstLaunch` is kept, like FM.FirstLaunchIntegration.
 //

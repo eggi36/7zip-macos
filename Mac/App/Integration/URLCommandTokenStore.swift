@@ -11,7 +11,7 @@
 //    the first launch of an installed copy -- including one started by an extension's URL --
 //    already has it;
 //  * never rotated otherwise;
-//  * Options > macOS > Reset All Settings empties the domain, so the relaunched instance creates a
+//  * Options > Settings > Reset All Settings empties the domain, so the relaunched instance creates a
 //    new one and pushes it to the extensions; a URL with the old one is refused.
 //
 // An extension that finds no secret (the app has never run) does not send its command: it sends

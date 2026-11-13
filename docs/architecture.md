@@ -66,7 +66,7 @@ tree, and stops after 2 s or 10 000 entries; a `.tar.gz` / `.tar.bz2` / `.tar.xz
 listed from its decompressed stream (`SZStreamTar`: the outer handler writes into an in-memory
 pipe that the tar handler reads sequentially), so nothing is ever extracted. `ArchivePreviewView`
 draws it with the panel's own code (`Formatting`, `Icons`, `ListFontChoice`). The extension's only entitlement is the sandbox; the app pushes the language, theme
-and time format into its container (`QuickLookPreferences`). Options ▸ macOS switches it through
+and time format into its container (`QuickLookPreferences`). Options ▸ Settings switches it through
 PlugInKit (`QuickLookExtensionControl`), like the Finder extension. The preview has no title or
 button of its own: Quick Look's title bar names the file and opens it with 7-Zip. Every custom
 `draw(_:)` fills its bounds, never the dirty rect — with the macOS 14 SDK views do not clip to their

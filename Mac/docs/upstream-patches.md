@@ -14,6 +14,7 @@ patched code path changed in 26.05 or 26.06, and each hunk is still needed.
 
 | File | Hunk | Reason |
 |---|---|---|
+| `CPP/7zip/UI/Common/LoadCodecs.cpp` | `kNumArcsMax` (the static format table of the build without external codecs) is 96 instead of 72 under `#ifdef __APPLE__` | the port registers 14 disc-image formats of its own (`Mac/Core/Handlers`); with them the static table of 72 was full, and `RegisterArc` drops every later format without a word -- the zip handler among them (`mac/feedback`, `CodecsSignatureTests`). Windows preprocesses exactly as before. |
 | `CPP/7zip/UI/Agent/Agent.h` | `#define INVALID_FILE_ATTRIBUTES ((DWORD)-1)` fallback after the includes | the constant only exists in `C/7zWindows.h`; `CAgent::Is_Attrib_ReadOnly()` compares against it |
 | `CPP/7zip/UI/Agent/Agent.h` | `struct CCodecIcons` and the `CodecIconsVector`/`InternalIcons` members of `CArchiveFolderManager` wrapped in `#ifdef _WIN32` | icon tables are read from a Win32 string-table resource; meaningless on macOS |
 | `CPP/7zip/UI/Agent/Agent.cpp` | `IsAltStreamPrefixWithColon` test in the update path wrapped in `#ifdef _WIN32` | declared only for `_WIN32` in `Windows/FileName.h` |

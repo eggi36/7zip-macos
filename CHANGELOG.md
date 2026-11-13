@@ -19,7 +19,7 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   name as the window title with a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. The theme follows the system's
-  Light / Dark until one is chosen (Options ▸ macOS ▸ Theme); this applies to everyone who kept the
+  Light / Dark until one is chosen (Options ▸ Settings ▸ Theme); this applies to everyone who kept the
   Light default of 1.1.2–1.2.x, while an explicit choice of Light is kept. The pixel-exact copy of the Windows window ("Classic") and
   its switch in Options ▸ macOS are gone.
   - The dialogs look like Mac dialogs: the system font at its regular size, AppKit's own pop-up
@@ -90,24 +90,33 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   of Apple's utilities with the same grey zipper, its pull in 7-Zip blue, and no lettering (as the
   HIG asks of app icons). `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
   - A click anywhere on a row selects it, as in Finder.
-  - A fresh install shows the toolbar's symbols without labels, as Mac apps do (*View ▸ Show
-    Buttons Text* adds them).
+  - A fresh install shows the toolbar's symbols without labels, as Mac apps do (the toolbar's
+    right-click menu adds them).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
     Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
     arrangement is saved. Up One Level can go next to Back / Forward. A Finder-style view switcher (Large Icons, Small Icons, List,
     Details) can be added too; it shows and sets the focused panel's view. The View ▸ Toolbars submenu is
     gone: Customize Toolbar… adds and removes buttons, Large Buttons has no Mac counterpart, and
-    Show Buttons Text is directly in the View menu.
+    the toolbar's right-click menu (Icon and Text / Icon Only) replaces Show Buttons Text.
 
 ### Changed
 
 - **The update check is removed**, until further notice: no Check for Updates… menu item, no
   "Check for updates at startup" option, and the app makes no network request at all.
-- Options ▸ macOS no longer repeats "Show grid lines"; it is on the Settings page, where 7-Zip on
-  Windows has it (the same setting as before).
+- Options has no macOS tab any more: the theme, "Quick Look preview for archives" and Reset All
+  Settings… are on the Settings page, under its Windows controls; "Show grid lines" is there once.
 - The About box shows the build: its number, when it was built and from which commit
   ("Build 402 (2026-11-13 21:50:07 1faab4b0c2)", "+" for uncommitted changes), so every compile
   can be told apart.
+- Opening a file in the file manager (double-click, Enter) opens it inside whenever 7-Zip can read
+  it -- an .epub, .docx or .jar too, which 7-Zip on Windows hands to their applications -- and only
+  otherwise with the system's default application. Open Outside (Shift-Enter) still starts any file.
+- View ▸ Show Buttons Text is gone; the toolbar's right-click menu switches the labels.
+- **A raw .bin opens without its .cue**: its data track as Track01.iso (the cue sheet stays the way
+  to see the separate tracks).
+- **GameCube disc images** (.gcm, and GameCube .iso files) open: the files of the disc under
+  files/, its system data (boot.bin, bi2.bin, apploader.img, main.dol, fst.bin) under sys/, as
+  Dolphin extracts a disc. Wii discs are encrypted and are not opened.
 - The address field has no Up button of its own any more: Up One Level is in the toolbar next to
   Back / Forward (Backspace and Go ▸ Enclosing Folder still work).
 - The sorted column's header shows the sort direction, as in Finder (7-Zip on Windows shows none).

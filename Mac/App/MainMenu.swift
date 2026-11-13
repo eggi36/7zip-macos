@@ -300,16 +300,16 @@ enum MainMenu {
         menu.addItem(time)
         TimeMenuDelegate.shared.rebuild(timeMenu, popupItem: time)
         // popup IDM_VIEW_TOOLBARS 733 is not here: its Archive Toolbar (750) and Standard Toolbar
-        // (751) are what Customize Toolbar... does on the Mac, and Large Buttons (752) has no Mac
-        // counterpart (macOS sizes toolbar icons itself). Show Buttons Text stays, after the
-        // window toolbar's own commands, as every Mac app's View menu has them (AppKit retitles
-        // Show / Hide Toolbar itself).
+        // (751) are what Customize Toolbar... does on the Mac, Large Buttons (752) has no Mac
+        // counterpart (macOS sizes toolbar icons itself), and Show Buttons Text (753) is the
+        // toolbar's own right-click menu (Icon and Text / Icon Only). In their place the window
+        // toolbar's own commands, as every Mac app's View menu has them (AppKit retitles Show /
+        // Hide Toolbar itself).
         let show = NSMenuItem(title: MacTerm.showToolbar.title, action: #selector(NSWindow.toggleToolbarShown(_:)), keyEquivalent: "t")
         show.keyEquivalentModifierMask = [.command, .option]
         menu.addItem(show)
         menu.addItem(NSMenuItem(title: MacTerm.customizeToolbar.title,
                                 action: #selector(NSWindow.runToolbarCustomizationPalette(_:)), keyEquivalent: ""))
-        item(menu, 753, lang: 753, "Show Buttons Text", action: #selector(a.viewToolbarsShowButtonsText(_:)))                // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT
         // Finder's path bar (PanelPathControl.swift); AppDelegate retitles Show / Hide.
         let pathBar = NSMenuItem(title: MacTerm.showPathBar.title,
                                  action: #selector(AppDelegate.toggleMacPathBar(_:)), keyEquivalent: "p")
@@ -545,7 +545,6 @@ final class FavoritesMenuDelegate: NSObject, NSMenuDelegate {
     func viewTwoPanels(_ sender: Any?)            // IDM_VIEW_TWO_PANELS 732
     func viewTimestampLevel(_ sender: Any?)       // IDM_VIEW_TIME 761 + k
     func viewTimeUTC(_ sender: Any?)              // IDM_VIEW_TIME_UTC 799
-    func viewToolbarsShowButtonsText(_ sender: Any?) // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
     func viewOpenRootFolder(_ sender: Any?)       // IDM_OPEN_ROOT_FOLDER 734
     func viewOpenParentFolder(_ sender: Any?)     // IDM_OPEN_PARENT_FOLDER 735
     func viewFoldersHistory(_ sender: Any?)       // IDM_FOLDERS_HISTORY 736

@@ -36,9 +36,9 @@ Current version: **7-Zip 26.06 for macOS 1.3.0**.
 - **Quick Look preview** — select an archive in Finder (or press Space) to see its summary and
   its contents as 7-Zip lists them, without opening the app; Quick Look's **Open with 7-Zip** is one
   click away.
-  Options ▸ macOS turns it off.
+  Options ▸ Settings turns it off.
 - **93 languages** — the official 7-Zip translations, switchable while the app runs.
-- **Light and Dark** themes: following the system by default, or fixed to Light or Dark in Options ▸ macOS.
+- **Light and Dark** themes: following the system by default, or fixed to Light or Dark in Options ▸ Settings.
 - **Native**: Swift and AppKit on top of the unchanged C/C++ engine. No emulation, no
   third-party code, no network access.
 
@@ -58,9 +58,9 @@ Current version: **7-Zip 26.06 for macOS 1.3.0**.
 
 <p align="center"><img src="docs/images/window-properties.avif" width="874" alt="Properties of an item inside an archive"></p>
 
-**Options ▸ macOS**
+**Options ▸ Settings**
 
-<p align="center"><img src="docs/images/window-options-macos.avif" width="597" alt="Options ▸ macOS"></p>
+<p align="center"><img src="docs/images/window-options-macos.avif" width="597" alt="Options ▸ Settings"></p>
 
 **Finder's right-click menu with the 7-Zip submenu**
 
@@ -140,7 +140,7 @@ chooses which of the eleven menu entries Finder shows, as on Windows. If the men
 copy of 7-Zip it belongs to.
 
 The **Quick Look preview** is on from the first launch: select an archive in Finder and look at the
-preview pane, or press Space. Options ▸ macOS ▸ **Quick Look preview for archives** switches it off
+preview pane, or press Space. Options ▸ Settings ▸ **Quick Look preview for archives** switches it off
 (it is the same switch as System Settings ▸ General ▸ Login Items & Extensions ▸ Quick Look). If
 Finder still shows the plain icon right after installing, run `qlmanage -r` or log out and back in.
 

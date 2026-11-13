@@ -183,12 +183,12 @@ final class ThemeTests: AppHostTestCase {
         XCTAssertEqual(gridInk(panel), 0, "no grid pixels by default")
 
         let (controller, window, tabs) = try openOptions()
-        let mac = try page(OptionsMacPage.self, tabs)
         let settings = try page(OptionsSettingsPage.self, tabs)
         let settingsBox = try XCTUnwrap(views(NSButton.self, in: settings.view).first { $0.tag == 2505 })
         XCTAssertEqual(settingsBox.state, .off)
-        XCTAssertFalse(views(NSButton.self, in: mac.view).contains { $0.title == settingsBox.title },
-                       "the macOS page has no second grid box")
+        XCTAssertEqual(views(NSButton.self, in: settings.view).filter { $0.title == settingsBox.title }.count, 1,
+                       "one grid box, also with the macOS rows on the page")
+        XCTAssertFalse(tabs.tabViewItems.contains { $0.label == "macOS" }, "no macOS tab any more")
 
         // On screen a change applies at once; the probe has closed the window, so the test commits
         // as closing it would.
@@ -301,11 +301,11 @@ final class ThemeTests: AppHostTestCase {
                 window.contentView?.layoutSubtreeIfNeeded()
                 checkTexts(in: window, "Options page \(index) \(theme)", minimum: 1)
             }
-            controller.selectPage(controller.pageCount - 1)
+            controller.selectPage(4)                        // Settings, with the macOS rows
             // quicklook: the host carries no QuickLook.appex, so its box is disabled ("This copy of
             // 7-Zip has no Quick Look extension."). The screenshot shows what an installed copy
             // shows: this copy's extension registered, never elected -- on (QuickLookPreviewTests).
-            let mac = try page(OptionsMacPage.self, tabs)
+            let mac = try page(OptionsSettingsPage.self, tabs)
             let savedRunner = FinderExtensionControl.runner
             FinderExtensionControl.runner = { args in
                 args.first == "-m" ? (0, " " + "    com.yrambler2001.7zip.QuickLook(1.2.0)\tX\t2026\t"
@@ -318,11 +318,7 @@ final class ThemeTests: AppHostTestCase {
             FinderExtensionControl.runner = savedRunner
             XCTAssertTrue(mac.quickLookBox.isEnabled)
             XCTAssertEqual(mac.quickLookBox.state, .on, "on by default in an installed copy")
-            shot(window, "options-macos-tab-\(theme.rawValue)")
-            if theme == .dark {
-                controller.selectPage(4)                    // Settings, a Windows page
-                shot(window, "options-dark")
-            }
+            shot(window, "options-settings-\(theme.rawValue)")
             ModalProbe.close(window)
             // Add to Archive
             var input = CompressDialogInput()

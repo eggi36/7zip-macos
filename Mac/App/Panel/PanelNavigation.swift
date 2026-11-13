@@ -10,20 +10,6 @@ import SevenZipKit
 
 extension PanelViewController {
 
-    /// Extensions that Enter always opens externally, never as an archive
-    /// (kStartExtensions, PanelItemOpen.cpp:633-660).
-    static let startExtensions: Set<String> = [
-        "exe", "bat", "ps1", "com", "lnk", "chm", "msi", "doc", "dot", "xls", "ppt", "pps", "wps",
-        "wpt", "wks", "xlr", "wdb", "vsd", "pub", "docx", "docm", "dotx", "dotm", "xlsx", "xlsm",
-        "xltx", "xltm", "xlsb", "xps", "xlam", "pptx", "pptm", "potx", "potm", "ppam", "ppsx",
-        "ppsm", "vsdx", "xsn", "mpp", "msg", "dwf", "flv", "swf", "epub", "odt", "ods", "wb3",
-        "pdf", "ps", "txt", "xml", "xsd", "xsl", "xslt", "hxk", "hxc", "htm", "html", "xhtml",
-        "xht", "mht", "mhtml", "htw", "asp", "aspx", "css", "cgi", "jsp", "shtml", "h", "hpp",
-        "hxx", "c", "cpp", "cxx", "m", "mm", "go", "swift", "awk", "sed", "hta", "js", "json",
-        "php", "php3", "php4", "php5", "phptml", "pl", "pm", "py", "pyo", "rb", "tcl", "ts",
-        "vbs", "asm", "mak", "clw", "csproj", "vcproj", "sln", "dsp", "dsw",
-    ]
-
     /// kExeExtensions (PanelItemOpen.cpp:629) -- used by the IsVirus_Message check.
     static let exeExtensions: Set<String> = ["exe", "bat", "ps1", "com", "lnk"]
 
@@ -277,10 +263,11 @@ extension PanelViewController {
         if row.isParentRow { goUp(); return }
         let engineIndex = row.engineIndex
         let isFS = snapshot?.isFileSystem ?? false
-        let ext = row.pathExtension.lowercased()
-        // DoItemAlwaysStart applies inside archives too (PanelItemOpen.cpp:993, :1503): a .docx in
-        // a zip is started, not opened as an archive.
-        let alwaysStart = !row.isDirectory && Self.startExtensions.contains(ext)
+        // The user's choice: a file opens inside the file manager whenever 7-Zip can open it, and
+        // only otherwise with the system's default application. 7zFM's DoItemAlwaysStart
+        // (kStartExtensions, PanelItemOpen.cpp:633-660, :993) started .docx, .epub, .jar, .pdf and
+        // the like externally without trying; here they are tried as archives first, as Open
+        // Inside does. Shift+Enter / Open Outside still hands any file to its application.
         runOnQueue { [self] in
             guard let folder = self.folder else { return }
             do {
@@ -296,10 +283,6 @@ extension PanelViewController {
                     }
                     let snap = self.makeSnapshot(sub)
                     DispatchQueue.main.async { self.apply(snap, selectNames: []) }
-                    return
-                }
-                if alwaysStart && !insideOnly {
-                    self.openExternally(row)
                     return
                 }
                 if !tryInternal && !insideOnly {

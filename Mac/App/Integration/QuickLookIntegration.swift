@@ -1,7 +1,7 @@
 // QuickLookIntegration.swift -- the app's side of the Quick Look preview extension (quicklook
 // scope, a macOS addition: 7zFM has no shell preview handler, docs/parity.md "Added on macOS").
 //
-//   * `QuickLookExtensionControl`: the switch behind Options > macOS > "Quick Look preview for
+//   * `QuickLookExtensionControl`: the switch behind Options > Settings > "Quick Look preview for
 //     archives" (lang 9970). An app cannot turn one of its extensions on or off through a public
 //     API, so this works exactly like the Finder integration's checkbox (`FinderExtensionControl`,
 //     01b §4.13): through PlugInKit, `pluginkit -e use|ignore -i com.yrambler2001.7zip.QuickLook`,

@@ -29,6 +29,16 @@ final class CodecsSignatureTests: XCTestCase {
         }
     }
 
+    /// Upstream's static format table holds kNumArcsMax entries and drops the rest without a
+    /// word (LoadCodecs.cpp); with the port's disc handlers it needs the larger macOS size. The
+    /// first and the last registered formats must both be there.
+    func testNoFormatFellOffTheTable() throws {
+        try SZCodecs.loadCodecs()
+        for name in ["7z", "zip", "rar", "tar", "Iso", "Udf", "CUE", "CHD", "ECM", "BIN", "GCM"] {
+            XCTAssertNotNil(SZCodecs.format(named: name), "\(name) is registered")
+        }
+    }
+
     func testSignaturesAreExposed() throws {
         try SZCodecs.loadCodecs()
         let sevenZip = try XCTUnwrap(SZCodecs.format(named: "7z"))

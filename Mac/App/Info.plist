@@ -1113,6 +1113,26 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
+			<string>GameCube Disc Image</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>gcm</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>doc-iso</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>org.7-zip.gcm-archive</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
 			<string>Any file or folder (drop to compress)</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
@@ -2140,6 +2160,26 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>ecm</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.7-zip.gcm-archive</string>
+			<key>UTTypeDescription</key>
+			<string>GameCube Disc Image</string>
+			<key>UTTypeIconFile</key>
+			<string>doc-iso</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>gcm</string>
 				</array>
 			</dict>
 		</dict>

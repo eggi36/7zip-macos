@@ -243,7 +243,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         // for write-back into its parent (PanelNestedArchives.swift, 01 §3.8).
         for panel in panels { panel.closeNestedArchivesForShutdown() }
         MainWindows.didClose(self)
-        // Toolbars with one identifier mirror each other's item changes (View > Show Buttons Text, a
+        // Toolbars with one identifier mirror each other's item changes (Icon and Text / Icon Only, a
         // customization). A closed window that something still holds must not take part: its
         // toolbar can be out of step, and AppKit then replays a change at an index it lacks.
         let closing = window
@@ -556,12 +556,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.autoRefresh = autoRefresh
     }
 
-    @objc func viewToolbarsShowButtonsText(_ sender: Any?) {                                          // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
-        toggleMacToolbarText(); syncMaskFromMacToolbar()
-    }
 
-    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so View > Show
-    /// Buttons Text's check mark and the saved setting see the same choice.
+    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the saved
+    /// setting sees the user's choice.
     func syncMaskFromMacToolbar() {
         let mask = macToolbarMask(keeping: toolbarsMask)
         guard mask != toolbarsMask else { return }
@@ -679,8 +676,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             return shown
         case #selector(viewTwoPanels(_:)): item.state = numPanels == 2 ? .on : .off
         case #selector(viewAutoRefresh(_:)): item.state = autoRefresh ? .on : .off
-        case #selector(viewToolbarsShowButtonsText(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 1) != 0 ? .on : .off
         case #selector(viewTimestampLevel(_:)):
             item.state = ((item.representedObject as? Int) == Settings.timestampLevel) ? .on : .off
         case #selector(viewTimeUTC(_:)): item.state = Settings.timestampShowUTC ? .on : .off
