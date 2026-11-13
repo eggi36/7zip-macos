@@ -73,7 +73,10 @@ targetTemplates:
         excludes:
           - "Info.plist"
           - "*.entitlements"
-      - path: Resources/Assets.xcassets
+      # The app icon: an Icon Composer icon (light, dark and tinted; make-mac-icons.sh). actool
+      # compiles it into Assets.car and writes the AppIcon.icns older macOS versions show.
+      - path: Resources/AppIcon.icon
+        buildPhase: resources
       - path: Resources/Icons
         buildPhase: resources
       - path: Resources/SFX
@@ -588,7 +591,10 @@ targets:
       - path: App
         excludes:
           - "Info.plist"
-      - path: Resources/Assets.xcassets
+      # The app icon: an Icon Composer icon (light, dark and tinted; make-mac-icons.sh). actool
+      # compiles it into Assets.car and writes the AppIcon.icns older macOS versions show.
+      - path: Resources/AppIcon.icon
+        buildPhase: resources
       # Document-type icons, one .icns per format, copied flat into Contents/Resources so
       # CFBundleDocumentTypes/CFBundleTypeIconFile finds them by bare name. Drawn by
       # Mac/scripts/make-mac-icons.sh.

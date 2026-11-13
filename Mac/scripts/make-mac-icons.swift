@@ -7,8 +7,10 @@
 // Draws everything with Core Graphics -- no SF Symbols (Apple's licence keeps them out of app
 // icons) and no third-party art:
 //
-//   * the app icon: a light macOS squircle with the archive icons' grey zipper, its pull in the
-//     7-Zip blue -- no lettering, as the HIG asks of app icons;
+//   * the app icon: the archive icons' grey zipper, its pull in the 7-Zip blue -- no lettering, as
+//     the HIG asks of app icons -- as an Icon Composer icon (Mac/Resources/AppIcon.icon): the
+//     zipper is a layer of its own on a light gradient fill, and a dark fill in Dark mode; macOS
+//     draws the tinted and clear looks itself, and Xcode makes the AppIcon.icns older systems use;
 //   * one document icon per format: macOS's own archive icon (`UTType.archive`, the grey sheet with
 //     the zipper that Finder shows for compressed files) with the extension under the zipper in
 //     the grey, size and place of the label on macOS's ZIP icon (measured: caps 84 of 1024 units,
@@ -16,8 +18,9 @@
 //     The archive icon is taken from the Mac the script runs on, so the result follows that
 //     macOS version; it is Apple's artwork -- fine for your own build, not for redistribution.
 //
-// Writes Mac/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png, Mac/Resources/Icons/
-// doc-<name>.icns (through `iconutil`) and the contact sheet Mac/build/screenshots/icons-mac-sheet.png.
+// Writes Mac/Resources/AppIcon.icon (icon.json and Assets/zipper.png), Mac/Resources/Icons/
+// doc-<name>.icns (through `iconutil`) and the contact sheet Mac/build/screenshots/icons-mac-sheet.png
+// (the app icon light and dark, then the document icons).
 
 import AppKit
 import Foundation
@@ -53,15 +56,24 @@ func render(_ pixels: Int, _ draw: (CGFloat) -> Void) -> Data {
 
 /// macOS-style zipper (as on the system's archive icon): a capsule pull with a round hole, then
 /// alternating rounded teeth under it. `k` scales the 1024-unit design.
-func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColor, hole: NSColor, teeth: Int,
+/// `hole` nil punches the pull's hole out (the app icon's layer shows its fill through it).
+func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColor, hole: NSColor?, teeth: Int,
                       pullColor: NSColor? = nil) {
     let pullW = 150 * k, pullH = 300 * k
     let pull = NSRect(x: cx - pullW / 2, y: top - pullH, width: pullW, height: pullH)
-    (pullColor ?? color).setFill()
-    NSBezierPath(roundedRect: pull, xRadius: pullW / 2, yRadius: pullW / 2).fill()
-    hole.setFill()
     let d = pullW * 0.42
-    NSBezierPath(ovalIn: NSRect(x: cx - d / 2, y: pull.minY + pullW * 0.32, width: d, height: d)).fill()
+    let holeRect = NSRect(x: cx - d / 2, y: pull.minY + pullW * 0.32, width: d, height: d)
+    (pullColor ?? color).setFill()
+    let pullPath = NSBezierPath(roundedRect: pull, xRadius: pullW / 2, yRadius: pullW / 2)
+    if let hole {
+        pullPath.fill()
+        hole.setFill()
+        NSBezierPath(ovalIn: holeRect).fill()
+    } else {
+        pullPath.append(NSBezierPath(ovalIn: holeRect))
+        pullPath.windingRule = .evenOdd
+        pullPath.fill()
+    }
     color.setFill()
     let tw = 170 * k, th = 48 * k
     var y = pull.minY - 60 * k
@@ -72,29 +84,39 @@ func drawSystemZipper(cx: CGFloat, top: CGFloat, scale k: CGFloat, color: NSColo
     }
 }
 
-/// The app icon (the user's choice, variant A, without the "7-Zip" lettering the HIG advises
-/// against): a light tile like Apple's utilities and the grey zipper of the archive icons, centred,
-/// with its pull in the 7-Zip blue so it is not mistaken for Archive Utility.
-func drawAppIcon(_ pixels: CGFloat) {
-    // Big Sur grid: an 824-unit squircle in the 1024 canvas, with the system's soft shadow.
-    let body = NSRect(x: 100, y: 100, width: 824, height: 824)
-    let squircle = NSBezierPath(roundedRect: body, xRadius: 185, yRadius: 185)
-    NSGraphicsContext.saveGraphicsState()
-    let shadow = NSShadow()
-    shadow.shadowColor = NSColor(white: 0, alpha: 0.28)
-    shadow.shadowOffset = NSSize(width: 0, height: -10)
-    shadow.shadowBlurRadius = 24
-    shadow.set()
-    rgb(0xE3E6EB).setFill()
-    squircle.fill()
-    NSGraphicsContext.restoreGraphicsState()
-    NSGradient(starting: rgb(0xFFFFFF), ending: rgb(0xE3E6EB))!.draw(in: squircle, angle: -90)
-    rgb(0xD0D4DA).setStroke()
-    squircle.lineWidth = pixels <= 32 ? 12 : 3
-    squircle.stroke()
-    // The zipper is 617 units tall at scale 1 (pull 300, gap 60, four teeth); centred at 1.05.
-    drawSystemZipper(cx: 512, top: 836, scale: 1.05, color: rgb(0x9C9FA6), hole: rgb(0xF4F5F7), teeth: 4,
+/// The app icon's fills (Icon Composer derives a gradient from each): a light grey like Apple's
+/// utilities, and a dark grey in Dark mode.
+let appFillLight = (r: 0.93, g: 0.94, b: 0.95)
+let appFillDark = (r: 0.22, g: 0.23, b: 0.25)
+
+/// The app icon's one layer (the user's choice, variant A, without the "7-Zip" lettering the HIG
+/// advises against): the grey zipper of the archive icons, centred on the full 1024 canvas (Icon
+/// Composer masks it to the squircle), with its pull in the 7-Zip blue so it is not mistaken for
+/// Archive Utility, and the pull's hole cut out.
+func drawZipperLayer(_ pixels: CGFloat) {
+    // The 824-unit tile of the old icon is the whole canvas now: scale 1.05 * 1024 / 824.
+    drawSystemZipper(cx: 512, top: 915, scale: 1.305, color: rgb(0x9C9FA6), hole: nil, teeth: 4,
                      pullColor: rgb(0x2A63E6))
+}
+
+/// A preview of the app icon for the contact sheet: the layer on its fill inside the squircle.
+func drawAppIconPreview(dark: Bool) -> (CGFloat) -> Void {
+    { pixels in
+        let body = NSRect(x: 100, y: 100, width: 824, height: 824)
+        let squircle = NSBezierPath(roundedRect: body, xRadius: 185, yRadius: 185)
+        let f = dark ? appFillDark : appFillLight
+        let base = NSColor(srgbRed: f.r, green: f.g, blue: f.b, alpha: 1)
+        NSGradient(starting: base.blended(withFraction: 0.35, of: dark ? .gray : .white) ?? base, ending: base)!
+            .draw(in: squircle, angle: -90)
+        NSGraphicsContext.saveGraphicsState()
+        squircle.addClip()
+        let t = NSAffineTransform()
+        t.translateX(by: 100, yBy: 100)
+        t.scale(by: 824.0 / 1024)
+        t.concat()
+        drawZipperLayer(pixels)
+        NSGraphicsContext.restoreGraphicsState()
+    }
 }
 
 // MARK: - document icons
@@ -182,15 +204,54 @@ let sizes: [(name: String, pixels: Int)] = [
     ("128x128@2x", 256), ("256x256", 256), ("256x256@2x", 512), ("512x512", 512), ("512x512@2x", 1024),
 ]
 
-let assets = repo + "/Mac/Resources/Assets.xcassets"
 let scratch = repo + "/Mac/build/macicons"
 try? fm.removeItem(atPath: scratch)
 
-// App icon
-for (name, pixels) in sizes {
-    try write(render(pixels, drawAppIcon), assets + "/AppIcon.appiconset/icon_\(name).png")
+// App icon: an Icon Composer bundle, the zipper layer and the fills.
+let iconBundle = repo + "/Mac/Resources/AppIcon.icon"
+try write(render(1024, drawZipperLayer), iconBundle + "/Assets/zipper.png")
+func srgb(_ c: (r: Double, g: Double, b: Double)) -> String {
+    String(format: "srgb:%.5f,%.5f,%.5f,1.00000", c.r, c.g, c.b)
 }
-print("app icon: \(sizes.count) PNGs")
+let iconJSON = """
+{
+  "fill" : {
+    "automatic-gradient" : "\(srgb(appFillLight))"
+  },
+  "fill-specializations" : [
+    {
+      "appearance" : "dark",
+      "value" : {
+        "automatic-gradient" : "\(srgb(appFillDark))"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "zipper.png",
+          "name" : "zipper"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}
+
+"""
+try write(Data(iconJSON.utf8), iconBundle + "/icon.json")
+print("app icon: Mac/Resources/AppIcon.icon (light and dark)")
 
 // Document icons
 for doc in docIcons {
@@ -210,7 +271,7 @@ print("document icons: \(docIcons.count) .icns")
 
 // Contact sheet: the app icon, then every document icon, at 128 and 32 px.
 let cell = 160, columns = 8
-let rows = (docIcons.count + 1 + columns - 1) / columns
+let rows = (docIcons.count + 2 + columns - 1) / columns
 let sheetSize = NSSize(width: cell * columns, height: cell * rows)
 let sheetRep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(sheetSize.width) * 2, pixelsHigh: Int(sheetSize.height) * 2,
                                 bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -220,7 +281,8 @@ NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: sheetRep)
 rgb(0xF5F5F7).setFill()
 NSRect(origin: .zero, size: sheetSize).fill()
-let entries: [(String, (CGFloat) -> Void)] = [("App", drawAppIcon)] + docIcons.map { doc in (doc.name, { drawDocIcon(doc, $0) }) }
+let entries: [(String, (CGFloat) -> Void)] = [("App", drawAppIconPreview(dark: false)), ("App dark", drawAppIconPreview(dark: true))]
+    + docIcons.map { doc in (doc.name, { drawDocIcon(doc, $0) }) }
 for (i, entry) in entries.enumerated() {
     let col = i % columns, row = i / columns
     let origin = NSPoint(x: col * cell, y: Int(sheetSize.height) - (row + 1) * cell)

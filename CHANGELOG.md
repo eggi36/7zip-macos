@@ -101,6 +101,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
 ### Changed
 
+- **The app icon has a Dark-mode look** (and the tinted and clear looks of macOS 26): the same
+  zipper on a dark tile when the system is dark. macOS 14 and 15 show the light icon as before.
 - **The update check is removed**, until further notice: no Check for Updates… menu item, no
   "Check for updates at startup" option, and the app makes no network request at all.
 - Options has no macOS tab any more: the theme, "Quick Look preview for archives" and Reset All
