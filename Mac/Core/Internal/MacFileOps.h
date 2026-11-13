@@ -16,6 +16,8 @@ namespace NMacFileOps {
 
 // NSFileManager.trashItemAtURL: moves `path` to the user's Trash.
 // On success `resultPath` receives the new location inside .Trash (may be empty).
+// On success with a known location it also posts "SZFileSystemDidTrashItem" (userInfo
+// "source" / "result" paths) for the app's Undo.
 // On failure `errorMessage` receives the localized description and `errnoValue` the POSIX
 // error when one can be derived (0 otherwise).
 bool TrashItem(const char *path, std::string &resultPath, std::string &errorMessage, int &errnoValue);

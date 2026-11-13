@@ -41,6 +41,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     *7-Zip Help* with Cmd+?. Comment moves to Option+Cmd+K so Cmd+Z is left for Undo. 7-Zip's
     Windows keys (F1, F7, Alt+Enter, Cmd+F3 ...) keep working. The new names exist in English and
     German; other languages keep their translation of the Windows name.
+  - *Edit ▸ Undo Move to Trash* (Cmd+Z) puts trashed files and folders back where they were, and
+    *Redo* (Shift+Cmd+Z) trashes them again, as in the Finder.
   - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
     window title, the window fitting each pane's height, and every change taking effect at once
     -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the

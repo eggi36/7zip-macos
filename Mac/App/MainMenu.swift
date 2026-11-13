@@ -236,7 +236,13 @@ enum MainMenu {
         let menu = NSMenu(title: Lang.menuTitle(idmEdit, "&Edit"))
         let a = MenuActions.self
         if AppLook.isMac {
-            // native-look: Cut, Copy, Paste come first in a Mac Edit menu.
+            // native-look: Undo / Redo (Move to Trash, text fields), then Cut, Copy, Paste come
+            // first in a Mac Edit menu.
+            menu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+            let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+            redo.keyEquivalentModifierMask = [.command, .shift]
+            menu.addItem(redo)
+            menu.addItem(.separator())
             addClipboardItems(to: menu)
             menu.addItem(.separator())
         }

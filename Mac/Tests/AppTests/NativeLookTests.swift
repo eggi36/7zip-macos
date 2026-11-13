@@ -433,9 +433,10 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertNotNil(find(mac, #selector(NSWindow.runToolbarCustomizationPalette(_:))))
         XCTAssertEqual(find(mac, #selector(a.helpContents(_:)))?.keyEquivalent, "?")
         let edit = try XCTUnwrap(mac.items[2].submenu)
-        XCTAssertEqual(edit.items.first?.action, #selector(NSText.cut(_:)), "Cut, Copy, Paste first")
+        XCTAssertEqual(edit.items.first?.action, Selector(("undo:")), "Undo, Redo first")
+        XCTAssertEqual(edit.items[3].action, #selector(NSText.cut(_:)), "then Cut, Copy, Paste")
 
-        // Cmd+Z is Undo on the Mac: nothing else may take it, and no two items share a shortcut.
+        // Cmd+Z is Undo on the Mac: nothing else takes it, and no two items share a shortcut.
         var seen: [String: String] = [:]
         for item in allItems(mac) where !item.keyEquivalent.isEmpty && !item.isAlternate {
             let key = "\(item.keyEquivalentModifierMask.rawValue)-\(item.keyEquivalent.lowercased())"
@@ -444,8 +445,59 @@ final class NativeLookTests: AppHostTestCase {
             }
             seen[key] = item.title
         }
-        XCTAssertNil(seen["\(NSEvent.ModifierFlags.command.rawValue)-z"], "Cmd+Z stays free for Undo")
+        XCTAssertEqual(seen["\(NSEvent.ModifierFlags.command.rawValue)-z"], "Undo", "Cmd+Z is Undo")
         XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
+    }
+
+    // MARK: native-look: undo Move to Trash
+
+    func testMacUndoPutsTrashedItemsBack() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sz-trash-undo-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("put-back.txt")
+        try Data("7-Zip".utf8).write(to: file)
+
+        let controller = try openWindow(look: .mac)
+        show(controller, dir.path)
+        let window = try XCTUnwrap(controller.window)
+        let panel = controller.focusedPanel
+        let row = try XCTUnwrap(panel.rows.firstIndex { $0.name == "put-back.txt" })
+        let undo = try XCTUnwrap(window.undoManager)
+        undo.removeAllActions()
+
+        panel.deleteItems(rowIndices: [row], toTrash: true, confirm: false)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "moved to the Trash")
+        XCTAssertTrue(undo.canUndo)
+        XCTAssertEqual(undo.undoActionName, "Move to Trash")
+
+        undo.undo()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "Undo puts it back")
+        XCTAssertTrue(wait(for: "listed again") { panel.rows.contains { $0.name == "put-back.txt" } })
+        XCTAssertTrue(undo.canRedo)
+
+        undo.redo()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "Redo trashes it again")
+        undo.undo()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "and Undo works again")
+        undo.removeAllActions()
+
+        // Classic keeps 7zFM: no undo is registered.
+        let classic = try openWindow(look: .classic)
+        show(classic, dir.path)
+        let classicUndo = try XCTUnwrap(classic.window?.undoManager)
+        classicUndo.removeAllActions()
+        let classicRow = try XCTUnwrap(classic.focusedPanel.rows.firstIndex { $0.name == "put-back.txt" })
+        classic.focusedPanel.deleteItems(rowIndices: [classicRow], toTrash: true, confirm: false)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertFalse(classicUndo.canUndo, "Classic has no Undo")
+        // Put the test file back out of the Trash so the user's Trash stays clean.
+        if let trashed = try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask,
+                                                      appropriateFor: file, create: false)
+            .appendingPathComponent("put-back.txt") {
+            try? FileManager.default.removeItem(at: trashed)
+        }
     }
 
     // MARK: native-look: sheets
