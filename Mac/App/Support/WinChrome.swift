@@ -33,24 +33,8 @@ enum WinChrome {
     /// labelColor is 85 % black.
     static let text = dynamic(gray(0), .labelColor)
 
-    /// The themed WS_EX_CLIENTEDGE of the list: a 1 px (130,135,144) line, then 1 px of the
-    /// window colour, so the header starts 2 px in (SysHeader32 @2,78 in a list @0,76).
-    static let listBorder = dynamic(rgb(130, 135, 144), .separatorColor)
-
     /// msctls_statusbar32: a 1 px (215,215,215) line on top and the part dividers.
     static let statusLine = dynamic(gray(215), .separatorColor)
-
-    /// The address combo's 1 px border (ComboBoxEx32, 24 px high).
-    static let comboBorder = dynamic(gray(141), .separatorColor)
-
-    /// The combo's drop-down chevron.
-    static let comboArrow = dynamic(gray(96), .secondaryLabelColor)
-
-    /// ReBar band border (RBS_BANDBORDERS) after the Up button: shadow, then light.
-    static let bandBorderShadow = dynamic(gray(180), .separatorColor)
-    static let bandBorderLight = dynamic(rgb(244, 247, 252), .clear)
-    /// The band's bottom edge under the Up button.
-    static let bandBottom = dynamic(gray(220), .separatorColor)
 
     // MARK: geometry (px = pt)
 

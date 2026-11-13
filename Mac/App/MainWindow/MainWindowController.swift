@@ -53,9 +53,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     /// (`ErrorAlert`, `ai/reports/fastui.md` section 6.10).
     var panelHostWindow: NSWindow? { window }
 
-    // Toolbar item identifiers (App.cpp g_ArchiveButtons / g_StandardButtons)
-    private static let archiveItems: [NSToolbarItem.Identifier] = [.szAdd, .szExtract, .szTest]
-    private static let standardItems: [NSToolbarItem.Identifier] = [.szCopy, .szMove, .szDelete, .szInfo]
 
     init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 640),

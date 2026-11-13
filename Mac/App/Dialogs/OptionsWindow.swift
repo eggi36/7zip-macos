@@ -202,22 +202,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
     /// native-look: the Mac look's page area (no tabs; the toolbar switches the pages).
     static var macPageRect: NSRect { NSRect(x: 20, y: 10, width: pageWidth, height: 481) }
-    static var tabControlRect: NSRect { NSRect(x: 6, y: 7, width: pageWidth + 8, height: 507) }
     static var pageRect: NSRect { NSRect(x: 10, y: 29, width: pageWidth, height: 481) }
     static var pageSize: NSSize { pageRect.size }
-    /// The four 50 x 14 DLU buttons, 4 DLU apart, the last 4 DLU from the right edge.
-    private static func buttonRect(_ fromRight: Int) -> NSRect {
-        let w = DLU.x(50)
-        let margin: CGFloat = 20
-        return NSRect(x: clientSize.width - margin - w - CGFloat(fromRight) * (w + 12), y: 550, width: w, height: 23)
-    }
-    // native-look: the Mac order is Apply, Cancel, OK from the left of the right-hand group, and
-    // Help is the round "?" button at the left margin.
-    static var okRect: NSRect { buttonRect(0) }          // IDOK
-    static var cancelRect: NSRect { buttonRect(1) }      // IDCANCEL
-    static var applyRect: NSRect { buttonRect(2) }       // ID_APPLY_NOW 12321
-    static var helpRect: NSRect { buttonRect(0) }                                        // IDHELP
-
     /// native-look: the toolbar symbol of each page (System Settings style pane switcher).
     private static func macSymbol(_ page: OptionsPageBase) -> String {
         switch page.pageID {
@@ -232,11 +218,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
 
     private let tabView = NSTabView()
-    private let tabControl = OptionsTabControl(frame: OptionsWindowController.tabControlRect)
     private var pages: [OptionsPageBase] = []
-    private let okButton = NSButton()
-    private let cancelButton = NSButton()
-    private let applyButton = NSButton()
     private let helpButton = NSButton()
     private var languageWasChanged = false      // CLangPage::LangWasChanged
 
@@ -303,17 +285,9 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         // Only now: adding the first item selects it, and that must not overwrite the stored
         // "last page" before reloadPages() has read it.
         tabView.delegate = self
-        tabControl.setTitles(pages.map(pageTitle))
-        tabControl.onSelect = { [weak self] index in self?.tabView.selectTabViewItem(at: index) }
-
-        configure(okButton, Lang.text(401, "OK"), #selector(okPressed(_:)))            // IDOK -> lang 401
-        configure(cancelButton, Lang.text(402, "Cancel"), #selector(cancelPressed(_:)))  // IDCANCEL -> 402
-        // "&Apply" comes from comctl32 on Windows (PSBTN_APPLYNOW), so no lang id exists for it
-        configure(applyButton, "Apply", #selector(applyPressed(_:)))
-        configure(helpButton, Lang.text(409, "Help"), #selector(helpPressed(_:)))        // IDHELP -> 409
-        okButton.keyEquivalent = "\r"
-        cancelButton.keyEquivalent = "\u{1b}"
-        applyButton.isEnabled = false
+        // HIG "Settings": no OK, Cancel or Apply (IDOK / IDCANCEL / ID_APPLY_NOW); every change
+        // applies at once. Help stays (IDHELP -> lang 409).
+        configure(helpButton, Lang.text(409, "Help"), #selector(helpPressed(_:)))
 
         buildMacChrome(content)
         window.contentView = content
@@ -476,22 +450,15 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             page.clearChanged()
             page.withoutChangeTracking { page.pageDidLoad() }
         }
-        applyButton.isEnabled = false
         languageWasChanged = false
         let index = min(max(Settings.optionsLastPage, 0), pages.count - 1)
         tabView.selectTabViewItem(at: index)
-        tabControl.select(index)
         window?.title = Lang.text(2100, "Options")
         syncMacPane()
     }
 
-    func pageDidChange() {
-        applyButton.isEnabled = pages.contains { $0.pageIsChanged }
-    }
-
     /// A control on a page changed (OptionsPageBase.changed()). native-look: applied at once.
     func pageControlDidChange() {
-        pageDidChange()
         macApplyNow()
     }
 
@@ -500,9 +467,6 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
     func languageDidChange() {
         languageWasChanged = true
         window?.title = Lang.text(2100, "Options")
-        okButton.title = Lang.text(401, "OK")
-        cancelButton.title = Lang.text(402, "Cancel")
-        applyButton.title = "Apply"   // not in the lang files (comctl32 string)
         helpButton.toolTip = Lang.text(409, "Help")
         helpButton.setAccessibilityLabel(helpButton.toolTip)
         for (item, page) in zip(tabView.tabViewItems, pages) { item.label = pageTitle(page) }
@@ -510,7 +474,6 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             item.label = pageTitle(pages[item.tag])
             item.paletteLabel = item.label
         }
-        tabControl.setTitles(pages.map(pageTitle))
         for (i, page) in pages.enumerated() {
             tabView.tabViewItem(at: i).label = pageTitle(page)
             page.loadViewIfNeeded()
@@ -529,33 +492,12 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
                 page.clearChanged()
             } else {
                 tabView.selectTabViewItem(at: i)
-                pageDidChange()
                 return false
             }
         }
-        pageDidChange()
         Settings.synchronize()
         OptionsPostApply.settingsApplied(languageChanged: languageWasChanged)
         return true
-    }
-
-    @objc private func applyPressed(_ sender: Any?) {
-        applyChangedPages()
-    }
-
-    @objc private func okPressed(_ sender: Any?) {
-        guard applyChangedPages() else { return }
-        close()
-    }
-
-    @objc private func cancelPressed(_ sender: Any?) {
-        for page in pages {
-            page.cancelPage()
-            page.clearChanged()
-        }
-        if languageWasChanged { OptionsPostApply.reloadLangItems() }
-        pageDidChange()
-        close()
     }
 
     /// OnNotifyHelp (PSN_HELP -> each page's OnNotifyHelp -> ShowHelpWindow(k*Topic)): the
@@ -571,7 +513,6 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
         guard let item = tabViewItem, let index = tabView.tabViewItems.firstIndex(of: item) else { return }
-        tabControl.select(index)
         Settings.optionsLastPage = index
         syncMacPane()
     }

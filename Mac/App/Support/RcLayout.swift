@@ -136,7 +136,6 @@ enum DialogMetrics {
     /// native-look: the Mac look's dialogs use the system font at its regular size (13 pt) and
     /// regular-size controls (`controlSize`).
     static var font: NSFont { NSFont.systemFont(ofSize: NSFont.systemFontSize) }
-    static let classicFont: NSFont = PanelMetrics.listFont
     static var boldFont: NSFont { NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
     static var controlSize: NSControl.ControlSize { .regular }
 
@@ -790,9 +789,6 @@ final class WinProgressBar: NSView {
             return NSColor(srgbRed: c.0 / 255, green: c.1 / 255, blue: c.2 / 255, alpha: 1)
         }
     }
-    static let frameColor = color((200, 200, 200), (90, 90, 90))
-    static let trackColor = color((235, 235, 235), (50, 50, 50))
-    static let barColor = color((0, 138, 17), (0, 160, 30))
 
     override init(frame: NSRect) {
         super.init(frame: frame)

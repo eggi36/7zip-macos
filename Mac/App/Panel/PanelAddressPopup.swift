@@ -40,10 +40,8 @@ enum AddressPopupMetrics {
     static var iconTop: CGFloat { 3 }
     static var textFromIcon: CGFloat { 22 }
     static var baseline: CGFloat { 16 }
-    static let highlightInset: CGFloat = 2
     static let maxVisibleRows = 30
 
-    static let borderColor = WinChrome.dynamic(WinChrome.rgb(0, 120, 215), .controlAccentColor)
     static let highlight = WinChrome.dynamic(WinChrome.rgb(0, 120, 215), .selectedContentBackgroundColor)
     static let highlightText = WinChrome.dynamic(.white, .alternateSelectedControlTextColor)
 }

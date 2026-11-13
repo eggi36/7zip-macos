@@ -6,7 +6,7 @@
 // every window of the process at once: the file-manager windows, every dialog, the message boxes,
 // the progress windows and the 7zG-mode dialogs. Every custom-drawn component already picks its
 // colours per appearance (`WinChrome.dynamic`, `PanelSelectionStyle`, `FMToolbarColors`,
-// `WinCombo`, `OptionsTabControl`, `WinProgressBar`, `DialogMetrics.groupLine`, ...), and AppKit
+// `WinProgressBar`, `DialogMetrics.groupLine`, ...), and AppKit
 // redraws a view whose effective appearance changed, so switching needs no window rebuild.
 //
 // Stored as `FM.Theme` = "system" | "light" | "dark" in the settings domain. Absent (a fresh
