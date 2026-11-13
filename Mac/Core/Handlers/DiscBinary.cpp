@@ -94,6 +94,7 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback *callback)
       const UInt32 extraOffset = GetUi32(tb + 0x0C);
       const unsigned sectorSize = GetUi16(tb + 0x10);
       const UInt64 startOffset = GetUi64(tb + 0x28);
+      const UInt32 startSector = GetUi32(tb + 0x24);
       const UInt32 footerOffset = GetUi32(tb + 0x34);
       UInt32 length = 0;
       if (extraOffset != 0 && extraOffset + 8 <= size)
@@ -152,6 +153,8 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback *callback)
       t.Stride = sectorSize;
       t.SourceIndex = (unsigned)src;
       t.Offset = startOffset;
+      t.Lba = startSector;
+      t.LbaKnown = true;
       t.NumSectors = length;
       if (t.NumSectors == 0)
       {
@@ -286,6 +289,7 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
         const UInt64 offset = v2 ? GetBe64(e) : GetBe32(e);
         const UInt64 length = v2 ? GetBe64(e + 8) : GetBe32(e + 4);
         const UInt32 mode = v2 ? GetBe32(e + 16) : GetBe32(e + 8);
+        const UInt32 lba = v2 ? GetBe32(e + 20) : GetBe32(e + 12);
         bool audio;
         const UInt32 stride = TaoSectorSize(mode, audio);
         if (stride == 0)
@@ -300,6 +304,8 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
         t.Stride = stride;
         t.SectorSize = stride == kRawSize + kSubSize ? kRawSize : stride;
         t.Offset = offset;
+        t.Lba = lba;
+        t.LbaKnown = true;
         t.NumSectors = length / stride;
         found.Add(t);
       }
@@ -404,7 +410,7 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
       r.Skip(6);
       const UInt32 mode = r.U32();         // 0 audio, 1 mode 1, 2 mode 2
       r.Skip(12);
-      r.U32();                             // start LBA
+      const UInt32 startLba = r.U32();
       r.U32();                             // total length
       r.Skip(16);
       const UInt32 sectorType = r.U32();   // 0: 2048, 1: 2336, 2: 2352
@@ -439,6 +445,8 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
       t.SectorSize = sectorSize;
       t.Stride = sectorSize;
       t.Offset = position;
+      t.Lba = startLba;
+      t.LbaKnown = true;
       t.NumSectors = length;
       if (position + (UInt64)length * sectorSize > header)
         return S_FALSE;

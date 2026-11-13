@@ -41,14 +41,45 @@ struct CTrack
   bool RawData;          // a data track exposed as raw sectors (.bin)
   bool SwapAudio;        // audio stored big-endian (CHD): swapped to the WAV's little-endian
   AString Name;          // a fixed item name (a hard-disk CHD's "image.img"), else TrackNN.ext
+  UInt64 Lba;            // the disc address of the first sector (where a file system points)
+  bool LbaKnown;         // given by the descriptor; otherwise laid out from the sessions
 
   CTrack():
       Number(0), Session(1), Audio(false), AudioKnown(false), SourceIndex(0), Offset(0),
       NumSectors(0), SectorSize(kRawSize), Stride(kRawSize),
-      UserOffset(0), UserSize(kRawSize), RawData(false), SwapAudio(false) {}
+      UserOffset(0), UserSize(kRawSize), RawData(false), SwapAudio(false), Lba(0), LbaKnown(false) {}
 
   UInt64 ExposedSize() const { return NumSectors * UserSize + (Audio ? kWavHeaderSize : 0); }
   UInt64 PackedSize() const { return NumSectors * Stride; }
+};
+
+// A file of a Mode 2 (CD-ROM XA) file system that holds Form 2 sectors (a Video CD's .DAT, a
+// PlayStation .STR): shown as Windows shows it, a RIFF "CDXA" file of its raw 2352-byte sectors.
+// The file system's other files come with it as plain files, so the folder is complete.
+struct CXaFile
+{
+  AString Path;
+  UInt32 Lba;
+  UInt32 Length;         // the directory's data length
+  bool Raw;              // RIFF CDXA of raw sectors
+  Byte Record[14];       // the directory record's XA system-use field (RIFF "fmt " data)
+
+  UInt32 NumSectors() const { return (Length + kCookedSize - 1) / kCookedSize; }
+  UInt64 Size() const { return Raw ? kWavHeaderSize + (UInt64)NumSectors() * kRawSize : Length; }
+};
+
+// One ISO per session of a multi-session disc: the disc from LBA 0 to the session's end, so the
+// session's file system (which also points into earlier sessions) reads as on the disc.
+struct CSessionIso
+{
+  UInt32 Session;
+  UInt64 NumSectors;
+};
+
+struct CItem
+{
+  Byte Kind;             // 0 track, 1 session, 2 XA file
+  unsigned Index;
 };
 
 class CDiscHandler:
@@ -80,6 +111,22 @@ protected:
 
   // Decides each track's exposed layout (Mode 1 / Mode 2 / audio) from its sectors.
   HRESULT FinishTracks();
+
+  // The disc as addressed by its file systems (DiscExtras.cpp).
+  CObjectVector<CXaFile> XaFiles;
+  CRecordVector<CSessionIso> SessionIsos;
+  CRecordVector<CItem> Items;
+  void AssignLbas();
+  int FindTrack(UInt64 lba) const;
+  HRESULT ReadUser(UInt64 lba, Byte *out);     // 2048 bytes; zeros where no data sector is
+  HRESULT ReadRaw(UInt64 lba, Byte *out);      // 2352 bytes; S_FALSE where none is stored
+  void BuildSessions();
+  HRESULT ParseXa();
+  void BuildItems();
+  UInt64 ItemSize(unsigned index) const;
+  friend class CSessionStream;
+  friend class CXaStream;
+  friend HRESULT CreateExtraStream(CDiscHandler *handler, const CItem &item, ISequentialInStream **stream);
 
 public:
   CDiscHandler(): PhySize(0), IsArc(false), Unsupported(false) {}

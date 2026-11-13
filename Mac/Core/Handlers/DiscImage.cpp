@@ -349,6 +349,10 @@ Z7_COM7F_IMF(CDiscHandler::Open(IInStream *stream, const UInt64 * /* maxCheckSta
   }
   IsArc = true;
   RINOK(FinishTracks())
+  AssignLbas();
+  BuildSessions();
+  RINOK(ParseXa())
+  BuildItems();
   if (PhySize == 0)
     RINOK(InStream_GetSize_SeekToEnd(stream, PhySize))
   return S_OK;
@@ -360,6 +364,9 @@ Z7_COM7F_IMF(CDiscHandler::Close())
   Sources.Clear();
   _volumeNames.Clear();
   Tracks.Clear();
+  XaFiles.Clear();
+  SessionIsos.Clear();
+  Items.Clear();
   PhySize = 0;
   IsArc = false;
   Unsupported = false;
@@ -369,7 +376,7 @@ Z7_COM7F_IMF(CDiscHandler::Close())
 
 Z7_COM7F_IMF(CDiscHandler::GetNumberOfItems(UInt32 *numItems))
 {
-  *numItems = Tracks.Size();
+  *numItems = Items.Size();
   return S_OK;
 }
 
@@ -394,15 +401,49 @@ Z7_COM7F_IMF(CDiscHandler::GetProperty(UInt32 index, PROPID propID, PROPVARIANT 
 {
   COM_TRY_BEGIN
   NCOM::CPropVariant prop;
-  if (index >= Tracks.Size())
+  if (index >= Items.Size())
     return E_INVALIDARG;
-  const CTrack &t = Tracks[index];
+  const CItem &item = Items[index];
+  if (item.Kind == 1)
+  {
+    const CSessionIso &si = SessionIsos[item.Index];
+    switch (propID)
+    {
+      case kpidPath:
+      {
+        char temp[16];
+        AString s ("Session");
+        ConvertUInt32ToString(si.Session, temp);
+        s += temp;
+        s += ".iso";
+        prop = s;
+        break;
+      }
+      case kpidSize: prop = ItemSize(index); break;
+      case kpidComment: prop = "The disc up to the end of this session"; break;
+    }
+    prop.Detach(value);
+    return S_OK;
+  }
+  if (item.Kind == 2)
+  {
+    const CXaFile &f = XaFiles[item.Index];
+    switch (propID)
+    {
+      case kpidPath: prop = f.Path; break;
+      case kpidSize: prop = f.Size(); break;
+      case kpidComment: if (f.Raw) prop = "CD-ROM XA (RIFF CDXA, raw sectors)"; break;
+    }
+    prop.Detach(value);
+    return S_OK;
+  }
+  const CTrack &t = Tracks[item.Index];
   switch (propID)
   {
     case kpidPath:
     {
       AString s;
-      TrackName(t, index, s);
+      TrackName(t, item.Index, s);
       prop = s;
       break;
     }
@@ -464,9 +505,12 @@ Z7_COM7F_IMF(CDiscHandler::GetStream(UInt32 index, ISequentialInStream **stream)
 {
   COM_TRY_BEGIN
   *stream = NULL;
-  if (index >= Tracks.Size())
+  if (index >= Items.Size())
     return E_INVALIDARG;
-  const CTrack &t = Tracks[index];
+  const CItem &item = Items[index];
+  if (item.Kind != 0)
+    return CreateExtraStream(this, item, stream);
+  const CTrack &t = Tracks[item.Index];
   if (t.SourceIndex >= Sources.Size())
     return S_FALSE;
   CTrackStream *spec = new CTrackStream;
@@ -485,15 +529,15 @@ Z7_COM7F_IMF(CDiscHandler::Extract(const UInt32 *indices, UInt32 numItems,
   COM_TRY_BEGIN
   const bool allFilesMode = (numItems == (UInt32)(Int32)-1);
   if (allFilesMode)
-    numItems = Tracks.Size();
+    numItems = Items.Size();
   if (numItems == 0)
     return S_OK;
   UInt64 totalSize = 0;
   for (UInt32 i = 0; i < numItems; i++)
   {
     const UInt32 index = allFilesMode ? i : indices[i];
-    if (index < Tracks.Size())
-      totalSize += Tracks[index].ExposedSize();
+    if (index < Items.Size())
+      totalSize += ItemSize(index);
   }
   RINOK(extractCallback->SetTotal(totalSize))
 
@@ -512,7 +556,7 @@ Z7_COM7F_IMF(CDiscHandler::Extract(const UInt32 *indices, UInt32 numItems,
     const Int32 askMode = testMode ? NExtract::NAskMode::kTest : NExtract::NAskMode::kExtract;
     CMyComPtr<ISequentialOutStream> outStream;
     RINOK(extractCallback->GetStream(index, &outStream, askMode))
-    size = index < Tracks.Size() ? Tracks[index].ExposedSize() : 0;
+    size = index < Items.Size() ? ItemSize(index) : 0;
     if (!testMode && !outStream)
       continue;
     RINOK(extractCallback->PrepareOperation(askMode))

@@ -296,16 +296,16 @@ final class DiscImageTests: XCTestCase {
         var cdi = pregap + raw + audio
         let header = cdi.count
         let mark = Data([0, 0, 1, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF])
-        func track(pregapSectors: Int, sectors: Int, mode: Int) -> Data {
+        func track(pregapSectors: Int, sectors: Int, mode: Int, lba: Int) -> Data {
             var t = le32(0) + mark + mark + zeros(4) + Data([4]) + Data("t.wv".utf8)
             t += zeros(11 + 4 + 4) + le32(0) + zeros(2) + le32(pregapSectors) + le32(sectors) + zeros(6)
-            t += le32(mode) + zeros(12) + le32(0) + le32(pregapSectors + sectors) + zeros(16) + le32(2)
+            t += le32(mode) + zeros(12) + le32(lba) + le32(pregapSectors + sectors) + zeros(16) + le32(2)
             t += zeros(29) + zeros(5) + le32(0)
             return t
         }
         var desc = le16(1) + le16(2)
-        desc += track(pregapSectors: 150, sectors: raw.count / 2352, mode: 1)
-        desc += track(pregapSectors: 0, sectors: audio.count / 2352, mode: 0)
+        desc += track(pregapSectors: 150, sectors: raw.count / 2352, mode: 1, lba: 0)
+        desc += track(pregapSectors: 0, sectors: audio.count / 2352, mode: 0, lba: raw.count / 2352)
         desc += zeros(4 + 8 + 1)
         cdi += desc
         let total = cdi.count + 8
@@ -620,5 +620,145 @@ final class DiscImageTests: XCTestCase {
         let items = try list(path("disk.chd"))
         XCTAssertEqual(items.map(\.name), ["image.img"])
         XCTAssertEqual(data(try extract(path("disk.chd")), "image.img"), disk)
+    }
+
+    // MARK: - ISZ segments
+
+    /// An ISZ split into three files (.isz, .i01, .i02), the first block cut by a segment end.
+    func testIszInSegments() throws {
+        let blockSize = 0x4000
+        var image = iso
+        image += Data(count: (2048 - image.count % 2048) % 2048)
+        let parts = blocks(image, blockSize)
+        var body = Data(), table = Data()
+        for part in parts {
+            let z = zlib(part)
+            let v = UInt32(2) << 22 | UInt32(z.count)
+            table += Data([UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF), UInt8((v >> 16) & 0xFF)])
+            body += z
+        }
+        let key: [UInt8] = [0xB6, 0x8C, 0xA5, 0xDE]
+        for i in 0..<table.count { table[i] ^= key[i % 4] }
+        // first file: header, block table, segment table (3 entries + end), then data
+        let segOffset = 64 + table.count
+        let dataOffset = segOffset + 4 * 24
+        let firstData = 700                      // a cut inside the first block
+        let secondData = body.count / 2 - firstData
+        let header2 = 64                         // later segments start with a header too
+        let cut1 = body.subdata(in: 0..<firstData)
+        let cut2 = body.subdata(in: firstData..<(firstData + secondData))
+        let cut3 = body.subdata(in: (firstData + secondData)..<body.count)
+        let size1 = dataOffset + cut1.count, size2 = header2 + cut2.count, size3 = header2 + cut3.count
+        func seg(_ size: Int, _ chunkOffset: Int, _ left: Int) -> Data {
+            le64(size) + le32(0) + le32(0) + le32(chunkOffset) + le32(left)
+        }
+        // left_size: bytes of a cut chunk that continue in the next file; chk_off: the next whole
+        // chunk -- here the data continues straight on, so chk_off = header + left of the cut
+        var segs = seg(size1, dataOffset, 0) + seg(size2, header2, 0) + seg(size3, header2, 0) + zeros(24)
+        for i in 0..<segs.count { segs[i] ^= key[i % 4] }
+        var h = Data("IsZ!".utf8) + Data([64, 1]) + le32(0) + le16(2048) + le32(image.count / 2048)
+        h += Data([0]) + le64(size1) + le32(parts.count) + le32(blockSize) + Data([3, 0])
+        h += le32(64) + le32(segOffset) + le32(dataOffset) + Data([0])
+        h += Data(count: 64 - h.count)
+        try write(h + table + segs + cut1, "split.isz")
+        try write(Data(count: header2) + cut2, "split.i01")
+        try write(Data(count: header2) + cut3, "split.i02")
+        try checkSingleISO(path("split.isz"), format: "ISZ", expected: image)
+    }
+
+    // MARK: - sessions
+
+    /// A two-session cue sheet: each session gets an ISO of the disc up to its end, the second
+    /// after the Red Book gap of 11400 sectors.
+    func testTwoSessionsGiveAnIsoEach() throws {
+        let raw = rawMode1(iso)
+        let n = raw.count / 2352
+        try write(raw, "s1.bin")
+        try write(raw, "s2.bin")
+        try write(Data("""
+            REM SESSION 01
+            FILE "s1.bin" BINARY
+              TRACK 01 MODE1/2352
+                INDEX 01 00:00:00
+            REM SESSION 02
+            FILE "s2.bin" BINARY
+              TRACK 02 MODE1/2352
+                INDEX 01 00:00:00
+            """.utf8), "multi.cue")
+        let items = try list(path("multi.cue"))
+        XCTAssertEqual(items.map(\.name), ["Track01.iso", "Track02.iso", "Session1.iso", "Session2.iso"])
+        let second = n + 11400
+        XCTAssertEqual(items[2].size, UInt64(n * 2048))
+        XCTAssertEqual(items[3].size, UInt64((second + n) * 2048))
+        let out = try extract(path("multi.cue"))
+        let s2 = data(out, "Session2.iso")
+        XCTAssertEqual(s2.prefix(iso.count), iso, "session 1 at LBA 0")
+        XCTAssertTrue(s2.subdata(in: (n * 2048)..<(second * 2048)).allSatisfy { $0 == 0 }, "the gap")
+        XCTAssertEqual(s2.subdata(in: (second * 2048)..<((second + n) * 2048)), iso, "session 2 at its LBA")
+    }
+
+    // MARK: - CD-ROM XA
+
+    /// A Mode 2 track whose ISO 9660 file system has a plain file and a Form 2 file (as a Video
+    /// CD's MPEG or a PlayStation .STR): the folder Track01 holds both, the Form 2 one as a RIFF
+    /// CDXA file of its raw sectors.
+    func testXaForm2FilesAsRiffCdxa() throws {
+        func bcd(_ v: Int) -> UInt8 { UInt8((v / 10) << 4 | (v % 10)) }
+        func sector(_ lba: Int, form2: Bool, _ payload: Data) -> Data {
+            var s = Data([0x00] + [UInt8](repeating: 0xFF, count: 10) + [0x00])
+            let a = lba + 150
+            s += Data([bcd(a / 4500), bcd((a / 75) % 60), bcd(a % 75), 2])
+            let sub = Data([1, 0, form2 ? 0x64 : 0x08, 0])        // file 1, video / data
+            s += sub + sub
+            let size = form2 ? 2324 : 2048
+            s += payload.prefix(size) + Data(count: size - min(size, payload.count))
+            s += Data(count: 2352 - s.count)
+            return s
+        }
+        func record(_ name: String, lba: Int, size: Int, dir: Bool, xa attr: UInt16) -> Data {
+            let n = Data(name.utf8)
+            let pad = n.count % 2 == 0 ? 1 : 0
+            let len = 33 + n.count + pad + 14
+            var r = Data([UInt8(len), 0]) + le32(lba) + be32(lba) + le32(size) + be32(size) + zeros(7)
+            r += Data([dir ? 2 : 0, 0, 0]) + le16(1) + be16(1) + Data([UInt8(n.count)]) + n + zeros(pad)
+            r += zeros(4) + Data([UInt8(attr >> 8), UInt8(attr & 0xFF)]) + Data("XA".utf8) + Data([1]) + zeros(5)
+            return r
+        }
+        let text = Data("plain file on an XA disc\n".utf8)
+        let movieSectors = 3
+        // LBA 16 PVD, 17 terminator, 18 root, 19 the text, 20-22 the movie
+        var root = record("\u{0}", lba: 18, size: 2048, dir: true, xa: 0x8D55)
+        root += record("\u{1}", lba: 18, size: 2048, dir: true, xa: 0x8D55)
+        root += record("README.TXT;1", lba: 19, size: text.count, dir: false, xa: 0x0D55)
+        root += record("MOVIE.DAT;1", lba: 20, size: movieSectors * 2048, dir: false, xa: 0x1555)
+        var pvd = Data([1]) + Data("CD001".utf8) + Data([1]) + zeros(149)
+        pvd += record("\u{0}", lba: 18, size: 2048, dir: true, xa: 0x8D55).prefix(34)
+        var track = Data()
+        for lba in 0..<16 { track += sector(lba, form2: false, Data()) }
+        track += sector(16, form2: false, pvd)
+        track += sector(17, form2: false, Data([255]) + Data("CD001".utf8) + Data([1]))
+        track += sector(18, form2: false, root)
+        track += sector(19, form2: false, text)
+        var movieRaw = Data()
+        for k in 0..<movieSectors {
+            let s = sector(20 + k, form2: true, Data(repeating: UInt8(0xA0 + k), count: 2324))
+            movieRaw += s
+            track += s
+        }
+        try write(track, "vcd.bin")
+        try write(Data("FILE \"vcd.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n".utf8), "vcd.cue")
+
+        let top = try list(path("vcd.cue"))
+        XCTAssertTrue(top.contains { $0.name == "Track01.iso" }, "\(top.map(\.name))")
+        XCTAssertTrue(top.contains { $0.name == "Track01" }, "the XA folder: \(top.map(\.name))")
+        let out = try extract(path("vcd.cue"))
+        XCTAssertEqual(data(out, "Track01/README.TXT"), text)
+        let movie = data(out, "Track01/MOVIE.DAT")
+        XCTAssertEqual(movie.count, 44 + movieSectors * 2352)
+        XCTAssertEqual(movie.prefix(4), Data("RIFF".utf8))
+        XCTAssertEqual(movie.subdata(in: 8..<16), Data("CDXAfmt ".utf8))
+        XCTAssertEqual(movie.subdata(in: 26..<28), Data("XA".utf8), "the XA record as the fmt data")
+        XCTAssertEqual(movie.subdata(in: 36..<40), Data("data".utf8))
+        XCTAssertEqual(movie.dropFirst(44), movieRaw, "the raw sectors")
     }
 }

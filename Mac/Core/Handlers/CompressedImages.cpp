@@ -500,19 +500,66 @@ using namespace NBlockImage;
 
 static const Byte kSignature[] = { 'I', 's', 'Z', '!' };
 
+// The table bytes and the segment table are XORed with the bitwise NOT of "IsZ!".
+static const Byte kKey[4] = { 0xB6, 0x8C, 0xA5, 0xDE };
+
 class CHandler: public CBlockHandler
 {
   CRecordVector<UInt32> _sizes;     // packed size of each block
   CRecordVector<Byte> _kinds;       // 0 zeros, 1 stored, 2 zlib, 3 bzip2
-  CRecordVector<UInt64> _offsets;   // where each block starts in the file
+  CRecordVector<UInt64> _offsets;   // where each block starts in the data (all segments joined)
   CByteBuffer _packed;
+  // The data: each segment file's part, one after another (.isz, .i01, .i02, ...).
+  CObjectVector< CMyComPtr<IInStream> > _segments;
+  CRecordVector<UInt64> _segStart;  // where the data begins in that file
+  CRecordVector<UInt64> _segLength; // how much of it there is
 
   HRESULT Open2(IInStream *stream, IArchiveOpenCallback *openCallback) Z7_override;
   HRESULT DecodeBlock(UInt64 block, Byte *out) Z7_override;
-  void CloseFormat() Z7_override { _sizes.Clear(); _kinds.Clear(); _offsets.Clear(); _packed.Free(); }
+  void CloseFormat() Z7_override
+  {
+    _sizes.Clear(); _kinds.Clear(); _offsets.Clear(); _packed.Free();
+    _segments.Clear(); _segStart.Clear(); _segLength.Clear();
+  }
+  HRESULT ReadData(UInt64 offset, Byte *data, size_t size);
 };
 
-HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback * /* openCallback */)
+// Reads `size` bytes at `offset` of the joined data, across segment files.
+HRESULT CHandler::ReadData(UInt64 offset, Byte *data, size_t size)
+{
+  for (unsigned k = 0; k < _segments.Size() && size != 0; k++)
+  {
+    if (offset >= _segLength[k])
+    {
+      offset -= _segLength[k];
+      continue;
+    }
+    size_t n = size;
+    if (n > _segLength[k] - offset)
+      n = (size_t)(_segLength[k] - offset);
+    RINOK(InStream_SeekSet(_segments[k], _segStart[k] + offset))
+    RINOK(ReadStream_FALSE(_segments[k], data, n))
+    data += n;
+    size -= n;
+    offset = 0;
+  }
+  return size == 0 ? S_OK : S_FALSE;
+}
+
+// "name.isz" -> "name.iNN"
+static UString SegmentName(const UString &first, unsigned k)
+{
+  UString s = first;
+  const int dot = s.ReverseFind_Dot();
+  if (dot >= 0)
+    s.DeleteFrom((unsigned)dot);
+  s += L".i";
+  s += (wchar_t)(L'0' + k / 10);
+  s += (wchar_t)(L'0' + k % 10);
+  return s;
+}
+
+HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback *openCallback)
 {
   Byte h[64];
   RINOK(ReadStream_FALSE(stream, h, sizeof(h)))
@@ -524,7 +571,6 @@ HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback * /* openCallbac
   const unsigned sectorSize = GetUi16(h + 10);
   const UInt32 totalSectors = GetUi32(h + 12);
   const unsigned password = h[16];
-  const UInt64 segmentSize = GetUi64(h + 17);
   const UInt32 numBlocks = GetUi32(h + 25);
   _blockSize = GetUi32(h + 29);
   const unsigned ptrLen = h[33];
@@ -539,17 +585,86 @@ HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback * /* openCallbac
   _imgExt = "iso";
   _method = "ISZ";
   _size = (UInt64)totalSectors * sectorSize;
-  if (password != 0 || segOffset != 0 || (segmentSize != 0 && segmentSize < fileSize))
+  if (password != 0)
   {
-    // Encrypted, or split into .i01 / .i02 ... segments.
-    _unsupported = true;
+    _unsupported = true;                 // AES or password protected
     return S_OK;
   }
+
+  // The segments: one entry of 24 bytes each (size, chunks, first chunk, offset of the first
+  // whole chunk, bytes of the last chunk that continue in the next file), ended by a zero size.
+  _segments.Add(CMyComPtr<IInStream>(stream));
+  if (segOffset == 0)
+  {
+    _segStart.Add(dataOffset);
+    _segLength.Add(fileSize - dataOffset);
+  }
+  else
+  {
+    if (segOffset + 24 > fileSize)
+      return S_FALSE;
+    const size_t maxSegs = 100;
+    CByteBuffer table(24 * maxSegs);
+    RINOK(InStream_SeekSet(stream, segOffset))
+    size_t got = table.Size();
+    RINOK(ReadStream(stream, table, &got))
+    // stored plainly, or obfuscated like the block table: plain when the first size is the file's
+    if (GetUi64(table) != fileSize)
+      for (size_t i = 0; i < got; i++)
+        table[i] ^= kKey[i & 3];
+    if (GetUi64(table) != fileSize)
+      return S_FALSE;
+    CMyComPtr<IArchiveOpenVolumeCallback> volumes;
+    if (openCallback)
+      openCallback->QueryInterface(IID_IArchiveOpenVolumeCallback, (void **)&volumes);
+    UString first;
+    if (volumes)
+    {
+      NCOM::CPropVariant prop;
+      if (volumes->GetProperty(kpidName, &prop) == S_OK && prop.vt == VT_BSTR)
+        first = prop.bstrVal;
+    }
+    UInt32 prevLeft = 0;
+    for (unsigned k = 0; (size_t)(k + 1) * 24 <= got && k < maxSegs; k++)
+    {
+      const Byte *e = table + (size_t)k * 24;
+      const UInt64 segSize = GetUi64(e);
+      if (segSize == 0)
+        break;
+      const UInt32 chunkOffset = GetUi32(e + 16);
+      const UInt32 left = GetUi32(e + 20);
+      CMyComPtr<IInStream> seg;
+      if (k == 0)
+        seg = stream;
+      else
+      {
+        if (!volumes || first.IsEmpty())
+        {
+          _unsupported = true;
+          return S_OK;
+        }
+        const HRESULT res = volumes->GetStream(SegmentName(first, k), &seg);
+        if (res != S_OK || !seg)
+        {
+          _unsupported = true;             // a missing .iNN segment
+          return S_OK;
+        }
+        _segments.Add(seg);
+      }
+      // A chunk cut at the end of the previous file continues just before this file's first
+      // whole chunk.
+      const UInt64 start = chunkOffset >= prevLeft ? chunkOffset - prevLeft : chunkOffset;
+      _segStart.Add(start);
+      _segLength.Add(segSize > start ? segSize - start : 0);
+      prevLeft = left;
+    }
+  }
+
   if (ptrOffset == 0)
   {
-    // No block table: the image is stored as it is after the header.
+    // No block table: the image is stored as it is.
     const UInt64 n = (_size + _blockSize - 1) / _blockSize;
-    UInt64 pos = dataOffset;
+    UInt64 pos = 0;
     for (UInt64 i = 0; i < n; i++, pos += _blockSize)
     {
       _sizes.Add(_blockSize);
@@ -564,11 +679,9 @@ HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback * /* openCallbac
   CByteBuffer table((size_t)numBlocks * ptrLen);
   RINOK(InStream_SeekSet(stream, ptrOffset))
   RINOK(ReadStream_FALSE(stream, table, table.Size()))
-  // The table is XORed with the bitwise NOT of "IsZ!".
-  static const Byte kKey[4] = { 0xB6, 0x8C, 0xA5, 0xDE };
   for (size_t i = 0; i < table.Size(); i++)
     table[i] ^= kKey[i & 3];
-  UInt64 pos = dataOffset;
+  UInt64 pos = 0;
   for (UInt32 i = 0; i < numBlocks; i++)
   {
     const Byte *e = table + (size_t)i * ptrLen;
@@ -602,16 +715,15 @@ HRESULT CHandler::DecodeBlock(UInt64 block, Byte *out)
     case 1:
     {
       memset(out, 0, _blockSize);
-      RINOK(InStream_SeekSet(Stream, _offsets[i]))
-      size_t n = size < _blockSize ? size : _blockSize;
-      return ReadStream(Stream, out, &n);
+      const size_t n = (size_t)(size < want ? size : want);
+      return ReadData(_offsets[i], out, n);
     }
   }
   if (size == 0 || size > _blockSize * 2 + 1024)
     return S_FALSE;
   if (_packed.Size() < size)
     _packed.Alloc(size);
-  RINOK(ReadAt(_offsets[i], _packed, size))
+  RINOK(ReadData(_offsets[i], _packed, size))
   size_t produced = 0;
   HRESULT res;
   if (_kinds[i] == 2)

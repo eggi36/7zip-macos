@@ -338,6 +338,8 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback *callback)
     t.SectorSize = sectorSize;
     t.Stride = sectorSize;
     t.Offset = offset;
+    t.Lba = lba;
+    t.LbaKnown = true;
     int src;
     RINOK(AddVolume(callback, ToUnicode(w[4]), src))
     if (src < 0)
@@ -473,6 +475,8 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback *callback)
     t.Stride = kRawSize;
     t.SourceIndex = (unsigned)src;
     t.Offset = (UInt64)(UInt32)e.PlbaSigned * kRawSize;
+    t.Lba = (UInt32)e.PlbaSigned;
+    t.LbaKnown = true;
     // The end: the next track in the same session, else that session's lead-out.
     UInt64 end = imgSectors;
     UInt32 bestNext = 0xFFFFFFFF;
