@@ -98,6 +98,26 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(table.usesAlternatingRowBackgroundColors)
     }
 
+    /// A fresh install: both toolbar groups, symbols only (no labels).
+    func testFreshToolbarShowsSymbolsOnly() throws {
+        let saved = Settings.toolbarsMask
+        defer {
+            // bit 31 = never saved: put the domain back the way it was
+            if saved & 0x8000_0000 != 0 { Settings.removeKey(Settings.Key.toolbars) } else { Settings.toolbarsMask = saved }
+        }
+        Settings.removeKey(Settings.Key.toolbars)
+        XCTAssertEqual(Settings.toolbarsMask & 1, 0, "no labels by default")
+        let controller = try openWindow()
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
+        let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
+        XCTAssertTrue(ids.contains(.szAdd) && ids.contains(.szInfo), "both groups: \(ids)")
+        let menu = MainMenu.build()
+        let text = try XCTUnwrap(allItems(menu).first { $0.action == #selector(MenuActions.viewToolbarsShowButtonsText(_:)) })
+        _ = controller.validateMenuItem(text)
+        XCTAssertEqual(text.state, .off, "View > Toolbars > Show Buttons Text is off")
+    }
+
     func testMacLookFollowsToolbarMenus() throws {
         let saved = Settings.toolbarsMask
         defer { Settings.toolbarsMask = saved }
