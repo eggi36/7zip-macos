@@ -293,13 +293,11 @@ final class Fix112Tests: AppHostTestCase {
         SZSettings.writesSuspended = false
     }
 
-    // MARK: - 3. Light by default
+    // MARK: - 3. System by default (a Mac app follows Light / Dark)
 
-    func testLightIsTheDefaultTheme() {
+    func testSystemIsTheDefaultTheme() {
         Settings.removeKey(Settings.Key.theme)
-        XCTAssertEqual(Settings.theme, .light)
-        AppTheme.applyStored()
-        XCTAssertEqual(NSApp.appearance?.name, .aqua)
+        XCTAssertEqual(Settings.theme, .system)
         Settings.theme = .system
         XCTAssertEqual(Settings.string(Settings.Key.theme), "system", "an explicit System is kept")
         XCTAssertNil(NSApp.appearance)
@@ -307,7 +305,7 @@ final class Fix112Tests: AppHostTestCase {
         _ = mac.view
         Settings.removeKey(Settings.Key.theme)
         mac.pageDidLoad()
-        XCTAssertEqual(mac.selectedTheme, .light, "the page shows Light for a fresh domain")
+        XCTAssertEqual(mac.selectedTheme, .system, "the page shows System for a fresh domain")
     }
 }
 

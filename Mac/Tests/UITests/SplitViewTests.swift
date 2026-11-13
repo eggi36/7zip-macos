@@ -93,7 +93,7 @@ final class SplitViewTests: SevenZipUITestCase {
         let divider = splitGroup.descendants(matching: .splitter).firstMatch
         XCTAssertTrue(divider.exists, "no divider to drag")
         divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.3,
+            .click(forDuration: 0.3,
                    thenDragTo: sevenZip.window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
         guard let dragged = dividerPosition else { return XCTFail("no divider after the drag") }
         let width = splitGroup.frame.width

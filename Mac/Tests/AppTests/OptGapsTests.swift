@@ -79,22 +79,6 @@ final class OptGapsTests: AppHostTestCase {
 
     // MARK: - Options > System (01b section 4.21, parity.md B 13 / D 12)
 
-    /// The format icons are 7-Zip's own document icons, not the system's.
-    func testSystemPageShowsTheFormatIcons() throws {
-        for type in FileTypes.all {
-            let image = try XCTUnwrap(OptionsSystemPage.formatIcon(for: type), "no icon for .\(type.ext)")
-            let bundled = Bundle.main.url(forResource: "doc-" + type.iconFileName, withExtension: "icns")
-            XCTAssertNotNil(bundled, "doc-\(type.iconFileName).icns is not in the bundle")
-            // The .icns carries a real 16 px representation for the 16 pt row.
-            XCTAssertTrue(image.representations.contains { $0.pixelsWide == 16 },
-                          ".\(type.ext): no 16 px representation in \(image.representations)")
-            // docicons2: the row icon is the panel list's small icon (the 16 px frame, doubled
-            // pixel-for-pixel on Retina), not the 32 px frame scaled into a 16 pt slot.
-            XCTAssertTrue(image === PanelArchiveIcons.icon(named: type.iconFileName, large: false),
-                          ".\(type.ext): not the panel list's small icon")
-        }
-    }
-
     /// NM_CLICK on the state column toggles that row; Return toggles the selection (NM_RETURN).
     func testSystemPageClickAndReturnToggleRows() throws {
         let page = try optionsPage(OptionsSystemPage.self)
@@ -204,7 +188,7 @@ final class OptGapsTests: AppHostTestCase {
         }
         let controller = MainWindowController()
         controller.showWindow(nil)
-        XCTAssertFalse(controller.toolbarView.buttons.isEmpty)
+        XCTAssertFalse(controller.commandToolbarItems.isEmpty)
         controller.window?.close()
         OptionsPostApply.reloadLangItems()           // raised before the fix
         XCTAssertNotNil(NSApp.mainMenu)
@@ -399,7 +383,6 @@ final class OptGapsTests: AppHostTestCase {
         }
         useLanguage("-")
     }
-
 
     static func textField(in view: NSView, where match: (NSTextField) -> Bool) -> NSTextField? {
         if let field = view as? NSTextField, match(field) { return field }

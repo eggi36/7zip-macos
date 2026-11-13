@@ -84,7 +84,9 @@ extension PanelViewController: NSUserInterfaceValidations {
     @objc func fileRename(_ sender: Any?) { renameFocusedItem() }                 // IDM_RENAME 545
     @objc func fileDelete(_ sender: Any?) {                                       // IDM_DELETE 548
         let shift = NSApp.currentEvent?.modifierFlags.contains(.shift) ?? false
-        deleteItems(toTrash: !shift)
+        // native-look: File > Delete Immediately is Shift+Del's permanent delete.
+        let immediately = (sender as? NSMenuItem)?.tag == MainMenu.deleteImmediatelyTag
+        deleteItems(toTrash: !shift && !immediately)
     }
     @objc func fileProperties(_ sender: Any?) { showProperties() }                // IDM_PROPERTIES 551
     @objc func fileComment(_ sender: Any?) { changeComment() }                    // IDM_COMMENT 552

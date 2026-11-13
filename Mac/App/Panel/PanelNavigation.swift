@@ -408,7 +408,7 @@ extension PanelViewController {
         let items = addressDropdownEntries.map {
             AddressPopupItem(name: $0.name, level: $0.level, icon: AddressDropdown.icon(for: $0))
         }
-        AddressPopup.show(below: pathCombo, items: items, font: PanelMetrics.listFont) { [weak self] index in
+        AddressPopup.show(below: pathCombo, items: items, font: PanelMetrics.panelFont) { [weak self] index in
             self?.commitAddressDropdownEntry(at: index)
         }
     }

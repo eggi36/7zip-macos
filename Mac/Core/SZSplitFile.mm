@@ -93,6 +93,142 @@ static BOOL SZCheckBreak(id<SZProgressDelegate> progress)
 
 @end
 
+/// CSplitVolName (Archive/Common/MultiStream.h, 7-Zip 26.06): the name sequence Combine walks.
+/// Numeric "name.001"/"name.000" series (7-Zip style) and Latin "nameaa"/"nameAA" series
+/// (GNU split style, whose suffix grows by two letters after "…yz" -> "…zaaa"). Same algorithm,
+/// UTF-16 code units for wchar_t.
+@interface SZSplitVolName : NSObject
+@property (nonatomic, strong) NSMutableString *name;     // [0, changedPos) is unchanged
+@property (nonatomic, strong) NSMutableString *changed;
+@property (nonatomic) NSUInteger changedPos;
+@property (nonatomic) NSInteger specPos;   // 0: both modes; -1: sequential only; > 0: skip mode only
+@property (nonatomic) unichar postfixChar; // '0', 'a' or 'A'
+@property (nonatomic) BOOL isComplicated;
+@end
+
+static inline unichar SZLowerAscii(unichar c)
+{
+    return (c >= 'A' && c <= 'Z') ? (unichar)(c + 0x20) : c;
+}
+
+@implementation SZSplitVolName
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self)
+    {
+        _name = [NSMutableString string];
+        _changed = [NSMutableString string];
+        _postfixChar = '0';
+    }
+    return self;
+}
+
+- (BOOL)isLatinPostfix
+{
+    return _postfixChar != '0';
+}
+
+- (void)addPostfix2Chars
+{
+    [_changed appendFormat:@"%C%C", _postfixChar, _postfixChar];
+    _specPos++;
+}
+
+- (BOOL)parseName
+{
+    const NSUInteger len = _name.length;
+    if (len < 2)
+        return NO;
+    NSUInteger pos = len - 2;
+    if (SZLowerAscii([_name characterAtIndex:pos]) == 'a' && SZLowerAscii([_name characterAtIndex:pos + 1]) == 'a')
+    {
+        _postfixChar = [_name characterAtIndex:len - 1];
+        while (pos != 0 && SZLowerAscii([_name characterAtIndex:pos - 1]) == 'a')
+            pos--;
+    }
+    else
+    {
+        _postfixChar = '0';
+        pos++;
+        const unichar c = [_name characterAtIndex:pos];
+        if (c != '0' && c != '1')
+            return NO;
+        while (pos != 0 && [_name characterAtIndex:pos - 1] == '0')
+            pos--;
+        if (len - pos < 2 || pos == 0 || [_name characterAtIndex:pos - 1] != '.')
+            return NO;
+    }
+    _changedPos = pos;
+    _changed = [[_name substringFromIndex:pos] mutableCopy];
+    return YES;
+}
+
+static inline void SZSetChar(NSMutableString *s, NSUInteger i, unichar c)
+{
+    [s replaceCharactersInRange:NSMakeRange(i, 1) withString:[NSString stringWithCharacters:&c length:1]];
+}
+
+/// CSplitVolName::GetNextName. NO stops the volume loop (a Latin series ran past "zz…z").
+- (BOOL)nextName
+{
+    _isComplicated = NO;
+    NSUInteger i = _changed.length;
+    for (;;)
+    {
+        unichar c = [_changed characterAtIndex:--i];
+        if ([self isLatinPostfix])
+        {
+            if ((c | 0x20) != 'z')
+            {
+                c++;
+                SZSetChar(_changed, i, c);
+                if ((c | 0x20) != 'z')
+                    return YES;
+                break;
+            }
+            c -= 'z' - 'a';
+            SZSetChar(_changed, i, c);
+            if (i == 0)
+                return NO;
+        }
+        else
+        {
+            if (c != '9')
+            {
+                c++;
+                SZSetChar(_changed, i, c);
+                if (c != '9')
+                    return YES;
+                break;
+            }
+            SZSetChar(_changed, i, '0');
+            if (i == 0)
+            {
+                _specPos = -1;
+                [_changed insertString:@"1" atIndex:0];
+                return YES;
+            }
+        }
+    }
+    if ((NSInteger)i != _specPos)
+        return YES;
+    if (i == 0)
+        _isComplicated = YES;
+    else
+        [self addPostfix2Chars];
+    return YES;
+}
+
+- (void)generateName
+{
+    [_name deleteCharactersInRange:NSMakeRange(_changedPos, _name.length - _changedPos)];
+    [_name appendString:_changed];
+}
+
+@end
+
 // ---------------------------------------------------------------------------
 
 @implementation SZSplitFile
@@ -351,57 +487,61 @@ static BOOL SZCheckBreak(id<SZProgressDelegate> progress)
 + (BOOL)parseFirstVolumeName:(NSString *)name
                unchangedPart:(NSString * _Nullable * _Nullable)unchangedPart
 {
-    // CVolSeqName::ParseName (PanelSplitFile.cpp:45-58)
-    if (name.length < 2)
+    SZSplitVolName *seq = [SZSplitVolName new];
+    seq.name = [name mutableCopy];
+    if (![seq parseName])
         return NO;
-    if ([name characterAtIndex:name.length - 1] != '1')
-        return NO;
-    if ([name characterAtIndex:name.length - 2] != '0')
-        return NO;
-    NSUInteger pos = name.length - 2;
-    while (pos > 0 && [name characterAtIndex:pos - 1] == '0')
-        pos--;
     if (unchangedPart)
-        *unchangedPart = [name substringToIndex:pos];
+        *unchangedPart = [name substringToIndex:seq.changedPos];
     return YES;
 }
 
 + (NSArray<NSString *> *)volumeNamesForFirstVolume:(NSString *)firstName
                                        inDirectory:(NSString *)directory
 {
-    NSString *unchanged = nil;
-    if (![self parseFirstVolumeName:firstName unchangedPart:&unchanged])
+    // CApp::Combine (PanelSplitFile.cpp, 26.06): the volume loop over CSplitVolName.
+    SZSplitVolName *seq = [SZSplitVolName new];
+    seq.name = [firstName mutableCopy];
+    if (![seq parseName])
         return @[];
-    SZVolSeqName *seq = [SZVolSeqName new];
-    seq.unchangedPart = unchanged ?: @"";
-    seq.changedPart = [firstName substringFromIndex:(unchanged ?: @"").length];
 
     NSMutableArray<NSString *> *names = [NSMutableArray array];
-    NSString *next = firstName;
     NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL (^isFile)(NSString *) = ^BOOL(NSString *n) {
+        BOOL isDir = NO;
+        return [fm fileExistsAtPath:[directory stringByAppendingPathComponent:n] isDirectory:&isDir] && !isDir;
+    };
     for (;;)
     {
-        NSString *full = [directory stringByAppendingPathComponent:next];
-        BOOL isDir = NO;
-        if (![fm fileExistsAtPath:full isDirectory:&isDir] || isDir)
+        [seq generateName];
+        if (!isFile(seq.name))
+        {
+            if (!seq.isComplicated)
+                break;
+            // linux split: "…yz" is followed by "…zaaa", not "…za"
+            [seq addPostfix2Chars];
+            [seq generateName];
+            if (!isFile(seq.name))
+                break;
+        }
+        [names addObject:[seq.name copy]];
+        if (![seq nextName])
             break;
-        [names addObject:next];
-        next = [seq nextName];
     }
     return names;
 }
 
 + (NSString *)combinedNameForFirstVolume:(NSString *)firstName
 {
-    NSString *unchanged = nil;
-    if (![self parseFirstVolumeName:firstName unchangedPart:&unchanged])
-        unchanged = firstName;
-    NSMutableString *out = [NSMutableString stringWithString:unchanged ?: @""];
-    while (out.length != 0 && [out characterAtIndex:out.length - 1] == '.')
-        [out deleteCharactersInRange:NSMakeRange(out.length - 1, 1)];
-    if (out.length == 0)
+    // CSplitVolName::Generate_SubName: the unchanged part without one trailing dot, "file" when empty.
+    SZSplitVolName *seq = [SZSplitVolName new];
+    seq.name = [firstName mutableCopy];
+    NSUInteger len = [seq parseName] ? seq.changedPos : firstName.length;
+    if (len != 0 && [firstName characterAtIndex:len - 1] == '.')
+        len--;
+    if (len == 0)
         return @"file";
-    return out;
+    return [firstName substringToIndex:len];
 }
 
 + (BOOL)combineVolumes:(NSArray<NSString *> *)names

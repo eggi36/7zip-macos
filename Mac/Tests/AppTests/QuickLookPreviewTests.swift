@@ -165,15 +165,12 @@ final class QuickLookPreviewTests: AppHostTestCase {
     func testLooksLikeThePanel() throws {
         let view = render(TestPaths.fixture("test.7z"), dark: false)
         let outline = view.outlineView
-        XCTAssertEqual(outline.rowHeight, PanelMetrics.rowHeight)
+        // Finder's list: 22 pt rows (a preview is denser than the 24 pt panel), the 28 pt header,
+        // the system font.
+        XCTAssertEqual(outline.rowHeight, 22)
         XCTAssertEqual(outline.headerView?.frame.height, PanelMetrics.headerHeight)
-        XCTAssertEqual(PreviewMetrics.font, PanelMetrics.listFont)
-        XCTAssertEqual(PreviewMetrics.font.pointSize, 12.2, accuracy: 0.001)
-        XCTAssertEqual(PreviewMetrics.digitsFont, PanelMetrics.listDigitsFont)
+        XCTAssertEqual(PreviewMetrics.font.pointSize, NSFont.systemFontSize, accuracy: 0.001)
         XCTAssertEqual(outline.tableColumns.map(\.title), ["Name", "Size", "Packed Size", "Modified"])
-        XCTAssertEqual(PreviewMetrics.sizeColumnWidth, CGFloat(PanelMetrics.sizeColumnWidth))
-        XCTAssertEqual(PreviewMetrics.timeColumnWidth(level: .min, utc: false),
-                       CGFloat(PanelMetrics.timeColumnWidth(level: .min, utc: false)))
         // Folders first, then names; the folder's size is the sum of what it holds.
         XCTAssertEqual(cellText(view, row: 0, column: .name), "sub")
         XCTAssertEqual(cellText(view, row: 0, column: .size), "3 010")
@@ -206,16 +203,6 @@ final class QuickLookPreviewTests: AppHostTestCase {
         XCTAssertFalse(Self.allViews(view).contains { ($0 as? NSButton)?.title.isEmpty == false }, "no button of its own")
     }
 
-    /// An archive inside an archive gets 7-Zip's own pixel-sharp 16 px frame, as in the panel.
-    func testArchiveItemsUseThePanelsArchiveIcons() throws {
-        let view = render(TestPaths.fixture("nested.zip"), dark: false)
-        let node = try XCTUnwrap(view.preview?.root.children.first { $0.name == "test.7z" })
-        let icon = ArchivePreviewView.icon(for: node)
-        XCTAssertTrue(icon === PanelArchiveIcons.icon(forName: "test.7z", large: false), "the panel's cached frame")
-        XCTAssertEqual(icon.size, NSSize(width: 16, height: 16))
-        let folder = ArchivePreviewNode(name: "x", isDirectory: true)
-        XCTAssertTrue(ArchivePreviewView.icon(for: folder) === Icons.folder)
-    }
 
     func testEncryptedHeadersSayWhatToDo() {
         let view = render(TestPaths.fixture("secret.7z"), dark: false)

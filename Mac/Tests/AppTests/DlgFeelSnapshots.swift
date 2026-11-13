@@ -69,6 +69,7 @@ final class DlgFeelSnapshots: AppHostTestCase {
     /// exists (a flag file, because xcodebuild does not pass the shell's environment on).
     private var paired: Bool { FileManager.default.fileExists(atPath: DlgSnap.buildDirectory + "/PAIRED") }
 
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         NSApp.appearance = NSAppearance(named: .aqua)

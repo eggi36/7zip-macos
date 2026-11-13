@@ -138,11 +138,12 @@ final class OptionsSystemPage: OptionsPageBase, NSTableViewDataSource, NSTableVi
     /// the bundled `doc-<name>.icns`, then to the system's icon for the type.
     static func formatIcon(for type: SevenZipFileType) -> NSImage? {
         let name = "doc-" + type.iconFileName
-        if let cached = iconCache[name] { return cached }
-        let image = PanelArchiveIcons.icon(named: type.iconFileName, large: false)
-            ?? Bundle.main.url(forResource: name, withExtension: "icns").flatMap(NSImage.init(contentsOf:))
+        // The bundled macOS-style document icon (what Finder shows).
+        let key = name
+        if let cached = iconCache[key] { return cached }
+        let image = Bundle.main.url(forResource: name, withExtension: "icns").flatMap(NSImage.init(contentsOf:))
             ?? type.utType.map { NSWorkspace.shared.icon(for: $0) }
-        if let image { iconCache[name] = image }
+        if let image { iconCache[key] = image }
         return image
     }
 

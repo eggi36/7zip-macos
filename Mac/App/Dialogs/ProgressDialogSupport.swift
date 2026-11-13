@@ -305,6 +305,14 @@ final class DialogWindow: NSWindow {
         DialogKit.center(self, over: owner)
     }
 
+    /// Attached as a sheet it is the window's sheet to accessibility too, not a free-standing
+    /// dialog: the modal session it runs in would otherwise list it twice, and UI automation then
+    /// takes the second entry for an alert covering the sheet.
+    override func accessibilityRole() -> NSAccessibility.Role? { sheetParent != nil ? .sheet : super.accessibilityRole() }
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? { sheetParent != nil ? nil : super.accessibilitySubrole() }
+    /// A sheet shows no title bar, but VoiceOver (and UI automation) still names it by its caption.
+    override func accessibilityTitle() -> String? { super.accessibilityTitle().flatMap { $0.isEmpty ? nil : $0 } ?? title }
+
     /// The plain AppKit behaviour, for a dialog with no owner at all.
     func centerOnScreen() {
         super.center()
@@ -424,6 +432,46 @@ extension DialogKit {
     }
 }
 
+// MARK: - native-look: dialogs as sheets
+
+extension DialogKit {
+
+    /// The window a dialog attaches to as a sheet in the Mac look (HIG "Sheets": a dialog about a
+    /// window's content belongs to that window): its owner when that is a main 7-Zip window, or a
+    /// dialog that is itself a sheet of one (a question asked from the Add to Archive sheet), on
+    /// screen and without a sheet already. nil = run it as a window of its own -- 7zG
+    /// mode, or a dialog owned by a progress window, the benchmark or nothing.
+    static func sheetParent(for window: NSWindow) -> NSWindow? {
+        guard !GMode.isActive else { return nil }
+        // Another window's modal session is running (an operation's progress window asking for a
+        // password or an overwrite): a sheet of the main window would sit behind that window, out
+        // of reach. The dialog is then a window of its own, ordered in front of it.
+        if let modal = NSApp.modalWindow, modal !== window { return nil }
+        let hint = (window as? DialogWindow)?.owner ?? (window as? WinMessageBoxWindow)?.ownerWindow
+        guard let owner = owner(for: window, parent: hint), owner.isVisible, !owner.isMiniaturized,
+              owner.attachedSheet == nil else { return nil }
+        if owner.windowController is MainWindowController { return owner }
+        if let grand = owner.sheetParent, grand.windowController is MainWindowController { return owner }
+        return nil
+    }
+
+    /// `runModal(for:)` as a sheet of the owner in the Mac look (`sheetParent(for:)`), kept
+    /// synchronous like the browse panel's sheet: a modal session for the sheet window itself, so
+    /// every caller still gets its answer on return. Without a sheet parent it is `runModal(for:)`.
+    @discardableResult
+    static func runModal(for window: NSWindow, asSheet: Bool) -> NSApplication.ModalResponse {
+        guard asSheet, let parent = sheetParent(for: window) else { return runModal(for: window) }
+        if window.isVisible { window.orderOut(nil) }
+        parent.beginSheet(window) { _ in }
+        let response = runModal(for: window)
+        // Always: a sheet that something ordered out is no longer attached, but AppKit still
+        // holds its sheet session until endSheet (a stale one blocks the window).
+        parent.endSheet(window)
+        if window.isVisible { window.orderOut(nil) }
+        return response
+    }
+}
+
 // MARK: - control factories
 
 /// Small helpers so every dialog is laid out the same way (GuiCommon.rc: margin m = 8,
@@ -471,7 +519,6 @@ enum DialogKit {
         let window = DialogWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 200),
                                   styleMask: style, backing: .buffered, defer: false)
         window.title = title
-        window.backgroundColor = WinChrome.face          // COLOR_BTNFACE (recheck §2)
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
         // SZ_DISABLE_ANIMATIONS: every dialog this app builds goes through here, so one call

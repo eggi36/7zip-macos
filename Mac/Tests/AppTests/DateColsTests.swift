@@ -182,36 +182,6 @@ final class DateColsTests: AppHostTestCase {
 
     // MARK: - 4. headers
 
-    /// SysHeader32 draws in the list's font: the main list's "Modified" is SF Pro 12.2 wide on
-    /// screen (50 pt), not the 11 pt NSTableHeaderCell draws whatever its `font` says (45.8 pt);
-    /// the Options and temp-files lists' headers use the same cell.
-    func testHeadersDrawInTheListFont() throws {
-        let (_, panel) = try openPanel(on: makeFixture())
-        let header = try XCTUnwrap(panel.tableView.headerView)
-        let index = panel.tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(String(SZPropID.mtime.rawValue)))
-        let rect = header.headerRect(ofColumn: index)
-        let rep = try XCTUnwrap(header.bitmapImageRepForCachingDisplay(in: rect))
-        header.cacheDisplay(in: rect, to: rep)
-        var minX = Int.max, maxX = -1
-        for y in 0..<rep.pixelsHigh {
-            for x in 0..<rep.pixelsWide {
-                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), c.alphaComponent > 0.5,
-                      c.brightnessComponent < 0.5 else { continue }
-                minX = min(minX, x)
-                maxX = max(maxX, x)
-            }
-        }
-        XCTAssertGreaterThan(maxX, minX, "the header title has ink")
-        let ink = CGFloat(maxX - minX + 1) * rect.width / CGFloat(rep.pixelsWide)
-        let title = try column(panel, .mtime).title
-        let inFont = (title as NSString).size(withAttributes: [.font: PanelMetrics.listFont]).width
-        let small = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11)]).width
-        XCTAssertGreaterThan(ink, small + 1.5, "'\(title)' ink \(ink) pt: drawn in 11 pt, not the list font (\(inFont))")
-        XCTAssertLessThanOrEqual(ink, inFont + 1, "'\(title)' ink \(ink) pt")
-        let options = OptionsUI.column("t", "Type", width: 80)
-        XCTAssertTrue(options.headerCell is WinHeaderCell, "Options list headers draw in the list font")
-    }
-
     // MARK: - checks
 
     /// Checks every visible column of `panel` at the current level; returns the number of time and

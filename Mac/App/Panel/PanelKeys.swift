@@ -142,7 +142,14 @@ extension PanelViewController {
             // mode it calculates the size of the focused folder (IFolderCalcItemFullSize), which
             // is what F3 does there too (01 §3.11 "View / Edit").
             if !command && !option && !shift {
-                if usesAlternativeSelection { insertToggleAndAdvance() } else { calcFocusedItemSize() }
+                // native-look: in the Mac look Space is Finder's Quick Look for the selected files
+                // and folders on disk (F3 still calculates a folder's size); AlternativeSelection
+                // keeps Space as its Insert key.
+                if usesAlternativeSelection {
+                    insertToggleAndAdvance()
+                } else {
+                    quickLook(nil)
+                }
                 return true
             }
         case NSHomeFunctionKey, NSEndFunctionKey:

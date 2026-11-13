@@ -46,78 +46,24 @@ final class PanelUpButton: NSButton {
     override func mouseEntered(with event: NSEvent) { isHovered = true }
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) { drawMac() }
+
+    /// An SF Symbol chevron with AppKit's hover and press tints.
+    private func drawMac() {
         let pressed = isHighlighted && isEnabled
         if isEnabled, pressed || isHovered {
-            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 2, yRadius: 2)
-            (pressed ? FMToolbarColors.pressedFill : FMToolbarColors.hoverFill).setFill()
+            let path = NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6)
+            NSColor.labelColor.withAlphaComponent(pressed ? 0.16 : 0.08).setFill()
             path.fill()
-            (pressed ? FMToolbarColors.pressedBorder : FMToolbarColors.hoverBorder).setStroke()
-            path.stroke()
         }
-        let shift: CGFloat = pressed ? FMToolbarView.pressedOffset.width : 0
-        let origin = NSPoint(x: floor((bounds.width - 16) / 2) + shift, y: floor((bounds.height - 16) / 2))
-        Self.drawIcon(at: origin, enabled: isEnabled)
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        guard let symbol = NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return }
+        MacSymbol.draw(symbol, tint: isEnabled ? .secondaryLabelColor : .tertiaryLabelColor,
+                       centeredIn: bounds)
     }
 
-    /// VIEW_PARENTFOLDER of comctl32's IDB_VIEW_SMALL_COLOR (Panel.cpp:447, 490-491): Windows
-    /// artwork, not in the 7-Zip sources, so it is drawn here as a look-alike in the same 16 x 16
-    /// cell (recheck2.md section 3; recheck-data/win/fresh-screen.png x 14...29, y 108...123): an
-    /// open yellow folder -- the back with its tab at the left, the front flap slanting up to the
-    /// right -- and a green arrow over it, its head at the top (tip at x 7.5), its stem leaning
-    /// down to the left into the folder. Disabled: the grey the toolbar gives a disabled bitmap.
-    static func drawIcon(at o: NSPoint, enabled: Bool) {
-        func c(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor {
-            enabled ? WinChrome.rgb(r, g, b) : WinChrome.gray((r * 0.3 + g * 0.59 + b * 0.11) * 0.55 + 100)
-        }
-        func p(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: o.x + x, y: o.y + y) }
-        NSGraphicsContext.saveGraphicsState()
-        defer { NSGraphicsContext.restoreGraphicsState() }
 
-        // the folder's back: tab at x 2...4 on row 4, top edge on row 5, left edge x 1 down to row 15
-        let back = NSBezierPath()
-        back.move(to: p(1.5, 15.5)); back.line(to: p(1.5, 5.5)); back.line(to: p(2.5, 4.5))
-        back.line(to: p(4.5, 4.5)); back.line(to: p(5.5, 5.5)); back.line(to: p(13.5, 5.5))
-        back.line(to: p(13.5, 8.5)); back.line(to: p(11.5, 15.5)); back.close()
-        NSGradient(starting: c(255, 253, 214), ending: c(255, 236, 160))?.draw(in: back, angle: 90)
-        c(228, 187, 66).setStroke()
-        back.lineWidth = 1
-        back.stroke()
-
-        // the front flap: from (2,9) up to (13.5,7.5), down to (11.5,13.5) and (1.5,15.5)
-        let flap = NSBezierPath()
-        flap.move(to: p(2.5, 9.0)); flap.line(to: p(13.6, 7.6)); flap.line(to: p(11.6, 13.4))
-        flap.line(to: p(2.0, 15.4)); flap.close()
-        NSGradient(starting: c(255, 248, 190), ending: c(255, 226, 130))?.draw(in: flap, angle: 90)
-        c(232, 196, 84).setStroke()
-        flap.lineWidth = 0.9
-        flap.stroke()
-        // its darker bottom edge (214,168,0)
-        let bottom = NSBezierPath()
-        bottom.move(to: p(2.6, 15.0)); bottom.line(to: p(11.4, 13.1))
-        bottom.lineWidth = 1
-        c(214, 168, 0).setStroke()
-        bottom.stroke()
-
-        // the arrow: tip (7.6, 0.3), head corners on row 4 at x 4.8 and 13.8, the stem from
-        // x 7.9...11.6 under the head leaning to x 6.8...8.8 at row 12.6
-        let arrow = NSBezierPath()
-        arrow.move(to: p(7.6, 0.3))
-        arrow.line(to: p(13.9, 4.9))
-        arrow.line(to: p(11.7, 4.9))
-        arrow.curve(to: p(9.0, 12.7), controlPoint1: p(11.6, 8.0), controlPoint2: p(10.2, 10.8))
-        arrow.line(to: p(6.7, 12.7))
-        arrow.curve(to: p(8.0, 4.9), controlPoint1: p(7.6, 10.4), controlPoint2: p(8.1, 7.6))
-        arrow.line(to: p(4.8, 4.9))
-        arrow.close()
-        let gradient = NSGradient(colors: [c(0, 134, 4), c(120, 222, 74), c(150, 238, 104), c(40, 160, 30)],
-                                  atLocations: [0, 0.45, 0.6, 1], colorSpace: .sRGB)
-        gradient?.draw(in: arrow, angle: 0)
-        c(0, 122, 3).setStroke()
-        arrow.lineWidth = 0.9
-        arrow.lineJoinStyle = .round
-        arrow.stroke()
-    }
 }
 
 /// The address combo's look: a ComboBoxEx32 border, the folder icon inside, the text 24 px in, a
@@ -134,8 +80,8 @@ final class AddressComboCell: NSComboBoxCell {
 
     /// Where the text goes: 24 px from the left (the Edit 1003 at x 57 in a combo at x 33), the
     /// arrow's 18 px at the right kept clear.
-    static let textInsetLeft: CGFloat = 24
-    static let arrowWidth: CGFloat = 18
+    static let textInsetLeft: CGFloat = 28
+    static let arrowWidth: CGFloat = 24
 
     private func textRect(_ frame: NSRect) -> NSRect {
         var r = frame
@@ -159,26 +105,31 @@ final class AddressComboCell: NSComboBoxCell {
     override func titleRect(forBounds rect: NSRect) -> NSRect { textRect(rect) }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        WinChrome.window.setFill()
-        cellFrame.fill()
-        WinChrome.comboBorder.setFill()
-        cellFrame.frame(withWidth: 1)
+        drawMac(withFrame: cellFrame, in: controlView)
+    }
+
+    /// native-look: a rounded field in the system's colours, the folder icon 6 pt in, an SF Symbol
+    /// chevron for the history drop-down.
+    private func drawMac(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let field = NSBezierPath(roundedRect: cellFrame.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+        NSColor.textBackgroundColor.setFill()
+        field.fill()
+        NSColor.separatorColor.setStroke()
+        field.lineWidth = 1
+        field.stroke()
         if let icon {
-            let flipped = controlView.isFlipped
-            let y = flipped ? cellFrame.minY + 4 : cellFrame.maxY - 4 - 16
-            icon.draw(in: NSRect(x: cellFrame.minX + 3, y: y, width: 16, height: 16), from: .zero,
+            let top = floor((cellFrame.height - 16) / 2)
+            let y = controlView.isFlipped ? cellFrame.minY + top : cellFrame.maxY - top - 16
+            icon.draw(in: NSRect(x: cellFrame.minX + 6, y: y, width: 16, height: 16), from: .zero,
                       operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
-        // the chevron: a 1 px "v", 9 px wide, 5 px tall, centred in the last 18 px
-        let cx = cellFrame.maxX - 9.5, cy = cellFrame.midY
-        let path = NSBezierPath()
-        let dy: CGFloat = controlView.isFlipped ? 1 : -1
-        path.move(to: NSPoint(x: cx - 4, y: cy - 2 * dy))
-        path.line(to: NSPoint(x: cx, y: cy + 2 * dy))
-        path.line(to: NSPoint(x: cx + 4, y: cy - 2 * dy))
-        path.lineWidth = 1
-        WinChrome.comboArrow.setStroke()
-        path.stroke()
+        let config = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        if let symbol = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) {
+            let arrow = NSRect(x: cellFrame.maxX - Self.arrowWidth, y: cellFrame.minY,
+                               width: Self.arrowWidth - 4, height: cellFrame.height)
+            MacSymbol.draw(symbol, tint: .secondaryLabelColor, centeredIn: arrow)
+        }
         drawInterior(withFrame: cellFrame, in: controlView)
     }
 
@@ -225,5 +176,22 @@ final class AddressComboBox: NSComboBox {
 
     override func draw(_ dirtyRect: NSRect) {
         cell?.draw(withFrame: bounds, in: self)
+    }
+}
+
+/// native-look: draws an SF Symbol in a colour, centred in a rect (flipped or not).
+enum MacSymbol {
+    static func draw(_ symbol: NSImage, tint: NSColor, centeredIn rect: NSRect) {
+        let size = symbol.size
+        let tinted = NSImage(size: size, flipped: false) { r in
+            symbol.draw(in: r)
+            tint.set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: rect.minX + floor((rect.width - size.width) / 2),
+                               y: rect.minY + floor((rect.height - size.height) / 2),
+                               width: size.width, height: size.height),
+                    from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 }

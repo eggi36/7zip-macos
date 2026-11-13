@@ -291,7 +291,8 @@ final class OpsGapsTests: AppHostTestCase {
 
     private func button(titled title: String, in root: NSView?) -> NSButton? {
         guard let root else { return nil }
-        if let b = root as? NSButton, b.title == title { return b }
+        // A Mac Help button is the round "?" with the title as its accessibility label.
+        if let b = root as? NSButton, b.title == title || b.accessibilityLabel() == title { return b }
         for child in root.subviews {
             if let found = button(titled: title, in: child) { return found }
         }

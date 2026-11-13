@@ -118,7 +118,9 @@ enum WindowAudit {
             let childPath = path + " > " + label
             let frame = content.convert(child.bounds, from: child)
             if frame.width > 1, frame.height > 1 {
-                if frame.minX < content.bounds.minX - slack || frame.maxX > content.bounds.maxX + slack
+                // The Settings window fits its height to the pane on screen; the borderless tab
+                // view keeps the tallest page's height and is cut below the pane's controls.
+                if !(child is NSTabView), frame.minX < content.bounds.minX - slack || frame.maxX > content.bounds.maxX + slack
                     || frame.minY < content.bounds.minY - slack || frame.maxY > content.bounds.maxY + slack {
                     findings.append("CLIPPED \(childPath): \(rect(frame)) leaves \(rect(content.bounds))")
                 }
@@ -128,8 +130,10 @@ enum WindowAudit {
                 if isControl(child) {
                     var aligned = frame
                     if let field = child as? NSTextField, !field.isEditable, !field.isBezeled {
-                        aligned = frame.insetBy(dx: 2, dy: 0)
+                        aligned = frame.insetBy(dx: 2, dy: 1)
                     }
+                    // AppKit's pop-up draws its bezel 3 pt inside the frame RcPlace.popup gives it.
+                    if child is NSPopUpButton { aligned = frame.insetBy(dx: 3, dy: 2) }
                     siblings.append((child, aligned, childPath))
                 }
                 if let tight = tightText(child, path: childPath) { findings.append(tight) }

@@ -325,12 +325,15 @@ final class ArchivePreviewStreamedTarTests: XCTestCase {
         try? FileManager.default.removeItem(atPath: work)
     }
 
-    /// `/usr/bin/tar -c<flag>f <name> -C src dir`.
+    /// `/usr/bin/tar --no-mac-metadata -c<flag>f <name> -C src dir`. Without the option (and
+    /// COPYFILE_DISABLE) bsdtar adds a `._name` AppleDouble entry for every file that carries an
+    /// extended attribute (macOS gives new files some), which doubled the entry counts.
     private func makeTar(_ name: String, _ flag: String) throws -> String {
         let out = (work as NSString).appendingPathComponent(name)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        process.arguments = ["-c\(flag)f", out, "-C", (work as NSString).appendingPathComponent("src"), "dir"]
+        process.arguments = ["--no-mac-metadata", "-c\(flag)f", out, "-C", (work as NSString).appendingPathComponent("src"), "dir"]
+        process.environment = ProcessInfo.processInfo.environment.merging(["COPYFILE_DISABLE": "1"]) { _, new in new }
         try process.run()
         process.waitUntilExit()
         try XCTSkipUnless(process.terminationStatus == 0, "bsdtar could not write \(name)")

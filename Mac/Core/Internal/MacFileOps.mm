@@ -43,7 +43,14 @@ bool TrashItem(const char *path, std::string &resultPath, std::string &errorMess
     if ([[NSFileManager defaultManager] trashItemAtURL:url resultingItemURL:&newURL error:&error])
     {
       if (newURL)
+      {
         resultPath = CppString(newURL.path);
+        // The app's Undo for Move to Trash listens for this (TrashUndo.swift); posted
+        // synchronously on the calling (operation) thread.
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"SZFileSystemDidTrashItem"
+                                                            object:nil
+                                                          userInfo:@{ @"source": p, @"result": newURL.path }];
+      }
       return true;
     }
     errorMessage = CppString(error.localizedDescription);

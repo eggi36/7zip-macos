@@ -100,7 +100,7 @@ final class GapsInputTests: SevenZipUITestCase {
         let source = panel.iconItem(named: "alpha.txt")
         let target = panel.iconItem(named: "dir")
         XCTAssertTrue(source.exists && target.exists)
-        source.press(forDuration: 0.6, thenDragTo: target)
+        source.click(forDuration: 0.6, thenDragTo: target)
 
         // A drop that asks first (an archive target) would show a box; a folder does not.
         XCTAssertTrue(waitForFile(scratch + "/dir/alpha.txt"), "nothing arrived in dir/")

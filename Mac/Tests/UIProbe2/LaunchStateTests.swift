@@ -23,7 +23,10 @@ final class LaunchStateTests: SevenZipUITestCase {
         XCTAssertTrue(panel.waitForPath(TestPaths.realHome), "panel 0 shows \(panel.path)")
         XCTAssertGreaterThan(panel.rowCount, 0, "home directory listed no items")
         XCTAssertTrue(panel.status.contains("object(s) selected"), "status bar reads '\(panel.status)'")
-        XCTAssertEqual(sevenZip.windowTitle, TestPaths.realHome + "/", "window title follows the panel path")
+        // Finder's title: the folder's name, its enclosing path as the subtitle.
+        let home = TestPaths.realHome as NSString
+        XCTAssertEqual(sevenZip.windowTitle, home.lastPathComponent + " – " + home.deletingLastPathComponent,
+                       "window title follows the panel's folder")
         screenshot("01-home")
     }
 

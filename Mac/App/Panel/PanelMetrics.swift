@@ -27,21 +27,23 @@ import SevenZipKit
 
 enum PanelMetrics {
 
+    /// AppKit's list metrics: 24 pt rows like Finder's list, a 28 pt header, the system font at 13 pt.
+
     /// Row pitch (LVIR_BOUNDS height).
-    static let rowHeight: CGFloat = 19
+    static var rowHeight: CGFloat { 24 }
     /// SysHeader32 height.
-    static let headerHeight: CGFloat = 24
+    static var headerHeight: CGFloat { 28 }
     /// LVIR_ICON: x and size of the small icon in the name column, and its offset from the row top.
-    static let iconX: CGFloat = 4
+    static var iconX: CGFloat { 6 }
     static let iconSize: CGFloat = 16
-    static let iconTop: CGFloat = 1
+    static var iconTop: CGFloat { 4 }
     /// LVIR_LABEL: where the label (and the selection fill) starts in the name column.
-    static let labelX: CGFloat = 20
+    static var labelX: CGFloat { 28 }
     /// The text's origin inside the label, and the fill after the text.
     static let labelTextInset: CGFloat = 2
     static let labelTrailing: CGFloat = 6
     /// The text margin of the other columns, on the side they are aligned to.
-    static let subitemPadding: CGFloat = 6
+    static var subitemPadding: CGFloat { 8 }
     /// How far inside its frame an `NSTextField(labelWithString:)` starts its text: 0 (measured
     /// in ListFeelTests; the old layout assumed 2 and so left the name flush with the fill).
     static let textFieldInset: CGFloat = 0
@@ -68,6 +70,13 @@ enum PanelMetrics {
     /// The list font with tabular digits: the Details columns other than the name, whose sizes,
     /// times and CRCs line up as Segoe UI's tabular digits do on Windows.
     static var listDigitsFont: NSFont { ListFontChoice.withTabularDigits(listFont) }
+
+    /// native-look: the panel's own font -- the list, the address field. The system font at 13 pt in
+    /// Finder's list. Dialogs keep `listFont`.
+    static var panelFont: NSFont { NSFont.systemFont(ofSize: 13) }
+    static var panelDigitsFont: NSFont { ListFontChoice.withTabularDigits(panelFont) }
+    /// The status bar's font: the small system font in the Mac look.
+    static var statusFont: NSFont { NSFont.systemFont(ofSize: NSFont.smallSystemFontSize) }
 
     /// A time column's default width: the widest date View > Time prints (ConvertUtcFileTimeToString2:
     /// "2024-12-31 23:59" at the default minute level, ":59" more at SEC, 7 / 9 more digits at
@@ -113,7 +122,7 @@ enum PanelMetrics {
     /// is) plus `subitemPadding` on both sides, never below Windows' 100.
     static func columnWidth(fitting text: String) -> Int {
         let field = NSTextField(labelWithString: text)
-        field.font = listDigitsFont
+        field.font = panelDigitsFont
         let width = ceil(field.intrinsicContentSize.width)
         return max(PanelColumnsModel.otherWidth, Int(width + 2 * (subitemPadding - textFieldInset)))
     }
@@ -122,7 +131,7 @@ enum PanelMetrics {
     /// size parts as wide as `widestSize` needs in the list font (2 px text inset each side and the
     /// 1 px divider, so 120 for SF Pro 12.2): never narrower than Windows' 100.
     static var statusSectionEdges: [CGFloat] {
-        let size = ceil((widestSize as NSString).size(withAttributes: [.font: listFont]).width)
+        let size = ceil((widestSize as NSString).size(withAttributes: [.font: statusFont]).width)
         let part = max(100, size + 6)
         return [220, 220 + part, 220 + 2 * part]
     }
@@ -206,12 +215,9 @@ extension PanelViewController {
     /// One Details column (InitColumns / AddColumn): the property's title, width and alignment.
     static func makeTableColumn(_ info: PanelColumn) -> NSTableColumn {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(String(info.propID.rawValue)))
-        let header = PanelHeaderCell(textCell: info.title)
-        header.alignment = PanelFormat.alignment(for: info.varType, propID: info.propID)
-        header.font = PanelMetrics.listFont                       // SysHeader32: the list's font
-        header.titleFont = PanelMetrics.listFont                  // datecols: drawn in it (WinHeaderCell)
-        header.textColor = WinChrome.text                         // COLOR_WINDOWTEXT, not AppKit grey
-        column.headerCell = header
+        // native-look: AppKit's own header cell, font and colour.
+        column.headerCell.stringValue = info.title
+        column.headerCell.alignment = PanelFormat.alignment(for: info.varType, propID: info.propID)
         column.title = info.title
         column.width = CGFloat(info.width)
         column.minWidth = 24

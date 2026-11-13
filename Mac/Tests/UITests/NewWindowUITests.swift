@@ -21,9 +21,16 @@ final class NewWindowUITests: SevenZipUITestCase {
 
     // MARK: - helpers
 
-    /// The file-manager windows: their title is the focused panel's path (CApp::RefreshTitle).
+    /// The file-manager windows: titled after the focused panel's folder with its path as the
+    /// subtitle, as Finder does -- "name – /enclosing/path" to accessibility ("/" at the root).
     private var managerWindows: XCUIElementQuery {
-        app.windows.matching(NSPredicate(format: "title BEGINSWITH '/'"))
+        app.windows.matching(NSPredicate(format: "title CONTAINS ' – /' OR title BEGINSWITH '/'"))
+    }
+
+    /// The title of a window showing the fixtures folder: "Fixtures – /path/to/Tests".
+    private var fixturesTitle: String {
+        let path = TestPaths.fixtures as NSString
+        return path.lastPathComponent + " – " + path.deletingLastPathComponent
     }
 
     private func waitForManagerWindows(_ count: Int, timeout: TimeInterval = 20) -> Bool {
@@ -77,7 +84,7 @@ final class NewWindowUITests: SevenZipUITestCase {
         XCTAssertTrue(waitForManagerWindows(2), "a reopen must open a new window, found \(managerWindows.count)")
         // Both start at the saved path, as two 7zFM launches would.
         let titles = managerWindows.allElementsBoundByIndex.map(\.title)
-        XCTAssertEqual(titles.filter { $0.hasPrefix(TestPaths.fixtures) }.count, 2, "\(titles)")
+        XCTAssertEqual(titles.filter { $0 == fixturesTitle }.count, 2, "\(titles)")
         screenshot("01-reopen-second-window")
         XCTAssertTrue(try sendReopen())
         XCTAssertTrue(waitForManagerWindows(3))
@@ -97,7 +104,8 @@ final class NewWindowUITests: SevenZipUITestCase {
         }, "no visible window after the reopen")
         // Un-minimizing the window (AppKit's own reaction to a reopen) would leave one window; a
         // new one makes two. The Window menu lists every window, minimized ones included.
-        let listed = sevenZip.itemTitles(in: "Window").filter { $0.hasPrefix("/") }
+        // Each window is listed as "folder (/enclosing/path)", Finder style.
+        let listed = sevenZip.itemTitles(in: "Window").filter { $0.contains(" (/") || $0.hasPrefix("/") }
         sevenZip.closeOpenMenus()
         XCTAssertEqual(listed.count, 2, "the reopen must open a new window, not un-minimize: \(listed)")
         screenshot("05-reopen-after-minimize")
@@ -131,7 +139,36 @@ final class NewWindowUITests: SevenZipUITestCase {
             throw XCTSkip("the Dock shows \(count) tiles titled \(name) (an installed 7-Zip is kept or "
                           + "recent in the Dock); not clicking one that may launch it")
         }
-        return query.firstMatch
+        let tile = query.firstMatch
+        revealDock(showing: tile)
+        return tile
+    }
+
+    /// An auto-hidden Dock keeps its tiles off screen until the pointer reaches its edge: move
+    /// the pointer to the edge the tile is beyond (left, bottom or right) and wait for it.
+    private func revealDock(showing tile: XCUIElement) {
+        guard !tile.isHittable, let screen = NSScreen.main?.frame else { return }
+        let frame = tile.frame                         // XCUITest coordinates: origin top left
+        let point: CGPoint
+        if frame.maxX <= screen.minX + 1 {
+            point = CGPoint(x: screen.minX, y: frame.midY)
+        } else if frame.minX >= screen.maxX - 1 {
+            point = CGPoint(x: screen.maxX - 1, y: frame.midY)
+        } else {
+            point = CGPoint(x: frame.midX, y: screen.height - 1)
+        }
+        // The menu bar's top-left corner is the screen's (XCUITest coordinates), a fixed anchor.
+        let origin = app.menuBars.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let edge = origin.withOffset(CGVector(dx: point.x - origin.screenPoint.x, dy: point.y - origin.screenPoint.y))
+        // The Dock shows on a movement that reaches the edge; a jump straight onto it is not
+        // always one, so come in from 40 pt away, a few times.
+        let inward = CGVector(dx: point.x <= screen.minX ? 40 : (point.x >= screen.maxX - 1 ? -40 : 0),
+                              dy: point.x <= screen.minX || point.x >= screen.maxX - 1 ? 0 : -40)
+        for _ in 0..<4 where !tile.isHittable {
+            edge.withOffset(inward).hover()
+            edge.hover()
+            _ = waitFor("the Dock shown", timeout: 2) { tile.isHittable }
+        }
     }
 
     /// A click on the Dock tile sends the reopen event from the Dock: the open window is shown,
@@ -160,7 +197,8 @@ final class NewWindowUITests: SevenZipUITestCase {
         XCTAssertTrue(waitFor("the window back on screen") {
             self.managerWindows.allElementsBoundByIndex.contains { $0.isHittable }
         }, "a Dock click must restore the minimized window")
-        let listed = sevenZip.itemTitles(in: "Window").filter { $0.hasPrefix("/") }
+        // Each window is listed as "folder (/enclosing/path)", Finder style.
+        let listed = sevenZip.itemTitles(in: "Window").filter { $0.contains(" (/") || $0.hasPrefix("/") }
         sevenZip.closeOpenMenus()
         XCTAssertEqual(listed.count, 1, "a Dock click must restore, not open a window: \(listed)")
         screenshot("07-dock-click-restores")
@@ -198,14 +236,14 @@ final class NewWindowUITests: SevenZipUITestCase {
 
     // MARK: - File > New Window
 
-    /// The key equivalent (Option+Cmd+N; Cmd+N stays Create File, IDM_CREATE_FILE Ctrl+N) and the
-    /// menu item each open a window.
+    /// The key equivalent (Cmd+N, as in Finder; New File has Option+Cmd+N) and the menu item each
+    /// open a window.
     func testNewWindowShortcutAndMenuItem() {
         launch()
         XCTAssertTrue(waitForManagerWindows(1))
         sevenZip.panel(0).focusList()
-        app.typeKey("n", modifierFlags: [.command, .option])
-        XCTAssertTrue(waitForManagerWindows(2), "Option+Cmd+N must open a window")
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(waitForManagerWindows(2), "Cmd+N must open a window")
         XCTAssertTrue(sevenZip.selectMenuItem("File", "New Window"))
         XCTAssertTrue(waitForManagerWindows(3), "File > New Window must open a window")
         screenshot("02-new-window")
@@ -224,7 +262,7 @@ final class NewWindowUITests: SevenZipUITestCase {
             self.managerWindows.allElementsBoundByIndex.contains { $0.title.contains("test.7z") }
         })
         let titles = managerWindows.allElementsBoundByIndex.map(\.title)
-        XCTAssertTrue(titles.contains { !$0.contains("test.7z") && $0.hasPrefix(TestPaths.fixtures) },
+        XCTAssertTrue(titles.contains { $0 == fixturesTitle },
                       "the first window must keep its folder: \(titles)")
         screenshot("03-archive-own-window")
     }

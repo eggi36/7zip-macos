@@ -6,7 +6,7 @@
 // every window of the process at once: the file-manager windows, every dialog, the message boxes,
 // the progress windows and the 7zG-mode dialogs. Every custom-drawn component already picks its
 // colours per appearance (`WinChrome.dynamic`, `PanelSelectionStyle`, `FMToolbarColors`,
-// `WinCombo`, `OptionsTabControl`, `WinProgressBar`, `DialogMetrics.groupLine`, ...), and AppKit
+// `WinProgressBar`, `DialogMetrics.groupLine`, ...), and AppKit
 // redraws a view whose effective appearance changed, so switching needs no window rebuild.
 //
 // Stored as `FM.Theme` = "system" | "light" | "dark" in the settings domain. Absent (a fresh
@@ -97,12 +97,14 @@ extension Settings.Key {
 }
 
 extension Settings {
-    /// The theme of a fresh install (fix112: Light; 1.0.0-1.1.1: System).
-    static let defaultTheme = AppTheme.light
+    /// The theme of a fresh install: System, as every Mac app (fix112 made it Light while the
+    /// window copied Windows').
+    static let defaultTheme = AppTheme.system
 
     /// `FM.Theme` (macOS only): System, Light (absent, the default) or Dark. Every choice is
     /// stored, System as "system", so it survives a later change of the default.
     static var theme: AppTheme {
+        // Follows the system's Light / Dark unless a theme was chosen.
         get { string(Key.theme).flatMap(AppTheme.init(rawValue:)) ?? defaultTheme }
         set { setString(newValue.rawValue, Key.theme) }
     }

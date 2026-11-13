@@ -85,22 +85,25 @@ final class MenuAndToolbarTests: AppHostTestCase {
                           "the app is not running with English strings")
 
         XCTAssertEqual(topLevelTitles(bar),
-                       ["7-Zip", "File", "Edit", "View", "Favorites", "Tools", "Window", "Help"],
+                       ["7-Zip", "File", "Edit", "View", "Go", "Favorites", "Tools", "Window", "Help"],
                        "top level menus: \(topLevelTitles(bar))")
 
-        assertMenu(bar, "File", contains: ["Open", "Open Inside", "Open Inside *", "Open Inside #",
-                                           "Open Outside", "View", "Edit", "Rename", "Copy To...",
-                                           "Move To...", "Delete", "Split file...", "Combine files...",
-                                           "Properties", "Comment...", "CRC", "Diff", "Create Folder",
-                                           "Create File", "Link...", "Exit"])
-        assertMenu(bar, "Edit", contains: ["Select All", "Deselect All", "Invert Selection", "Select...",
-                                           "Deselect...", "Select by Type", "Deselect by Type"])
-        assertMenu(bar, "View", contains: ["Large Icons", "Small Icons", "List", "Details", "Name", "Type",
-                                           "Date", "Size", "Unsorted", "Flat View", "2 Panels", "Toolbars",
-                                           "Open Root Folder", "Up One Level", "Folders History...",
-                                           "Refresh", "Auto Refresh"])
-        assertMenu(bar, "Tools", contains: ["Options...", "Benchmark", "Delete Temporary Files..."])
-        assertMenu(bar, "Help", contains: ["Contents...", "About 7-Zip..."])
+        // The Mac names and places (MacTerms.swift, HIG "The menu bar").
+        assertMenu(bar, "File", contains: ["New Window", "New Tab", "Open", "Open Inside", "Open Inside *",
+                                           "Open Inside #", "Open Outside", "View", "Edit", "Rename", "Copy To...",
+                                           "Move To...", "Move to Trash", "Split file...", "Combine files...",
+                                           "Get Info", "Comment...", "CRC", "Diff", "New Folder",
+                                           "New File", "Link...", "Close Window"])
+        assertMenu(bar, "Edit", contains: ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Deselect All",
+                                           "Invert Selection", "Select...", "Deselect...", "Select by Type",
+                                           "Deselect by Type"])
+        assertMenu(bar, "View", contains: ["Large Icons", "Small Icons", "List", "Details", "Sort By",
+                                           "Flat View", "2 Panels", "Toolbars", "Refresh", "Auto Refresh"])
+        assertMenu(bar, "Go", contains: ["Back", "Forward", "Enclosing Folder", "Open Root Folder",
+                                         "Folders History..."])
+        assertMenu(bar, "Tools", contains: ["Benchmark", "Delete Temporary Files..."])
+        assertMenu(bar, "Help", contains: ["7-Zip Help"])
+        assertMenu(bar, "7-Zip", contains: ["About 7-Zip...", "Settings…"])
         XCTAssertEqual(itemTitles(bar, ["Favorites"]).first, "Add folder to Favorites as")
 
         // The nested CRC submenu, titled from lang id 553 which no .ttt translates.
@@ -120,15 +123,16 @@ final class MenuAndToolbarTests: AppHostTestCase {
         XCTAssertTrue(items.contains { $0.accessibilityIdentifier() == "viewTwoPanels:" },
                       "no item sends viewTwoPanels:")
         let about = items.filter { $0.accessibilityIdentifier() == "helpAbout:" }
-        XCTAssertEqual(about.count, 2,
-                       "IDM_ABOUT 961 sits in the 7-Zip menu and in Help; found \(about.count)")
+        XCTAssertEqual(about.count, 1,
+                       "IDM_ABOUT 961 sits in the 7-Zip menu (HIG); found \(about.count)")
         for item in about { XCTAssertEqual(item.title, "About 7-Zip...") }
         XCTAssertEqual(items.filter { $0.accessibilityIdentifier() == "toolsShowAbout:" }.count, 0,
                        "the runtime retarget is gone, so no item reports that selector")
 
         // Every item that sends an action declares it as its accessibility identity -- the rule
         // that makes `menuItem(selector:)` language independent (MainMenu.item).
-        for item in items where item.action != nil && !item.isSeparatorItem {
+        // A hidden twin that keeps a Windows key (MainMenu.macify) reports its own identifier.
+        for item in items where item.action != nil && !item.isSeparatorItem && !item.isHidden {
             let identifier = item.accessibilityIdentifier()
             guard !identifier.isEmpty else { continue }      // the standard AppKit items set none
             XCTAssertEqual(identifier, NSStringFromSelector(item.action!),
@@ -153,18 +157,25 @@ final class MenuAndToolbarTests: AppHostTestCase {
     func testToolbarButtons() {
         let controller = MainWindowController()
         defer { controller.window?.close() }
-        // The 7zFM strip (FMToolbar.swift, winmatch), not an NSToolbar.
-        let buttons = controller.toolbarView.buttons
-        let titles = buttons.map(\.title)
+        // The window's NSToolbar (MacToolbar.swift) carries the seven 7zFM commands.
+        let items = controller.commandToolbarItems
+        let titles = items.map(\.label)
         XCTAssertEqual(titles, ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"],
                        "toolbar items: \(titles)")
-        for button in buttons {
-            XCTAssertNotNil(button.action, "toolbar button '\(button.title)' sends nothing")
-            XCTAssertTrue(button.isEnabled)
+        for item in items {
+            XCTAssertNotNil(item.action, "toolbar item '\(item.label)' sends nothing")
         }
         // The compress scope implemented Add, so it must be wired, not a placeholder
         // (kMenuCmdID_Toolbar_Add 1070).
-        XCTAssertEqual(buttons.first?.action.map(NSStringFromSelector), "toolbarAddToArchive:",
+        XCTAssertEqual(items.first?.action.map(NSStringFromSelector), "toolbarAddToArchive:",
                        "Add must send the toolbar Add selector")
+    }
+}
+
+extension MainWindowController {
+    /// The seven 7zFM toolbar commands in the window's NSToolbar, in toolbar order.
+    var commandToolbarItems: [NSToolbarItem] {
+        let ids: [NSToolbarItem.Identifier] = [.szAdd, .szExtract, .szTest, .szCopy, .szMove, .szDelete, .szInfo]
+        return window?.toolbar?.items.filter { ids.contains($0.itemIdentifier) } ?? []
     }
 }

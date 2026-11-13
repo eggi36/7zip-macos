@@ -135,8 +135,13 @@ final class FinderIntegrationTests: SevenZipUITestCase {
         let app = XCUIApplication()
         app.launchArguments = ["x", "-o" + out + "/", "-ad", "-an",
                               "-aiw-!" + TestPaths.fixture("test.7z")]
+        // A settings domain of its own, as `SevenZipApp.launch` gives every launch: never the
+        // user's preferences (whose language would title the dialog in another language).
+        let seed = try SettingsSeedFile.make(name: "finder-argv", values: SettingsSeed.clean.preferences ?? [:])
+        addTeardownBlock { seed.remove() }
         app.launchEnvironment = ["SEVENZIP_UITEST": "1"]
             .merging(TestShard.environment(for: "FinderIntegrationTests")) { mine, _ in mine }
+            .merging(seed.launchEnvironment) { _, new in new }
         if app.state != .notRunning && app.state != .unknown { app.terminate() }
         app.launch()
 
@@ -145,7 +150,7 @@ final class FinderIntegrationTests: SevenZipUITestCase {
         }
         // "no document windows" (03 section 6.4): the file manager, whose title is the panel's
         // path, is never on screen.
-        XCTAssertEqual(app.windows.matching(NSPredicate(format: "title BEGINSWITH '/'")).count, 0)
+        XCTAssertEqual(app.windows.matching(NSPredicate(format: "title CONTAINS ' – /' OR title BEGINSWITH '/'")).count, 0)
         screenshot("10-command-mode-argv")
         XCTAssertTrue(sevenZip.dismissDialog(dialog, button: "Cancel"))
         // Cancel is E_ABORT, which ends the command-mode process.

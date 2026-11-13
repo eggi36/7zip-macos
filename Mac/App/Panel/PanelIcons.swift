@@ -9,7 +9,8 @@ import SevenZipKit
 enum PanelIcons {
 
     static let smallSize = NSSize(width: 16, height: 16)
-    static let largeSize = NSSize(width: 32, height: 32)
+    /// native-look: Finder's 64 pt icons in the Mac look's Large Icons view.
+    static let largeSize = NSSize(width: 64, height: 64)
 
     static func icon(for row: PanelRow, snapshot: PanelSnapshot?, cache: inout [String: NSImage],
                      large: Bool) -> NSImage {
@@ -39,9 +40,7 @@ enum PanelIcons {
         }
         // By extension: 7-Zip's own per-format icon for the extensions it registers (the shell's
         // DefaultIcon 7z.dll,<index>; PanelArchiveIcons, feel3), else the system's.
-        if !row.isDirectory, let archive = PanelArchiveIcons.icon(forName: row.name, large: large) {
-            return archive
-        }
+        // native-look: the Mac look shows the system's document icon for every file, as Finder does.
         return resized(Icons.icon(forName: row.name, isDirectory: row.isDirectory), size)
     }
 
@@ -63,7 +62,6 @@ enum PanelIcons {
             return NSImage(systemSymbolName: "externaldrive", accessibilityDescription: nil)
         }
         if !snapshot.archivePath.isEmpty {
-            if let archive = PanelArchiveIcons.icon(forName: snapshot.archivePath, large: false) { return archive }
             return resized(NSWorkspace.shared.icon(forFile: snapshot.archivePath), smallSize)
         }
         if snapshot.isFileSystem, !snapshot.fullPath.isEmpty {

@@ -26,6 +26,8 @@ enum MainMenu {
     /// "No lang id": a macOS-only item with no 7-Zip string. Not 0, which is the *product name*
     /// ("7-Zip") in every translation (CLang::Open, Lang.cpp:158-160).
     static let noLangID = UInt32.max
+    /// native-look: File > Delete Immediately (the Option alternate of Move to Trash), Shift+Del.
+    static let deleteImmediatelyTag = 5480
 
     private static func fkey(_ n: Int) -> String {
         String(UnicodeScalar(NSF1FunctionKey + n - 1)!)
@@ -52,6 +54,30 @@ enum MainMenu {
         return it
     }
 
+    // MARK: native-look: Mac names and shortcuts
+
+    /// The Mac look's version of an item: its Mac name and shortcut. The Windows shortcut is kept
+    /// as a hidden twin item (still answered, not shown), so no key 7zFM users know stops working.
+    @discardableResult
+    private static func macify(_ it: NSMenuItem, _ title: String? = nil, key: String, mods: NSEvent.ModifierFlags,
+                               keepWindowsKey: Bool = true) -> NSMenuItem {
+        if keepWindowsKey, !it.keyEquivalent.isEmpty, let menu = it.menu {
+            let twin = NSMenuItem(title: it.title, action: it.action, keyEquivalent: it.keyEquivalent)
+            twin.keyEquivalentModifierMask = it.keyEquivalentModifierMask
+            twin.tag = it.tag
+            twin.isHidden = true
+            twin.allowsKeyEquivalentWhenHidden = true
+            twin.setAccessibilityIdentifier("sz.windowsKey." + (it.action.map(NSStringFromSelector) ?? ""))
+            menu.insertItem(twin, at: menu.index(of: it) + 1)
+        }
+        if let title { it.title = title }
+        it.keyEquivalent = key
+        it.keyEquivalentModifierMask = mods
+        return it
+    }
+
+    private static var deleteKey: String { "\u{8}" }
+
     static func build() -> NSMenu {
         OpsInfraDemo.installIfRequested()   // SZ_OPSINFRA_DEMO: opsinfra scope verification hook
         ToolsCommands.install()             // tools scope: real About dialog on the IDM_ABOUT items
@@ -65,6 +91,7 @@ enum MainMenu {
         bar.addItem(fileMenu())
         bar.addItem(editMenu())
         bar.addItem(viewMenu())
+        bar.addItem(goMenu())      // native-look: Finder's Go menu
         bar.addItem(favoritesMenu())
         bar.addItem(toolsMenu())
         bar.addItem(windowMenu())
@@ -77,8 +104,12 @@ enum MainMenu {
     private static func appMenu() -> NSMenuItem {
         let menu = NSMenu(title: "7-Zip")
         item(menu, 961, lang: 961, "&About 7-Zip...", action: #selector(MenuActions.helpAbout(_:)))   // IDM_ABOUT
+        // native-look: the update check sits under About, as in most Mac apps.
+        item(menu, 0, lang: UpdateCheck.LangID.menuItem, "Check for &Updates...",
+             action: #selector(AppDelegate.helpCheckForUpdates(_:)))
         menu.addItem(.separator())
-        item(menu, 900, lang: 900, "&Options...", key: ",", mods: [.command], action: #selector(MenuActions.toolsOptions(_:)))   // IDM_OPTIONS (Preferences...)
+        let options = item(menu, 900, lang: 900, "&Options...", key: ",", mods: [.command], action: #selector(MenuActions.toolsOptions(_:)))   // IDM_OPTIONS (Preferences...)
+        options.title = MacTerm.settings.title(windows: options.title)   // HIG: "Settings…"
         menu.addItem(.separator())
         let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
         services.submenu = NSMenu(title: "Services")
@@ -104,8 +135,13 @@ enum MainMenu {
         // macOS addition, no Windows resource ID: a second 7zFM.exe launch is a new window on
         // Windows (01 §1.1), here a window of this process (MainWindows.swift). Option+Cmd+N,
         // because Cmd+N is IDM_CREATE_FILE's Ctrl+N under the Ctrl -> Cmd mapping.
-        item(menu, 0, lang: noLangID, "New Window", key: "n", mods: [.command, .option],
-             action: #selector(a.fileNewWindow(_:)))
+        let newWindow = item(menu, 0, lang: noLangID, "New Window", key: "n", mods: [.command, .option],
+                             action: #selector(a.fileNewWindow(_:)))
+        // native-look: Cmd+N opens a window, as in Finder; Create File moves to Option+Cmd+N.
+        macify(newWindow, key: "n", mods: [.command], keepWindowsKey: false)
+        // native-look: window tabs (HIG "Windows": tabs), Cmd+T as in Finder and Safari.
+        menu.addItem(NSMenuItem(title: MacTerm.newTab.title, action: #selector(NSResponder.newWindowForTab(_:)),
+                                keyEquivalent: "t"))
         menu.addItem(.separator())
         addFileCommands(to: menu)
         // The 7-Zip Explorer commands (CPanel::CreateSevenZipMenu) are not a fixed part of this
@@ -114,7 +150,9 @@ enum MainMenu {
         // programMenu = true). FileMenuDelegate does the same (ai/reports/wincompare.md).
         menu.delegate = FileMenuDelegate.shared
         menu.addItem(.separator())
-        item(menu, 8, lang: 557, "E&xit\tAlt+F4", key: "w", mods: [.command], action: #selector(a.fileExit(_:)))   // IDCLOSE (lang 557)
+        let exit = item(menu, 8, lang: 557, "E&xit\tAlt+F4", key: "w", mods: [.command], action: #selector(a.fileExit(_:)))   // IDCLOSE (lang 557)
+        // native-look: it closes the window (WM_CLOSE), which macOS calls Close Window.
+        macify(exit, MacTerm.closeWindow.title(windows: exit.title), key: "w", mods: [.command], keepWindowsKey: false)
         let top = NSMenuItem()
         top.submenu = menu
         return top
@@ -125,7 +163,8 @@ enum MainMenu {
     /// builder with programMenu = false, which only leaves out Exit).
     static func addFileCommands(to menu: NSMenu) {
         let a = MenuActions.self
-        item(menu, 540, lang: 540, "&Open\tEnter", key: String(UnicodeScalar(NSDownArrowFunctionKey)!), mods: [.command], action: #selector(a.fileOpen(_:)))                  // IDM_OPEN
+        let open = item(menu, 540, lang: 540, "&Open\tEnter", key: String(UnicodeScalar(NSDownArrowFunctionKey)!), mods: [.command], action: #selector(a.fileOpen(_:)))                  // IDM_OPEN
+        macify(open, key: "o", mods: [.command])                                  // native-look: Cmd+O (Cmd+Down kept)
         item(menu, 541, lang: 541, "Open &Inside\tCtrl+PgDn", key: String(UnicodeScalar(NSPageDownFunctionKey)!), mods: [.command], action: #selector(a.fileOpenInside(_:)))  // IDM_OPEN_INSIDE
         let inside = Lang.stripMnemonic(Lang.dropAccelerator(Lang.translated(541) ?? "Open &Inside"))
         let one = item(menu, 590, lang: 590, "Open Inside *", action: #selector(a.fileOpenInsideOne(_:)))          // IDM_OPEN_INSIDE_ONE
@@ -139,13 +178,23 @@ enum MainMenu {
         item(menu, 545, lang: 545, "Rena&me\tF2", key: fkey(2), action: #selector(a.fileRename(_:)))               // IDM_RENAME
         item(menu, 546, lang: 546, "&Copy To...\tF5", key: fkey(5), action: #selector(a.fileCopyTo(_:)))           // IDM_COPY_TO
         item(menu, 547, lang: 547, "&Move To...\tF6", key: fkey(6), action: #selector(a.fileMoveTo(_:)))           // IDM_MOVE_TO
-        item(menu, 548, lang: 548, "&Delete\tDel", key: "\u{8}", mods: [.command], action: #selector(a.fileDelete(_:)))   // IDM_DELETE (Del -> Cmd+Backspace)
+        let delete = item(menu, 548, lang: 548, "&Delete\tDel", key: "\u{8}", mods: [.command], action: #selector(a.fileDelete(_:)))   // IDM_DELETE (Del -> Cmd+Backspace)
+        // native-look: Finder's names -- Move to Trash, and with Option held Delete
+        // Immediately (7zFM's Shift+Del), as an alternate of the same command.
+        macify(delete, MacTerm.moveToTrash.title(windows: delete.title), key: deleteKey, mods: [.command], keepWindowsKey: false)
+        let now = item(menu, 548, lang: noLangID, "Delete Immediately...", key: deleteKey, mods: [.command, .option],
+                       action: #selector(a.fileDelete(_:)), tag: MainMenu.deleteImmediatelyTag)
+        now.title = MacTerm.deleteImmediately.title
+        now.isAlternate = true
         menu.addItem(.separator())
         item(menu, 549, lang: 549, "&Split file...", action: #selector(a.fileSplit(_:)))                           // IDM_SPLIT
         item(menu, 550, lang: 550, "Com&bine files...", action: #selector(a.fileCombine(_:)))                      // IDM_COMBINE
         menu.addItem(.separator())
-        item(menu, 551, lang: 551, "P&roperties\tAlt+Enter", key: "\r", mods: [.option], action: #selector(a.fileProperties(_:)))   // IDM_PROPERTIES
-        item(menu, 552, lang: 552, "Comme&nt...\tCtrl+Z", key: "z", mods: [.command], action: #selector(a.fileComment(_:)))         // IDM_COMMENT
+        let info = item(menu, 551, lang: 551, "P&roperties\tAlt+Enter", key: "\r", mods: [.option], action: #selector(a.fileProperties(_:)))   // IDM_PROPERTIES
+        macify(info, MacTerm.getInfo.title(windows: info.title), key: "i", mods: [.command])   // native-look: Get Info, Cmd+I
+        let comment = item(menu, 552, lang: 552, "Comme&nt...\tCtrl+Z", key: "z", mods: [.command], action: #selector(a.fileComment(_:)))         // IDM_COMMENT
+        // native-look: Cmd+Z is Undo on the Mac, so Comment gets Option+Cmd+K instead.
+        macify(comment, key: "k", mods: [.command, .option], keepWindowsKey: false)
         // popup "CRC" (resource id 0; IDM_CRC 553 is defined but unused by the .rc)
         let crc = NSMenuItem(title: Lang.menuTitle(553, "CRC"), action: nil, keyEquivalent: "")
         let crcMenu = NSMenu(title: crc.title)
@@ -162,8 +211,10 @@ enum MainMenu {
         menu.addItem(crc)
         item(menu, 554, lang: 554, "Di&ff", action: #selector(a.fileDiff(_:)))                                     // IDM_DIFF (hidden unless a Diff tool is configured)
         menu.addItem(.separator())
-        item(menu, 555, lang: 555, "Create Folder\tF7", key: fkey(7), action: #selector(a.fileCreateFolder(_:)))   // IDM_CREATE_FOLDER
-        item(menu, 556, lang: 556, "Create File\tCtrl+N", key: "n", mods: [.command], action: #selector(a.fileCreateFile(_:)))   // IDM_CREATE_FILE
+        let folder = item(menu, 555, lang: 555, "Create Folder\tF7", key: fkey(7), action: #selector(a.fileCreateFolder(_:)))   // IDM_CREATE_FOLDER
+        macify(folder, MacTerm.newFolder.title(windows: folder.title), key: "n", mods: [.command, .shift])   // native-look: Shift+Cmd+N (F7 kept)
+        let file = item(menu, 556, lang: 556, "Create File\tCtrl+N", key: "n", mods: [.command], action: #selector(a.fileCreateFile(_:)))   // IDM_CREATE_FILE
+        macify(file, MacTerm.newFile.title(windows: file.title), key: "n", mods: [.command, .option], keepWindowsKey: false)
         menu.addItem(.separator())
         item(menu, 558, lang: 558, "&Link...", action: #selector(a.fileLink(_:)))                                  // IDM_LINK
         // IDM_ALT_STREAMS 559: NTFS alternate streams are hidden on macOS (00-orchestration.md)
@@ -182,6 +233,15 @@ enum MainMenu {
         // resource, so they are not built here either (01 §2.2).
         let menu = NSMenu(title: Lang.menuTitle(idmEdit, "&Edit"))
         let a = MenuActions.self
+        // native-look: Undo / Redo (Move to Trash, text fields), then Cut, Copy, Paste come
+        // first in a Mac Edit menu.
+        menu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(redo)
+        menu.addItem(.separator())
+        addClipboardItems(to: menu)
+        menu.addItem(.separator())
         item(menu, 600, lang: 600, "Select &All\tShift+[Grey +]", key: "a", mods: [.command], action: #selector(a.editSelectAll(_:)))          // IDM_SELECT_ALL (also Ctrl+A)
         item(menu, 601, lang: 601, "Deselect All\tShift+[Grey -]", key: "-", mods: [.shift, .numericPad], action: #selector(a.editDeselectAll(_:)))   // IDM_DESELECT_ALL
         item(menu, 602, lang: 602, "&Invert Selection\tGrey *", key: "*", mods: [.numericPad], action: #selector(a.editInvertSelection(_:)))  // IDM_INVERT_SELECTION
@@ -193,17 +253,16 @@ enum MainMenu {
         // Clipboard: 7zFM binds Ctrl+C / Ctrl+X / Ctrl+V in the panel key handler and has no menu
         // items for them (PanelMenu.cpp:427-489). macOS expects them in the Edit menu, so they are
         // added here with the standard selectors -- a text field in focus keeps its own behaviour.
-        menu.addItem(.separator())
-        let copyItem = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        menu.addItem(copyItem)
-        let cutItem = NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        menu.addItem(cutItem)
-        let pasteItem = NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        menu.addItem(pasteItem)
         let top = NSMenuItem()
         top.submenu = menu
         EditMenuCleanup.adopt(menu)     // recheck2: no AutoFill / Dictation / Emoji items
         return top
+    }
+
+    private static func addClipboardItems(to menu: NSMenu) {
+        menu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        menu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        menu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
     }
 
     // MARK: View (IDM_VIEW 502)
@@ -216,12 +275,22 @@ enum MainMenu {
         item(menu, 702, lang: 702, "&List\tCtrl+3", key: "3", mods: [.command], action: #selector(a.viewList(_:)))                // IDM_VIEW_LIST
         item(menu, 703, lang: 703, "&Details\tCtrl+4", key: "4", mods: [.command], action: #selector(a.viewDetails(_:)))          // IDM_VIEW_DETAILS (default)
         menu.addItem(.separator())
+        // native-look: the arrange items go into a "Sort By" submenu with Finder's
+        // Control+Option+Cmd+1... keys (Cmd+F3... kept).
+        var sortMenu = menu
+        let sortBy = NSMenuItem(title: MacTerm.sortBy.title, action: nil, keyEquivalent: "")
+        sortMenu = NSMenu(title: sortBy.title)
+        sortBy.submenu = sortMenu
+        menu.addItem(sortBy)
         // kIDLangPairs: the arrange items use the property-name strings 1004/1020/1012/1007
-        item(menu, 710, lang: 1004, "Name\tCtrl+F3", key: fkey(3), mods: [.command], action: #selector(a.viewArrangeByName(_:)))   // IDM_VIEW_ARANGE_BY_NAME
-        item(menu, 711, lang: 1020, "Type\tCtrl+F4", key: fkey(4), mods: [.command], action: #selector(a.viewArrangeByType(_:)))   // IDM_VIEW_ARANGE_BY_TYPE
-        item(menu, 712, lang: 1012, "Date\tCtrl+F5", key: fkey(5), mods: [.command], action: #selector(a.viewArrangeByDate(_:)))   // IDM_VIEW_ARANGE_BY_DATE
-        item(menu, 713, lang: 1007, "Size\tCtrl+F6", key: fkey(6), mods: [.command], action: #selector(a.viewArrangeBySize(_:)))   // IDM_VIEW_ARANGE_BY_SIZE
-        item(menu, 730, lang: 730, "Unsorted\tCtrl+F7", key: fkey(7), mods: [.command], action: #selector(a.viewArrangeNoSort(_:)))   // IDM_VIEW_ARANGE_NO_SORT
+        let sortItems = [
+            item(sortMenu, 710, lang: 1004, "Name\tCtrl+F3", key: fkey(3), mods: [.command], action: #selector(a.viewArrangeByName(_:))),   // IDM_VIEW_ARANGE_BY_NAME
+            item(sortMenu, 711, lang: 1020, "Type\tCtrl+F4", key: fkey(4), mods: [.command], action: #selector(a.viewArrangeByType(_:))),   // IDM_VIEW_ARANGE_BY_TYPE
+            item(sortMenu, 712, lang: 1012, "Date\tCtrl+F5", key: fkey(5), mods: [.command], action: #selector(a.viewArrangeByDate(_:))),   // IDM_VIEW_ARANGE_BY_DATE
+            item(sortMenu, 713, lang: 1007, "Size\tCtrl+F6", key: fkey(6), mods: [.command], action: #selector(a.viewArrangeBySize(_:))),   // IDM_VIEW_ARANGE_BY_SIZE
+            item(sortMenu, 730, lang: 730, "Unsorted\tCtrl+F7", key: fkey(7), mods: [.command], action: #selector(a.viewArrangeNoSort(_:))),   // IDM_VIEW_ARANGE_NO_SORT
+        ]
+        for (i, it) in sortItems.enumerated() { macify(it, key: "\(i + 1)", mods: [.control, .option, .command]) }
         menu.addItem(.separator())
         item(menu, 731, lang: 731, "Flat View", action: #selector(a.viewFlatView(_:)))                                            // IDM_VIEW_FLAT_VIEW
         item(menu, 732, lang: 732, "&2 Panels\tF9", key: fkey(9), action: #selector(a.viewTwoPanels(_:)))                         // IDM_VIEW_TWO_PANELS
@@ -243,14 +312,44 @@ enum MainMenu {
         item(toolbarsMenu, 753, lang: 753, "Show Buttons Text", action: #selector(a.viewToolbarsShowButtonsText(_:)))         // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT
         toolbars.submenu = toolbarsMenu
         menu.addItem(toolbars)
+        // native-look: the window toolbar's own commands, as every Mac app's View menu has them
+        // (AppKit retitles Show / Hide Toolbar itself).
+        let show = NSMenuItem(title: MacTerm.showToolbar.title, action: #selector(NSWindow.toggleToolbarShown(_:)), keyEquivalent: "t")
+        show.keyEquivalentModifierMask = [.command, .option]
+        menu.addItem(show)
+        menu.addItem(NSMenuItem(title: MacTerm.customizeToolbar.title,
+                                action: #selector(NSWindow.runToolbarCustomizationPalette(_:)), keyEquivalent: ""))
+        // Finder's path bar (PanelPathControl.swift); AppDelegate retitles Show / Hide.
+        let pathBar = NSMenuItem(title: MacTerm.showPathBar.title,
+                                 action: #selector(AppDelegate.toggleMacPathBar(_:)), keyEquivalent: "p")
+        pathBar.keyEquivalentModifierMask = [.command, .option]
+        menu.addItem(pathBar)
+        menu.addItem(.separator())
+        item(menu, 737, lang: 737, "&Refresh\tCtrl+R", key: "r", mods: [.command], action: #selector(a.viewRefresh(_:)))       // IDM_VIEW_REFRESH
+        item(menu, 738, lang: 738, "Auto Refresh", action: #selector(a.viewAutoRefresh(_:)))                                   // IDM_VIEW_AUTO_REFRESH
+        let top = NSMenuItem()
+        top.submenu = menu
+        return top
+    }
+
+    /// Back, Forward, Open Root Folder, Up One Level, Folders History: View menu items in 7zFM,
+    /// the Go menu in the Mac look.
+    private static func addGoItems(to menu: NSMenu) {
+        let a = MenuActions.self
         // Back / Forward: not in 7zFM (which has no navigation stack), added for macOS.
         item(menu, 0, lang: noLangID, "Back", key: "[", mods: [.command], action: #selector(a.viewGoBack(_:)), tag: 780)
         item(menu, 0, lang: noLangID, "Forward", key: "]", mods: [.command], action: #selector(a.viewGoForward(_:)), tag: 781)
+        let up = item(menu, 735, lang: 735, "Up One Level\tBackspace", key: String(UnicodeScalar(NSUpArrowFunctionKey)!), mods: [.command], action: #selector(a.viewOpenParentFolder(_:)))   // IDM_OPEN_PARENT_FOLDER
+        up.title = MacTerm.enclosingFolder.title(windows: up.title)
+        menu.addItem(.separator())
         item(menu, 734, lang: 734, "Open Root Folder\t\\", action: #selector(a.viewOpenRootFolder(_:)))                       // IDM_OPEN_ROOT_FOLDER ("\" or "/" typed in the list)
-        item(menu, 735, lang: 735, "Up One Level\tBackspace", key: String(UnicodeScalar(NSUpArrowFunctionKey)!), mods: [.command], action: #selector(a.viewOpenParentFolder(_:)))   // IDM_OPEN_PARENT_FOLDER (Backspace in the list; Cmd+Up here)
         item(menu, 736, lang: 736, "Folders History...\tAlt+F12", key: fkey(12), mods: [.option], action: #selector(a.viewFoldersHistory(_:)))   // IDM_FOLDERS_HISTORY
-        item(menu, 737, lang: 737, "&Refresh\tCtrl+R", key: "r", mods: [.command], action: #selector(a.viewRefresh(_:)))       // IDM_VIEW_REFRESH
-        item(menu, 738, lang: 738, "Auto Refresh", action: #selector(a.viewAutoRefresh(_:)))                                   // IDM_VIEW_AUTO_REFRESH
+    }
+
+    /// native-look: Finder's Go menu with the navigation commands.
+    private static func goMenu() -> NSMenuItem {
+        let menu = NSMenu(title: MacTerm.go.title)
+        addGoItems(to: menu)
         let top = NSMenuItem()
         top.submenu = menu
         return top
@@ -272,8 +371,7 @@ enum MainMenu {
     private static func toolsMenu() -> NSMenuItem {
         let menu = NSMenu(title: Lang.menuTitle(idmTools, "&Tools"))
         let a = MenuActions.self
-        item(menu, 900, lang: 900, "&Options...", action: #selector(a.toolsOptions(_:)))                        // IDM_OPTIONS
-        menu.addItem(.separator())
+        // IDM_OPTIONS 900 is Settings… in the app menu (HIG).
         item(menu, 901, lang: 901, "&Benchmark", action: #selector(a.toolsBenchmark(_:)))                       // IDM_BENCHMARK
         // IDM_BENCHMARK2 902 exists only in the Windows CE build (01-fm-feature-inventory.md 2.5)
         menu.addItem(.separator())
@@ -302,12 +400,9 @@ enum MainMenu {
     private static func helpMenu() -> NSMenuItem {
         let menu = NSMenu(title: Lang.menuTitle(idmHelp, "&Help"))
         let a = MenuActions.self
-        item(menu, 960, lang: 960, "&Contents...\tF1", key: fkey(1), action: #selector(a.helpContents(_:)))    // IDM_HELP_CONTENTS
-        menu.addItem(.separator())
-        // macOS addition (pub3), no Windows resource ID: the update check (UpdateCheck.swift).
-        item(menu, 0, lang: UpdateCheck.LangID.menuItem, "Check for &Updates...",
-             action: #selector(AppDelegate.helpCheckForUpdates(_:)))
-        item(menu, 961, lang: 961, "&About 7-Zip...", action: #selector(a.helpAbout(_:)))                      // IDM_ABOUT
+        let contents = item(menu, 960, lang: 960, "&Contents...\tF1", key: fkey(1), action: #selector(a.helpContents(_:)))    // IDM_HELP_CONTENTS
+        // native-look: "7-Zip Help" with Cmd+? (F1 kept); About and the update check are in the app menu.
+        macify(contents, MacTerm.help.title(windows: contents.title), key: "?", mods: [.command])
         NSApp.helpMenu = menu
         let top = NSMenuItem()
         top.submenu = menu

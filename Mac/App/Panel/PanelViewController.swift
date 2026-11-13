@@ -141,10 +141,13 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
     let pathBar = PathBarView()
     private let upButton = PanelUpButton()
     let pathCombo = AddressComboBox()
+    /// Finder's path bar under the list (PanelPathControl.swift).
+    let pathControlBar = PanelPathControlBar()
     /// The list's themed WS_EX_CLIENTEDGE (recheck §2): a 1 px line, 1 px of white, then the list.
     private let listFrame = PanelListFrameView()
     private let listContainer = NSView()
-    private let scrollView = WinScrollView()
+    /// AppKit's overlay scroll bars.
+    private let scrollView = NSScrollView()
     let tableView = PanelTableView()
     private(set) var iconView: PanelIconView!
     /// Section 0 of the status bar ("N / M object(s) selected"); sections 1-3 follow it.
@@ -156,7 +159,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
     /// the two size parts widened for SF Pro's "9 999 999 999 999" (datecols, PanelMetrics).
     static var statusSectionEdges: [CGFloat] { PanelMetrics.statusSectionEdges }
     /// The dividers in front of sections 1-3.
-    private var statusDividers: [NSView] = []
     /// The first part's text from the status bar's left edge; moved in at the window's rounded
     /// corner (PanelMetrics.statusLeadingInset, fix111).
     private var statusLabelLeading: NSLayoutConstraint?
@@ -193,7 +195,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         pathCombo.action = #selector(pathComboAction(_:))
         pathCombo.delegate = self
         pathCombo.onDropDown = { [weak self] in self?.showAddressPopup() }
-        pathCombo.font = PanelMetrics.listFont          // the GUI font, as the list (recheck §2)
+        pathCombo.font = PanelMetrics.panelFont          // the GUI font, as the list (recheck §2)
         pathCombo.isBordered = false
         pathCombo.translatesAutoresizingMaskIntoConstraints = false
         // The address bar's ComboBoxEx draws no focus ring on Windows; the caret and the selected
@@ -213,14 +215,15 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         tableView.allowsMultipleSelection = !alternativeSelection
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
-        tableView.usesAlternatingRowBackgroundColors = false
+        // Finder's striped rows.
+        tableView.usesAlternatingRowBackgroundColors = true
         tableView.gridStyleMask = Settings.showGrid ? [.solidHorizontalGridLineMask, .solidVerticalGridLineMask] : []
-        tableView.gridColor = PanelSelectionStyle.grid               // LVS_EX_GRIDLINES (240,240,240)
+        tableView.gridColor = .gridColor                       // LVS_EX_GRIDLINES
         // 7zFM 26.03's list: 19 px rows with no gap, the cells draw their own margins, a 24 px
         // header (PanelMetrics, listfeel.md §2).
         tableView.rowHeight = PanelMetrics.rowHeight
         tableView.intercellSpacing = .zero
-        tableView.style = .plain
+        tableView.style = .inset                               // rounded inset selection
         tableView.columnAutoresizingStyle = .noColumnAutoresizing
         tableView.target = self
         tableView.doubleAction = #selector(doubleClicked(_:))
@@ -248,7 +251,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         // status bar (each panel owns one, 01 §1.2), as msctls_statusbar32 draws it on Windows 11
         // (recheck §2): 23 px with a 1 px (215) line on top, COLOR_BTNFACE, the GUI font in black,
         // a part's text 2 px in, 1 px (215) dividers at a part's right edge - 1 on rows 2..21.
-        statusLabel.font = PanelMetrics.listFont
+        statusLabel.font = PanelMetrics.statusFont
         statusLabel.textColor = WinChrome.text
         statusLabel.lineBreakMode = .byTruncatingMiddle
         Bidi.makeLeftToRight(statusLabel)
@@ -257,13 +260,14 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         status.translatesAutoresizingMaskIntoConstraints = false
         status.clipsToBounds = true          // a narrow panel cuts the sections, as a Win32 status bar does
         status.addSubview(statusLabel)
-        // 01 §1.2 "Status bar": four parts with fixed right edges, a divider after each of the
-        // first three; the last one takes the rest.
+        // 01 §1.2 "Status bar": four parts with fixed right edges; the last one takes the rest.
+        // The Mac status bar is quiet: secondary text, no part dividers.
         let textBaseline: CGFloat = 16       // ink rows 7..15 under the line: baseline 16 px down
         var statusConstraints: [NSLayoutConstraint] = []
+        statusLabel.textColor = .secondaryLabelColor
         for (i, label) in statusSections.enumerated() {
             label.font = statusLabel.font
-            label.textColor = WinChrome.text
+            label.textColor = .secondaryLabelColor
             label.lineBreakMode = .byTruncatingTail
             Bidi.makeLeftToRight(label)
             label.translatesAutoresizingMaskIntoConstraints = false
@@ -277,25 +281,19 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             } else {
                 statusConstraints.append(label.trailingAnchor.constraint(lessThanOrEqualTo: status.trailingAnchor, constant: -2))
             }
-            let divider = PanelColorView(WinChrome.statusLine)
-            status.addSubview(divider)
-            statusDividers.append(divider)
-            statusConstraints += [
-                divider.leadingAnchor.constraint(equalTo: status.leadingAnchor, constant: left - 1),
-                divider.widthAnchor.constraint(equalToConstant: 1),
-                divider.topAnchor.constraint(equalTo: status.topAnchor, constant: 1),
-                divider.heightAnchor.constraint(equalToConstant: 20),
-            ]
         }
 
-        let statusLine = PanelColorView(WinChrome.statusLine)
+        let statusLine = PanelColorView(.separatorColor)
         listFrame.translatesAutoresizingMaskIntoConstraints = false
 
         root.addSubview(pathBar)
         root.addSubview(listFrame)
         root.addSubview(listContainer)
+        root.addSubview(pathControlBar)
         root.addSubview(statusLine)
         root.addSubview(status)
+        pathControlBar.isShown = MacPathBar.isShown
+        pathControlBar.onOpen = { [weak self] path in self?.openFromPathControl(path) }
 
         let inset = PanelListFrameView.inset
         NSLayoutConstraint.activate([
@@ -308,13 +306,16 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             upButton.widthAnchor.constraint(equalToConstant: WinChrome.upButtonRect.width),
             upButton.heightAnchor.constraint(equalToConstant: WinChrome.upButtonRect.height),
             pathCombo.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: WinChrome.comboX),
-            pathCombo.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor),
-            pathCombo.topAnchor.constraint(equalTo: pathBar.topAnchor),
-            pathCombo.heightAnchor.constraint(equalToConstant: WinChrome.bandHeight),
+            pathCombo.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor, constant: -WinChrome.comboInset.width),
+            pathCombo.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: WinChrome.comboInset.height),
+            pathCombo.heightAnchor.constraint(equalToConstant: WinChrome.bandHeight - 2 * WinChrome.comboInset.height),
             listFrame.topAnchor.constraint(equalTo: pathBar.bottomAnchor),
             listFrame.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             listFrame.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            listFrame.bottomAnchor.constraint(equalTo: statusLine.topAnchor),
+            listFrame.bottomAnchor.constraint(equalTo: pathControlBar.topAnchor),
+            pathControlBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            pathControlBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            pathControlBar.bottomAnchor.constraint(equalTo: statusLine.topAnchor),
             listContainer.topAnchor.constraint(equalTo: listFrame.topAnchor, constant: inset),
             listContainer.leadingAnchor.constraint(equalTo: listFrame.leadingAnchor, constant: inset),
             listContainer.trailingAnchor.constraint(equalTo: listFrame.trailingAnchor, constant: -inset),
@@ -367,6 +368,25 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
                            name: Settings.Group.view.notificationName, object: nil)
         center.addObserver(self, selector: #selector(languageDidChange(_:)),
                            name: Settings.Group.language.notificationName, object: nil)
+        center.addObserver(self, selector: #selector(pathBarVisibilityDidChange(_:)),
+                           name: MacPathBar.didChange, object: nil)
+    }
+
+    /// native-look: View > Show / Hide Path Bar, for every panel at once (as Finder).
+    @objc private func pathBarVisibilityDidChange(_ note: Notification) {
+        pathControlBar.isShown = MacPathBar.isShown
+    }
+
+    /// native-look: a click on a part of the path bar opens that folder; the folder this panel
+    /// came from is selected in it, as Up does.
+    private func openFromPathControl(_ path: String) {
+        let current = snapshot?.fullPath ?? ""
+        var child: String?
+        if current.hasPrefix(path) {
+            let rest = current.dropFirst(path.count).split(separator: "/")
+            child = rest.first.map(String.init)
+        }
+        navigate(to: path, select: child, focusListOnSuccess: true)
     }
 
     /// ReloadLangItems (01 §1.1, 01b §4.22): the column titles and the status-bar template come
@@ -1110,7 +1130,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         for (i, edge) in Self.statusSectionEdges.enumerated() {
             let hidden = edge + 12 > width
             if statusSections[i].isHidden != hidden { statusSections[i].isHidden = hidden }
-            if statusDividers[i].isHidden != hidden { statusDividers[i].isHidden = hidden }
         }
         updateStatusLeadingInset()
     }
@@ -1188,6 +1207,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         }
         pathCombo.addressCell?.icon = sized
         pathCombo.needsDisplay = true
+        pathControlBar.show(path: snap.isRoot ? "" : snap.fullPath)
     }
 
     func focusList() {
@@ -1296,15 +1316,11 @@ final class PathBarView: NSView {
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        WinChrome.window.setFill()
+        // native-look: the window's background with a hairline under it.
+        NSColor.windowBackgroundColor.setFill()
         bounds.fill()
-        let x = WinChrome.comboX
-        WinChrome.bandBorderShadow.setFill()
-        NSRect(x: x - 2, y: 0, width: 1, height: bounds.height).fill()
-        WinChrome.bandBorderLight.setFill()
-        NSRect(x: x - 1, y: 0, width: 1, height: bounds.height).fill()
-        WinChrome.bandBottom.setFill()
-        NSRect(x: 0, y: bounds.height - 1, width: x - 2, height: 1).fill()
+        NSColor.separatorColor.setFill()
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
     }
 }
 
@@ -1323,11 +1339,10 @@ final class PanelColorView: NSView {
 /// The list's themed client edge: a 1 px (130,135,144) line, then the window colour; the list
 /// sits `inset` inside (SysHeader32 @2,78 in a SysListView32 @0,76).
 final class PanelListFrameView: NSView {
-    static let inset: CGFloat = 2
+    /// native-look: no client edge in the Mac look; the list runs to the panel's edges.
+    static var inset: CGFloat { 0 }
     override func draw(_ dirtyRect: NSRect) {
-        WinChrome.window.setFill()
+        NSColor.controlBackgroundColor.setFill()
         bounds.fill()
-        WinChrome.listBorder.setFill()
-        bounds.frame(withWidth: 1)
     }
 }

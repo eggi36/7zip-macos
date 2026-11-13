@@ -87,7 +87,7 @@ final class GModeUITests: SevenZipUITestCase {
 
     /// File-manager windows: their title is the focused panel's path (CApp::RefreshTitle).
     private func managerWindows(_ app: XCUIApplication) -> XCUIElementQuery {
-        app.windows.matching(NSPredicate(format: "title BEGINSWITH '/'"))
+        app.windows.matching(NSPredicate(format: "title CONTAINS ' – /' OR title BEGINSWITH '/'"))
     }
 
     /// A dialog of `app` by title. The app's dialogs are AXDialog windows, so XCUI lists them under

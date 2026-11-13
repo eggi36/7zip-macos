@@ -37,7 +37,10 @@ extension PanelViewController {
         var options = OperationRunner.Options(title: Lang.text(6106, "Deleting"))
         options.mainTitle = Lang.text(6107, "Error deleting file or folder")   // IDS_ERROR_DELETING
         options.initialStatus = .deleting
-        let result = runFolderOperation(options) { folder, runner -> Bool in
+        // A move to the Trash can be undone (TrashUndo.swift).
+        let recorder = snap.isFileSystem && toTrash
+            ? TrashRecorder(paths: targets.map(\.fullPath).filter { !$0.isEmpty }) : nil
+        _ = runFolderOperation(options) { folder, runner -> Bool in
             if let fs = folder as? SZFileSystemFolder {
                 try fs.deleteItems(at: engineIndices, toTrash: toTrash, delegate: runner)
             } else {
@@ -45,11 +48,12 @@ extension PanelViewController {
             }
             return true
         }
-        if case .success = result {
-            refreshAfterOperation(focusRow: firstRow)
-        } else {
-            refreshAfterOperation(focusRow: firstRow)
+        if let trashed = recorder?.stop() {
+            TrashUndo.register(trashed, undoManager: hostWindow?.undoManager,
+                               refresh: { [weak self] names in self?.refreshAfterOperation(selectNames: names) },
+                               report: { [weak self] error in self?.showError(error) })
         }
+        refreshAfterOperation(focusRow: firstRow)
     }
 
     /// The confirmation of 01 §3.11: captions 6100 / 6101 / 6102, texts 6103 / 6104 / 6105.

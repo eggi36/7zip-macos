@@ -189,7 +189,8 @@ enum QuickLookSettingsBridge {
         QuickLookPreferences(language: Settings.string(Settings.Key.lang) ?? "",
                              theme: Settings.theme.rawValue,
                              timestampLevel: Settings.timestampLevel,
-                             timestampShowUTC: Settings.timestampShowUTC)
+                             timestampShowUTC: Settings.timestampShowUTC,
+                             look: "mac")
     }
 
     /// Writes the snapshot into the extension's container when it exists. Never in a test

@@ -295,6 +295,8 @@ final class WinMessageBoxWindow: NSWindow {
     let boxButtons: WinMessageBox.Buttons
     let icon: WinMessageBox.Icon
     let layout: WinMessageBoxLayout
+    /// The alert's layout (NSAlert's metrics).
+    let macLayout: MacMessageBoxLayout
     /// The window the box belongs to (nil only when the app shows no window).
     private(set) weak var ownerWindow: NSWindow?
     /// The push buttons, in the Windows order (Yes, No, Cancel / OK, Cancel).
@@ -311,10 +313,18 @@ final class WinMessageBoxWindow: NSWindow {
         ownerWindow = owner
         layout = WinMessageBoxLayout(text: text, caption: caption, buttonCount: buttons.results.count,
                                      hasIcon: icon != .none, customTitles: buttons.customTitles)
+        macLayout = MacMessageBoxLayout(text: text, titles: buttons.results.map(buttons.title(of:)))
         // MB_YESNO has no Cancel: its close box is disabled (SC_CLOSE is not in its system menu).
-        super.init(contentRect: NSRect(origin: .zero, size: layout.clientSize),
-                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        // native-look: an alert has no visible title bar (NSAlert: titled, full-size content, the
+        // title hidden); the caption stays the window's accessibility title.
+        super.init(contentRect: NSRect(origin: .zero, size: macLayout.clientSize),
+                   styleMask: [.titled, .closable, .fullSizeContentView],
+                   backing: .buffered, defer: false)
         title = caption
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        isMovableByWindowBackground = true
+        standardWindowButton(.closeButton)?.isHidden = true
         isReleasedWhenClosed = false
         animationBehavior = .alertPanel
         hidesOnDeactivate = false
@@ -324,37 +334,62 @@ final class WinMessageBoxWindow: NSWindow {
         standardWindowButton(.zoomButton)?.isHidden = true
     }
 
-    private func build() {
-        let content = WinMessageBoxContentView(frame: NSRect(origin: .zero, size: layout.clientSize))
-        content.bandTop = layout.bandTop
-        if let frame = layout.iconFrame {
-            let iconView = WinMessageBoxIconView(frame: frame)
-            iconView.icon = icon
-            content.addSubview(iconView)
+    /// native-look: an alert as macOS draws one (NSAlert, macOS 11 and later): the app icon (for an
+    /// error the caution sign badged with it) at the top left, the first line of the message as the
+    /// bold message text, the rest as the informative text, and equal-width buttons at the bottom
+    /// -- side by side with the default (Windows' first button) rightmost, or stacked with the
+    /// default on top when there are more than two. The answers, keys, Esc rule and copy-as-text
+    /// are the Windows box's.
+    private func buildMac(_ mac: MacMessageBoxLayout) {
+        let content = RcFormView(frame: NSRect(origin: .zero, size: mac.clientSize))
+        let view = NSImageView(frame: mac.iconFrame)
+        view.image = Self.macAlertIcon(icon)
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.setAccessibilityElement(false)
+        content.addSubview(view)
+        let headline = NSTextField(wrappingLabelWithString: mac.messageText)
+        headline.font = MacMessageBoxLayout.boldFont
+        headline.isSelectable = true
+        headline.frame = mac.messageFrame
+        content.addSubview(headline)
+        if !mac.informativeText.isEmpty {
+            let info = NSTextField(wrappingLabelWithString: mac.informativeText)
+            info.font = MacMessageBoxLayout.font
+            info.isSelectable = true
+            info.frame = mac.informativeFrame
+            content.addSubview(info)
         }
-        let text = WinMessageBoxText(labelWithString: message)
-        text.lines = layout.lines
-        text.frame = layout.textFrame
-        content.addSubview(text)
         for (i, answer) in boxButtons.results.enumerated() {
             let button = NSButton(title: boxButtons.title(of: answer), target: self, action: #selector(buttonClicked(_:)))
             button.bezelStyle = .rounded
-            button.font = DialogMetrics.font
+            button.controlSize = .large
             button.tag = answer.rawValue
-            // The first button is the default (DM_GETDEFID: IDYES / IDOK); Escape belongs to Cancel.
             if i == 0 {
                 button.keyEquivalent = "\r"
             } else if answer == .cancel || (answer == boxButtons.escapeResult && WinMessageBox.Result.customButtons.contains(answer)) {
                 button.keyEquivalent = "\u{1b}"
             }
-            // RcPlace.button: the push bezel fills its frame; Windows draws 1 px inside its rect.
-            button.frame = layout.buttonFrames[i].insetBy(dx: 1, dy: 0)
+            button.frame = mac.buttonFrames[i]
             content.addSubview(button)
             pushButtons.append(button)
         }
         contentView = content
         initialFirstResponder = pushButtons.first
     }
+
+    /// NSAlert's icons: the app icon, and for a critical alert (MB_ICONSTOP, MB_ICONWARNING) the
+    /// caution sign with the app icon as a badge at its lower right.
+    static func macAlertIcon(_ icon: WinMessageBox.Icon) -> NSImage {
+        let app = NSApp.applicationIconImage ?? NSImage(named: NSImage.applicationIconName) ?? NSImage()
+        guard icon == .error || icon == .warning, let caution = NSImage(named: NSImage.cautionName) else { return app }
+        return NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            caution.draw(in: rect)
+            app.draw(in: NSRect(x: rect.maxX - 32, y: rect.minY, width: 32, height: 32))
+            return true
+        }
+    }
+
+    private func build() { buildMac(macLayout) }
 
     // MARK: answering
 
@@ -368,7 +403,9 @@ final class WinMessageBoxWindow: NSWindow {
         guard result == nil else { return }
         result = answer
         if NSApp.modalWindow === self { NSApp.stopModal(withCode: NSApplication.ModalResponse(rawValue: answer.rawValue)) }
-        orderOut(nil)
+        // A sheet is taken down by its parent's endSheet (DialogKit.runModal(for:asSheet:));
+        // ordering it out here would detach it and leave AppKit's sheet session behind.
+        if sheetParent == nil { orderOut(nil) }
     }
 
     /// Shows the box modally and returns the answer. A session ended from outside (the test reset)
@@ -376,7 +413,7 @@ final class WinMessageBoxWindow: NSWindow {
     func runModal() -> WinMessageBox.Result {
         for observer in WinMessageBox.observers { observer(self) }
         placeOnOwnersScreen()
-        if result == nil { _ = DialogKit.runModal(for: self) }
+        if result == nil { _ = DialogKit.runModal(for: self, asSheet: true) }   // native-look: a sheet
         if isVisible { orderOut(nil) }
         ownerWindow?.makeKeyAndOrderFront(nil)
         return result ?? boxButtons.escapeResult ?? .no
@@ -385,10 +422,8 @@ final class WinMessageBoxWindow: NSWindow {
     /// The centre of the owner's screen, the whole frame (MessageBox centres on the monitor, title
     /// bar included; the owner's own position does not matter).
     private func placeOnOwnersScreen() {
-        guard let screen = ownerWindow?.screen ?? NSScreen.main else { return }
-        let size = frame.size
-        setFrameOrigin(NSPoint(x: (screen.frame.midX - size.width / 2).rounded(),
-                               y: (screen.frame.midY - size.height / 2).rounded()))
+        // A Mac alert sits over the window it belongs to.
+        DialogKit.center(self, over: ownerWindow)
     }
 
     /// `runModal(for:)` centres the window it orders in; the box keeps its own place.
@@ -451,132 +486,93 @@ final class WinMessageBoxWindow: NSWindow {
 
     override var canBecomeKey: Bool { true }
 
-    override func accessibilitySubrole() -> NSAccessibility.Subrole? { .dialog }
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? { sheetParent != nil ? nil : .dialog }
+    override func accessibilityRole() -> NSAccessibility.Role? { sheetParent != nil ? .sheet : super.accessibilityRole() }
+    override func accessibilityTitle() -> String? { super.accessibilityTitle().flatMap { $0.isEmpty ? nil : $0 } ?? title }
 }
 
-// MARK: - views
+/// native-look: the Mac look's alert geometry, measured from NSAlert on macOS 27: 260 pt wide, a
+/// 64 pt icon 20 pt from the top left, the bold message text 16 pt below it, the informative text
+/// 10 pt below that, and 28 pt buttons 16 pt from the edges, 8 pt apart side by side or 6 pt apart
+/// stacked. A long message makes the alert wider (up to 460 pt) instead of very tall.
+struct MacMessageBoxLayout {
+    static let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    static let boldFont = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+    static let margin: CGFloat = 20
+    static let iconSize: CGFloat = 64
+    static let width: CGFloat = 260
+    static let maxWidth: CGFloat = 460
+    static let buttonHeight: CGFloat = 28
 
-/// The white message area over the (243,243,243) button band.
-final class WinMessageBoxContentView: NSView {
-    var bandTop: CGFloat = 0
+    let messageText: String
+    let informativeText: String
+    let clientSize: NSSize
+    let iconFrame: NSRect
+    let messageFrame: NSRect
+    let informativeFrame: NSRect
+    let buttonFrames: [NSRect]
+    /// Whether the buttons are stacked (more than two, or too wide to sit side by side).
+    let stacksButtons: Bool
 
-    static let face = WinChrome.dynamic(WinChrome.gray(255), .textBackgroundColor)
-    static let band = WinChrome.dynamic(WinChrome.gray(243), .windowBackgroundColor)
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        Self.face.setFill()
-        NSRect(x: 0, y: 0, width: bounds.width, height: bandTop).fill()
-        Self.band.setFill()
-        NSRect(x: 0, y: bandTop, width: bounds.width, height: bounds.height - bandTop).fill()
-    }
-}
-
-/// The static: its `stringValue` is the whole message (what accessibility and the tests read); it
-/// draws the lines the layout broke, 13 px apart, on the Windows baselines.
-final class WinMessageBoxText: NSTextField {
-    var lines: [String] = []
-
-    static let color = WinChrome.dynamic(WinChrome.gray(0), .labelColor)
-
-    override var isFlipped: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        font = WinMessageBoxLayout.font                    // what it draws in (sffont: the UI font)
+    /// The first line is the message text, the rest the informative text.
+    static func split(_ text: String) -> (String, String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let br = trimmed.firstIndex(where: \.isNewline) else { return (trimmed, "") }
+        return (String(trimmed[..<br]), trimmed[br...].trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let font = WinMessageBoxLayout.font
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: Self.color]
-        for (i, line) in lines.enumerated() {
-            let baseline = WinMessageBoxLayout.firstBaseline + CGFloat(i) * WinMessageBoxLayout.lineHeight
-            (line as NSString).draw(at: NSPoint(x: 0, y: baseline - font.ascender), withAttributes: attributes)
+    private static func height(_ text: String, _ font: NSFont, _ width: CGFloat) -> CGFloat {
+        guard !text.isEmpty else { return 0 }
+        let field = NSTextField(wrappingLabelWithString: text)
+        field.font = font
+        field.preferredMaxLayoutWidth = width
+        return ceil(field.fittingSize.height)
+    }
+
+    init(text: String, titles: [String]) {
+        (messageText, informativeText) = Self.split(text)
+        let m = Self.margin
+        // Wider only when the text would run past about 12 lines at the standard width.
+        var width = Self.width
+        let lineHeight = ceil(Self.font.ascender - Self.font.descender + Self.font.leading)
+        while width < Self.maxWidth,
+              Self.height(messageText, Self.boldFont, width - 2 * m) + Self.height(informativeText, Self.font, width - 2 * m) > 12 * lineHeight {
+            width += 50
         }
-    }
-}
-
-/// The Windows 11 message box icons (imageres), drawn: the bitmaps are Windows artwork. Shapes and
-/// colours from the 32 x 32 captures (recheck2-data/win/mb-err, -warn, -info, -delfile .png).
-final class WinMessageBoxIconView: NSView {
-    var icon: WinMessageBox.Icon = .none { didSet { needsDisplay = true } }
-
-    override var isFlipped: Bool { true }
-
-    private static func c(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> NSColor { WinChrome.rgb(r, g, b) }
-
-    override func draw(_ dirtyRect: NSRect) {
-        switch icon {
-        case .none: break
-        case .error: drawError()
-        case .warning: drawWarning()
-        case .information: drawInformation()
-        case .question: drawQuestion()
+        let textWidth = width - 2 * m
+        iconFrame = NSRect(x: m, y: m, width: Self.iconSize, height: Self.iconSize)
+        var y = iconFrame.maxY + 16
+        messageFrame = NSRect(x: m, y: y, width: textWidth, height: Self.height(messageText, Self.boldFont, textWidth))
+        y = messageFrame.maxY
+        if informativeText.isEmpty {
+            informativeFrame = NSRect(x: m, y: y, width: textWidth, height: 0)
+        } else {
+            informativeFrame = NSRect(x: m, y: y + 10, width: textWidth,
+                                      height: Self.height(informativeText, Self.font, textWidth))
+            y = informativeFrame.maxY
         }
-    }
-
-    private func circle(top: NSColor, bottom: NSColor) {
-        let path = NSBezierPath(ovalIn: NSRect(x: 0, y: 0, width: 32, height: 32))
-        NSGradient(starting: top, ending: bottom)?.draw(in: path, angle: 90)
-    }
-
-    /// MB_ICONSTOP: an orange-red disc, (240,121,43) at the top to (227,85,0) at the bottom, a white
-    /// X over x/y 10...21.
-    private func drawError() {
-        circle(top: Self.c(241, 123, 45), bottom: Self.c(226, 84, 0))
-        let x = NSBezierPath()
-        x.move(to: NSPoint(x: 11.3, y: 11.3)); x.line(to: NSPoint(x: 20.7, y: 20.7))
-        x.move(to: NSPoint(x: 20.7, y: 11.3)); x.line(to: NSPoint(x: 11.3, y: 20.7))
-        x.lineWidth = 2.4
-        x.lineCapStyle = .square
-        Self.c(250, 236, 230).setStroke()
-        x.stroke()
-    }
-
-    /// MB_ICONQUESTION / MB_ICONINFORMATION's disc: (17,170,230) at the top to (0,139,216).
-    private func blueDisc() { circle(top: Self.c(18, 172, 232), bottom: Self.c(0, 136, 212)) }
-
-    private func drawInformation() {
-        blueDisc()
-        NSColor.white.setFill()
-        NSBezierPath(roundedRect: NSRect(x: 14.9, y: 7.8, width: 2.2, height: 2.4), xRadius: 1, yRadius: 1).fill()
-        NSRect(x: 15, y: 13, width: 2, height: 11.4).fill()
-    }
-
-    private func drawQuestion() {
-        blueDisc()
-        NSColor.white.setStroke()
-        NSColor.white.setFill()
-        let q = NSBezierPath()
-        // In flipped coordinates angles run clockwise: from the left (180) over the top (270) to the
-        // right below the middle (380 = 20).
-        q.appendArc(withCenter: NSPoint(x: 15.9, y: 12.4), radius: 3.9, startAngle: 180, endAngle: 380, clockwise: false)
-        q.curve(to: NSPoint(x: 16, y: 18), controlPoint1: NSPoint(x: 18.6, y: 14.6), controlPoint2: NSPoint(x: 16, y: 15.6))
-        q.line(to: NSPoint(x: 16, y: 20.4))
-        q.lineWidth = 2
-        q.stroke()
-        NSBezierPath(ovalIn: NSRect(x: 14.85, y: 22.4, width: 2.3, height: 2.3)).fill()
-    }
-
-    /// MB_ICONWARNING: a yellow triangle, (255,226,0) at the top to (255,197,0), a darker 1 px base
-    /// (230,166,0), and a near-black exclamation mark.
-    private func drawWarning() {
-        let t = NSBezierPath()
-        t.move(to: NSPoint(x: 16, y: 1.6))
-        t.line(to: NSPoint(x: 30.6, y: 29.4))
-        t.line(to: NSPoint(x: 1.4, y: 29.4))
-        t.close()
-        t.lineJoinStyle = .round
-        NSGradient(starting: Self.c(255, 227, 0), ending: Self.c(255, 196, 0))?.draw(in: t, angle: 90)
-        Self.c(238, 186, 0).setStroke()
-        t.lineWidth = 0.8
-        t.stroke()
-        Self.c(229, 163, 0).setFill()
-        NSRect(x: 2.4, y: 29, width: 27.2, height: 1).fill()
-        NSGradient(starting: Self.c(60, 60, 60), ending: Self.c(28, 28, 28))?
-            .draw(in: NSRect(x: 15, y: 8, width: 2, height: 12), angle: 90)
-        Self.c(5, 5, 5).setFill()
-        NSBezierPath(ovalIn: NSRect(x: 14.5, y: 22.6, width: 3, height: 3)).fill()
+        y += 16
+        let probe = NSButton(title: "", target: nil, action: nil)
+        probe.bezelStyle = .rounded
+        probe.controlSize = .large
+        let natural: [CGFloat] = titles.map { probe.title = $0; return ceil(probe.intrinsicContentSize.width) }
+        let rowWidth = width - 32
+        let half = (rowWidth - 8) / 2
+        stacksButtons = titles.count > 2 || natural.contains { $0 > half }
+        var frames: [NSRect] = []
+        if stacksButtons {
+            for i in titles.indices {             // the default on top, the others below in order
+                frames.append(NSRect(x: 16, y: y + CGFloat(i) * (Self.buttonHeight + 6), width: rowWidth, height: Self.buttonHeight))
+            }
+            y += CGFloat(titles.count) * (Self.buttonHeight + 6) - 6
+        } else {
+            let w = titles.count == 1 ? rowWidth : half
+            for i in titles.indices {             // the default rightmost
+                frames.append(NSRect(x: width - 16 - w - CGFloat(i) * (w + 8), y: y, width: w, height: Self.buttonHeight))
+            }
+            y += Self.buttonHeight
+        }
+        buttonFrames = frames
+        clientSize = NSSize(width: width, height: y + 16)
     }
 }

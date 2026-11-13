@@ -345,7 +345,11 @@ public final class SevenZipApp {
         let texted = NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@", title, title)
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            for query in [app.sheets, app.dialogs, app.windows] {
+            // A dialog run in its own modal session is listed twice when it is a sheet: as the
+            // window's Sheet and as a top-level Dialog. XCUITest takes the Dialog for an alert
+            // covering anything reached through the Sheet (and presses its Cancel), so the
+            // top-level Dialog comes first; a sheet with no such twin is found under its window.
+            for query in [app.dialogs, app.sheets, app.descendants(matching: .sheet), app.windows] {
                 let byTitle = query.matching(titled).firstMatch
                 if byTitle.exists { return byTitle }
                 let byText = query.containing(texted).firstMatch
@@ -375,7 +379,7 @@ public final class SevenZipApp {
     public func waitForNoDialog(timeout: TimeInterval = 10) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if app.sheets.count == 0 && app.dialogs.count == 0 { return true }
+            if app.descendants(matching: .sheet).count == 0 && app.descendants(matching: .dialog).count == 0 { return true }
             usleep(200_000)
         }
         return false

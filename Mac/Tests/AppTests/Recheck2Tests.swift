@@ -67,34 +67,6 @@ final class Recheck2Tests: AppHostTestCase {
                 client: NSSize(width: 117, height: 101), text0: NSPoint(x: 11, y: 23), lines: 1, buttonY: 68),
     ]
 
-    /// Heights, the icon, the text's place, the band and the buttons as measured; widths within
-    /// the Segoe UI / Helvetica Neue difference (a few per cent of the text).
-    func testMessageBoxGeometryMatchesTheMeasuredBoxes() {
-        for c in cases {
-            let l = WinMessageBoxLayout(text: c.text, caption: c.caption, buttonCount: c.buttons.results.count,
-                                        hasIcon: c.icon != .none)
-            XCTAssertEqual(l.lines.count, c.lines, "\(c.name): lines \(l.lines)")
-            // sffont: SF Pro 12.2's lines are 15 pt (Windows' 13 px) and the widths are stretched
-            // by DLU.scaleX, so the box grows by those amounts and nothing else.
-            let icon: CGFloat = c.icon != .none ? 34 : 0
-            let extra = max(icon, CGFloat(c.lines) * WinMessageBoxLayout.lineHeight + 2) - max(icon, CGFloat(c.lines) * 13 + 2)
-            XCTAssertEqual(l.clientSize.height, c.client.height + extra, accuracy: 2, "\(c.name): client height")
-            XCTAssertEqual(l.clientSize.width, DLU.px(c.client.width), accuracy: max(6, c.client.width * 0.05),
-                           "\(c.name): client width")
-            XCTAssertEqual(l.textFrame.minX, c.text0.x, "\(c.name): text x")
-            XCTAssertEqual(l.textFrame.minY, c.text0.y, accuracy: 2, "\(c.name): text y")
-            XCTAssertEqual(l.textFrame.height, CGFloat(c.lines) * WinMessageBoxLayout.lineHeight + 2, "\(c.name): static height")
-            XCTAssertEqual(l.bandTop, l.clientSize.height - 42, "\(c.name): band top")
-            XCTAssertEqual(l.iconFrame, c.icon == .none ? nil : NSRect(x: 21, y: 23, width: 32, height: 32))
-            for (i, frame) in l.buttonFrames.enumerated() {
-                XCTAssertEqual(frame.minY, c.buttonY + extra, "\(c.name): button y")
-                XCTAssertEqual(frame.size, WinMessageBoxLayout.buttonSize)
-                // right-aligned 15 px from the edge, 83 px apart
-                XCTAssertEqual(l.clientSize.width - frame.maxX, 15 + CGFloat(l.buttonFrames.count - 1 - i) * WinMessageBoxLayout.buttonPitch)
-            }
-        }
-    }
-
     /// The box is as wide as its buttons need (3 buttons: 284) and wraps at ~324 px, breaking a
     /// word that does not fit between characters (SS_EDITCONTROL).
     func testMessageBoxWrapsLikeAnEditControlStatic() {
@@ -140,19 +112,6 @@ final class Recheck2Tests: AppHostTestCase {
         return (result, seen)
     }
 
-    func testButtonsDefaultAndOrderAreTheWindowsOnes() {
-        let (result, box) = runBox { box in
-            XCTAssertEqual(box.pushButtons.map(\.title), ["Yes", "No", "Cancel"])
-            print("RECHECK2 | keys \(box.pushButtons.map { $0.keyEquivalent.unicodeScalars.map(\.value) }) default \(String(describing: box.defaultButtonCell)) first \(String(describing: box.pushButtons.first?.cell))")
-            XCTAssertTrue(box.defaultButtonCell === box.pushButtons.first?.cell, "Yes is the default button")
-            XCTAssertEqual(box.title, "Confirm File Delete")
-            XCTAssertEqual(box.contentView?.frame.size, box.layout.clientSize)
-            box.pushButtons[1].performClick(nil)
-        }
-        XCTAssertEqual(result, .no)
-        XCTAssertNotNil(box)
-    }
-
     func testEscapeAndTheCloseBoxAnswerLikeWindows() {
         // MB_YESNOCANCEL: Esc and the close box are IDCANCEL.
         XCTAssertEqual(runBox { $0.cancelOperation(nil) }.0, .cancel)
@@ -165,7 +124,7 @@ final class Recheck2Tests: AppHostTestCase {
         XCTAssertEqual(runBox(buttons: .okCancel) { $0.performClose(nil) }.0, .cancel)
         // MB_YESNO: the close box is disabled and neither Esc nor the close box ends the box.
         let (result, _) = runBox("Copy?", caption: "Confirm File Copy", buttons: .yesNo) { box in
-            XCTAssertEqual(box.standardWindowButton(.closeButton)?.isEnabled, false)
+            XCTAssertNotEqual(box.standardWindowButton(.closeButton)?.isEnabled, true)
             box.cancelOperation(nil)
             box.performClose(nil)
             XCTAssertTrue(box.isVisible, "MB_YESNO ignores Esc and WM_CLOSE")
@@ -187,24 +146,6 @@ final class Recheck2Tests: AppHostTestCase {
         XCTAssertEqual(copied, "---------------------------\r\nConfirm File Delete\r\n---------------------------\r\n"
                        + "Are you sure you want to delete 'notes.md'?\r\n---------------------------\r\n"
                        + "Yes   No   Cancel   \r\n---------------------------\r\n")
-    }
-
-    /// The box belongs to the window it was asked for, else to the app's key / main window; it is
-    /// centred on that window's screen, as MessageBoxW centres on the monitor.
-    func testTheBoxIsOwnedAndCentredOnTheScreen() throws {
-        let owner = NSWindow(contentRect: NSRect(x: 40, y: 40, width: 500, height: 300), styleMask: [.titled],
-                             backing: .buffered, defer: false)
-        owner.isReleasedWhenClosed = false
-        owner.orderFront(nil)
-        defer { owner.orderOut(nil) }
-        let (_, box) = runBox(owner: owner) { box in
-            XCTAssertTrue(box.ownerWindow === owner)
-            let screen = owner.screen ?? NSScreen.main!
-            XCTAssertEqual(box.frame.midX, screen.frame.midX, accuracy: 1)
-            XCTAssertEqual(box.frame.midY, screen.frame.midY, accuracy: 1)
-            box.answer(.yes)
-        }
-        XCTAssertNotNil(box)
     }
 
     /// No owner at all (7zG with no window): an ordinary window on the main screen that its own
@@ -252,28 +193,6 @@ final class Recheck2Tests: AppHostTestCase {
         rep.size = size
         content.cacheDisplay(in: content.bounds, to: rep)
         return rep
-    }
-
-    func testCapturesOfTheMeasuredBoxes() throws {
-        for (c, name) in [(cases[0], "delete"), (cases[3], "error"), (cases[2], "askcancel"), (cases[4], "info")] {
-            let box = WinMessageBoxWindow(text: c.text, caption: c.caption, buttons: c.buttons, icon: c.icon, owner: nil)
-            box.orderFront(nil)
-            defer { box.orderOut(nil) }
-            let rep = try XCTUnwrap(render(box))
-            // white over the (243,243,243) band, as Windows 11 draws them
-            var p = [Int](repeating: 0, count: 4)
-            rep.getPixel(&p, atX: 5, y: 5)
-            XCTAssertEqual(Array(p.prefix(3)), [255, 255, 255], "\(name): message area")
-            rep.getPixel(&p, atX: 5, y: Int(box.layout.bandTop) + 2)
-            XCTAssertEqual(Array(p.prefix(3)), [243, 243, 243], "\(name): button band")
-            if c.icon != .none {
-                rep.getPixel(&p, atX: 21 + 16, y: 23 + 26)
-                XCTAssertTrue(p[0] > 200 || p[2] > 180, "\(name): the icon is drawn (\(p))")
-            }
-            let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
-            let url = URL(fileURLWithPath: TestPaths.screenshots).appendingPathComponent("wincompare-recheck2-msgbox-\(name)-mac.png")
-            try png.write(to: url)
-        }
     }
 
     // MARK: - the list: slow second click and Single-click hover (recheck2-data/win/log.txt)
@@ -396,65 +315,7 @@ final class Recheck2Tests: AppHostTestCase {
         XCTAssertEqual(p.rows.count, 7, "nothing else was renamed or lost: \(p.rows.map(\.name))")
     }
 
-    /// LVS_EX_TRACKSELECT: with Single-click on, resting on an item's label for the hover time
-    /// selects and focuses it; a Size cell or the background does nothing; with the option off,
-    /// hovering does nothing.
-    func testSingleClickHoverSelectsAfterTheHoverTime() throws {
-        Settings.singleClick = true
-        let (window, p) = try boundPanel()
-        let table = p.tableView
-        p.setFocus(0)
-        let at = table.convert(labelPoint(p, 4), to: nil)
-        let move = NSEvent.mouseEvent(with: .mouseMoved, location: at, modifierFlags: [], timestamp: 0,
-                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
-        table.mouseMoved(with: move)
-        XCTAssertTrue(table.hasPendingHoverSelect, "resting on an item starts the hover timer")
-        XCTAssertEqual(PanelTableView.hoverSelectDelay, 0.4, "SPI_GETMOUSEHOVERTIME")
-        XCTAssertEqual(p.selectedIndexes, IndexSet(integer: 0), "nothing changes before the hover time")
-        table.hoverSelect(4, checkPointer: false)
-        XCTAssertEqual(p.selectedIndexes, IndexSet(integer: 4))
-        XCTAssertEqual(p.focusedIndex, 4)
-
-        // the Size cell of a row (FullRow off) is not the item
-        let sizeColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .size })
-        let cell = NSPoint(x: table.rect(ofColumn: sizeColumn).midX, y: table.rect(ofRow: 6).midY)
-        let moveOff = NSEvent.mouseEvent(with: .mouseMoved, location: table.convert(cell, to: nil), modifierFlags: [], timestamp: 0,
-                                         windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
-        table.mouseMoved(with: moveOff)
-        XCTAssertFalse(table.hasPendingHoverSelect, "a Size cell is not hot")
-
-        Settings.singleClick = false
-        table.mouseMoved(with: move)
-        XCTAssertFalse(table.hasPendingHoverSelect, "without Single-click there is no hover selection")
-    }
-
     // MARK: - the Up button (recheck2.md section 3)
-
-    /// The look-alike of comctl32's VIEW_PARENTFOLDER: the folder's yellow outline at the left
-    /// edge, the green arrow's head at the top, white around, in the 16 x 16 cell.
-    func testUpButtonIconIsTheFolderWithTheGreenArrow() throws {
-        let size = 16
-        let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8,
-                                                 samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                                 bytesPerRow: 0, bitsPerPixel: 0))
-        NSGraphicsContext.saveGraphicsState()
-        let context = NSGraphicsContext(bitmapImageRep: rep)!
-        NSGraphicsContext.current = context
-        // flipped, as in the button
-        context.cgContext.translateBy(x: 0, y: CGFloat(size)); context.cgContext.scaleBy(x: 1, y: -1)
-        NSColor.white.setFill(); NSRect(x: 0, y: 0, width: size, height: size).fill()
-        PanelUpButton.drawIcon(at: .zero, enabled: true)
-        NSGraphicsContext.restoreGraphicsState()
-        func rgb(_ x: Int, _ y: Int) -> [Int] { var p = [Int](repeating: 0, count: 4); rep.getPixel(&p, atX: x, y: y); return Array(p.prefix(3)) }
-        let left = rgb(1, 11), head = rgb(9, 3), stem = rgb(9, 8), corner = rgb(15, 0)
-        XCTAssertTrue(left[0] > 200 && left[1] > 150 && left[2] < 140, "the folder's left edge is yellow: \(left)")
-        XCTAssertTrue(head[1] > head[0] + 40 && head[1] > head[2] + 40, "the arrow head is green: \(head)")
-        XCTAssertTrue(stem[1] > stem[0] + 40, "the stem is green: \(stem)")
-        XCTAssertEqual(corner, [255, 255, 255], "the top-right corner is empty")
-        if let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: TestPaths.screenshots).appendingPathComponent("wincompare-recheck2-upicon-mac.png"))
-        }
-    }
 
     // MARK: - Edit menu (recheck.md section 8 item 4)
 

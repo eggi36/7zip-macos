@@ -215,6 +215,11 @@ extension MainWindowController {
                                       "\(numVolumes)")
             guard ToolsAlerts.confirm(title: Lang.text(7304, "Confirm Splitting"),
                                       message: message, toolsWindow) else { return }
+            // 26.06 CApp::Split: a hard limit after the confirmation
+            if numVolumes >= 1 << 29 {
+                ToolsAlerts.error("too big number of parts", toolsWindow)
+                return
+            }
         }
 
         var path = choice.path
@@ -276,8 +281,11 @@ extension MainWindowController {
             return
         }
 
+        // 26.06: the output name (Generate_SubName), a blank line, then
         // AddValuePair2(IDS_PROP_FILES, count, size) + the first two and the last part
-        var info = "\(Lang.text(1032, "Files")): \(names.count)    ( \(Formatting.size(total)) bytes )\n"
+        let outputName = SZSplitFile.combinedName(forFirstVolume: row.name)
+        var info = outputName + "\n\n"
+        info += "\(Lang.text(1032, "Files")): \(names.count)    ( \(Formatting.size(total)) bytes )\n"
         info += items.folderPath
         for name in names.prefix(2) { info += "\n  " + name }
         if names.count > 3 { info += "\n  ..." }
@@ -300,7 +308,6 @@ extension MainWindowController {
             ToolsAlerts.error(Lang.format(Lang.text(3003, "Cannot create folder '{0}'"), path), toolsWindow)
             return
         }
-        let outputName = SZSplitFile.combinedName(forFirstVolume: row.name)
         let outputPath = path + outputName
         if FileManager.default.fileExists(atPath: outputPath) {
             ToolsAlerts.error(Lang.format(Lang.text(3008, "File {0} is already exist"), outputPath), toolsWindow)

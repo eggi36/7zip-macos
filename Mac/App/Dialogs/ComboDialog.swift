@@ -60,11 +60,44 @@ private final class ComboDialogController: NSObject {
 
     /// Runs modally on the main thread; the whole value is selected first so typing replaces it.
     func run() -> String? {
-        window.makeKeyAndOrderFront(nil)
+        // native-look: a sheet of the main window (DialogKit.sheetParent), else a window.
+        if DialogKit.sheetParent(for: window) == nil {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            addSheetHeading()
+        }
         combo.selectText(nil)
-        DialogKit.runModal(for: window)
+        DialogKit.runModal(for: window, asSheet: true)
         window.orderOut(nil)
         return result
+    }
+
+    /// native-look: a sheet has no title bar, and this one dialog serves Rename, Create Folder,
+    /// Create File, Comment and Select -- so the caption becomes a bold heading above the field,
+    /// as an NSAlert's message text names what a sheet asks.
+    private func addSheetHeading() {
+        guard let form = window.contentView else { return }
+        let heading = NSTextField(labelWithString: window.title)
+        heading.font = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+        heading.lineBreakMode = .byTruncatingMiddle
+        let height: CGFloat = 26
+        let size = form.frame.size
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: size.width, height: size.height + height))
+        let x = RcDialog(98).rect(100).minX
+        heading.frame = NSRect(x: x, y: size.height + 2, width: size.width - 2 * x, height: 18)
+        heading.autoresizingMask = [.width, .minYMargin]
+        form.frame = NSRect(origin: .zero, size: size)
+        form.autoresizingMask = [.width, .height]
+        window.contentView = container
+        container.addSubview(form)
+        container.addSubview(heading)
+        // The new content view takes the window's old size, so the target is computed up front.
+        window.contentMinSize = NSSize(width: window.contentMinSize.width, height: window.contentMinSize.height + height)
+        window.setContentSize(NSSize(width: size.width, height: size.height + height))
+        form.frame = NSRect(origin: .zero, size: size)                         // then the final frames
+        heading.frame = NSRect(x: x, y: size.height + 2, width: size.width - 2 * x, height: 18)
+        window.initialFirstResponder = combo
+        window.makeFirstResponder(combo)
     }
 
     @objc private func okClicked() {

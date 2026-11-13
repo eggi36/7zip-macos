@@ -133,7 +133,7 @@ final class OverwriteDialog: NSObject {
                     defaultIsNo: Bool = false, parent: NSWindow? = nil) -> Result {
         let dialog = OverwriteDialog(oldInfo: oldFile, newInfo: newFile,
                                     showExtraButtons: showExtraButtons, defaultIsNo: defaultIsNo, parent: parent)
-        DialogKit.runModal(for: dialog.window)
+        DialogKit.runModal(for: dialog.window, asSheet: true)   // native-look: a sheet
         dialog.window.orderOut(nil)
         return dialog.result
     }

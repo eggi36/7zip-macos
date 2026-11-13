@@ -129,7 +129,7 @@ final class PasswordDialog: NSObject, NSTextFieldDelegate {
     /// Saves the Show-password state like CExtractCallbackImp does (Save_ShowPassword).
     static func run(_ options: Options = Options(), parent: NSWindow? = nil) -> Result? {
         let dialog = PasswordDialog(options: options, parent: parent)
-        DialogKit.runModal(for: dialog.window)
+        DialogKit.runModal(for: dialog.window, asSheet: true)   // native-look: a sheet
         dialog.window.orderOut(nil)
         if let result = dialog.result, result.showPassword != options.showPassword {
             Settings.extractShowPassword = result.showPassword   // through Settings, so observers hear it

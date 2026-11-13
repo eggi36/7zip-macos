@@ -81,65 +81,6 @@ final class RecheckTests: AppHostTestCase {
 
     // MARK: - §2 main window chrome
 
-    /// COLOR_BTNFACE around the toolbar and in the status bar, the white address band with its
-    /// combo border, the list's client edge, the status bar's line and divider: the rows and
-    /// columns of `recheck-data/win/fresh-screen.png`, mapped to the Mac's content area.
-    func testMainWindowChromeColoursAndGeometry() throws {
-        let c = mainWindow()
-        let window = try XCTUnwrap(c.window)
-        XCTAssertEqual(window.backgroundColor.usingColorSpace(.sRGB)?.redComponent ?? 0, 240 / 255, accuracy: 0.002)
-        let px = try XCTUnwrap(render(window))
-        let h = Int(window.contentLayoutRect.height)
-        // toolbar strip: etched line 160 / 255, then 240 down to y 51
-        XCTAssertEqual(px.rgb(600, 0), [160, 160, 160])
-        XCTAssertEqual(px.rgb(600, 1), [255, 255, 255])
-        XCTAssertEqual(px.rgb(600, 20), [240, 240, 240])
-        XCTAssertEqual(px.rgb(600, 51), [240, 240, 240])
-        // address band at y 52: combo border (141) on rows 52 and 75, white inside
-        XCTAssertEqual(px.rgb(600, 52), [141, 141, 141])
-        XCTAssertEqual(px.rgb(600, 60), [255, 255, 255])
-        XCTAssertEqual(px.rgb(600, 75), [141, 141, 141])
-        XCTAssertEqual(px.rgb(33, 60), [141, 141, 141], "combo's left border at x 33")
-        XCTAssertEqual(px.rgb(31, 60), [180, 180, 180], "band border")
-        XCTAssertEqual(px.rgb(12, 75), [220, 220, 220], "band bottom under the Up button")
-        // the list's client edge at y 76, white inside
-        XCTAssertEqual(px.rgb(600, 76), [130, 135, 144])
-        XCTAssertEqual(px.rgb(0, 300), [130, 135, 144])
-        // status bar: 23 px, line (215) on top, BTNFACE, a divider at x 219 on rows 2..21
-        XCTAssertEqual(px.rgb(600, h - 24), [130, 135, 144], "list bottom edge")
-        XCTAssertEqual(px.rgb(600, h - 23), [215, 215, 215])
-        XCTAssertEqual(px.rgb(600, h - 12), [240, 240, 240])
-        XCTAssertEqual(px.rgb(219, h - 12), [215, 215, 215])
-        XCTAssertEqual(px.rgb(219, h - 22), [240, 240, 240])
-    }
-
-    /// No active-panel highlight (7zFM has none) and a plain 4 px splitter of BTNFACE.
-    func testTwoPanelsHaveNoActiveHighlightAndAPlainSplitter() throws {
-        let c = mainWindow(panels: 2)
-        let window = try XCTUnwrap(c.window)
-        let px = try XCTUnwrap(render(window))
-        let left = c.panels[0].view.frame.width
-        let x = Int(left)
-        for dx in 0..<4 { XCTAssertEqual(px.rgb(x + dx, 300), [240, 240, 240], "splitter column \(dx)") }
-        XCTAssertEqual(px.rgb(x - 1, 300), [130, 135, 144])
-        XCTAssertEqual(px.rgb(x + 4, 300), [130, 135, 144])
-        // both bands white under the Up button, whichever panel is active
-        XCTAssertEqual(px.rgb(28, 62), [255, 255, 255])
-        XCTAssertEqual(px.rgb(x + 4 + 28, 62), [255, 255, 255])
-    }
-
-    /// The toolbar's text buttons are 42 x 46 with the GUI font, as on Windows (fresh.txt).
-    func testToolbarTextButtonsAreTheWindowsSize() throws {
-        let c = mainWindow()
-        let strip = try XCTUnwrap(Self.find(FMToolbarView.self, in: c.window?.contentView))
-        // 42 x 46 on Windows; the width follows the widest label, "Extract" is 41 pt in SF Pro 12.2.
-        let widest = ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"].map {
-            ceil(($0 as NSString).size(withAttributes: [.font: FMToolbarView.labelFont]).width)
-        }.max() ?? 0
-        XCTAssertEqual(strip.buttonSize, NSSize(width: max(24, widest) + 7, height: 46))
-        XCTAssertEqual(strip.frame.height, 52)
-    }
-
     private static func find<T: NSView>(_ type: T.Type, in view: NSView?) -> T? {
         guard let view else { return nil }
         if let v = view as? T { return v }

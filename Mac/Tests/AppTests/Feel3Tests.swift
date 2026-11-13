@@ -137,82 +137,7 @@ final class Feel3Tests: AppHostTestCase {
 
     // MARK: 2. combo boxes
 
-    /// A drop-down list draws its text left-aligned 4 pt in, baseline 15 pt down, in a box with
-    /// Windows 11's (210) border and (253) fill -- not AppKit's centred capsule.
-    func testDropDownListDrawsLeftAlignedText() throws {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 60), styleMask: [.titled],
-                              backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
-        let form = RcFormView(frame: window.contentLayoutRect)
-        window.contentView = form
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.addItems(withTitles: ["English : English  ---", "Deutsch"])
-        form.addSubview(popup)
-        RcPlace.popup(popup, NSRect(x: 20, y: 10, width: 240, height: 21))
-        XCTAssertTrue(popup.cell is WinPopUpButtonCell)
-        XCTAssertEqual(popup.frame.height, 21)
-        let rep = try XCTUnwrap(render(popup))
-        let x = try XCTUnwrap(inkMinX(rep, fromX: 1.5, threshold: 100))
-        XCTAssertEqual(x, 4.5, accuracy: 1.5, "the text 4 px in (Windows' 'E' ink at +4/+5)")
-        let rows = try XCTUnwrap(inkRows(rep, fromX: 3, toX: 60, threshold: 100))
-        // Windows: 'E' from y+6, the 'g' of "English" down to y+16 (its last ink row), baseline 15.
-        XCTAssertEqual(rows.1, 17, accuracy: 1, "the descender's last row 16 px below the top (bottom edge 17)")
-        // the fill
-        let data = try XCTUnwrap(rep.bitmapData)
-        let p = data + 4 * rep.bytesPerRow + 200 * 4
-        XCTAssertEqual(Int(p[0]), 253, accuracy: 2, "CBS_DROPDOWNLIST fill (253)")
-        save(rep, "combo-dropdownlist")
-    }
-
-    /// An edit combo (CBS_DROPDOWN): the WinComboBox, 21 pt, white with a (141) border.
-    func testEditComboIsWindowsStyle() throws {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 60), styleMask: [.titled],
-                              backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
-        let form = RcFormView(frame: window.contentLayoutRect)
-        window.contentView = form
-        let combo = WinComboBox()
-        combo.stringValue = "/Users/me/Documents/"
-        form.addSubview(combo)
-        RcPlace.combo(combo, NSRect(x: 12, y: 10, width: 438, height: 21))
-        XCTAssertEqual(combo.frame.height, 21)
-        let rep = try XCTUnwrap(render(combo))
-        let x = try XCTUnwrap(inkMinX(rep, fromX: 1.5, threshold: 100))
-        XCTAssertEqual(x, 4.5, accuracy: 1.5, "the text 4 px in")
-        let data = try XCTUnwrap(rep.bitmapData)
-        let border = data + 20 * rep.bytesPerRow + 0
-        XCTAssertEqual(Int(border[0]), 141, accuracy: 3, "CBS_DROPDOWN border (141)")
-        save(rep, "combo-edit")
-    }
-
     // MARK: 3. scroll bars
-
-    /// No scroll bar while nothing overflows, in every view mode and both panels; legacy style
-    /// (Win32's), which the system's overlay preference cannot switch.
-    func testNoScrollBarsWithoutOverflow() throws {
-        let scratch = makeScratch()
-        for mode in 0...3 {
-            let controller = makeWindow(panels: 2, mode: mode)
-            for panel in controller.panels {
-                navigate(panel, to: scratch)
-                panel.view.layoutSubtreeIfNeeded()
-                let scroll: NSScrollView = mode == 3 ? try XCTUnwrap(panel.tableView.enclosingScrollView)
-                                                     : panel.iconView.scrollView
-                scroll.tile()
-                XCTAssertEqual(scroll.scrollerStyle, .legacy, "mode \(mode)")
-                scroll.scrollerStyle = .overlay
-                XCTAssertEqual(scroll.scrollerStyle, .legacy, "the preference cannot switch it")
-                XCTAssertTrue(scroll.verticalScroller?.isHidden ?? true, "mode \(mode): a vertical scroll bar with 7 rows")
-                // Details: a horizontal bar exactly when the columns are wider than the list (as
-                // Windows: two 500 pt panels do not hold 7zFM's 760 px of default columns).
-                let overflows = mode == 3 && panel.tableView.tableColumns.reduce(0) { $0 + $1.width } > scroll.contentView.bounds.width
-                XCTAssertEqual(!(scroll.horizontalScroller?.isHidden ?? true), overflows, "mode \(mode): horizontal bar")
-            }
-            controller.window?.close()
-        }
-    }
 
     // MARK: 6 / 7. the address bar
 
@@ -253,11 +178,11 @@ final class Feel3Tests: AppHostTestCase {
         let list = popup.list
         XCTAssertEqual(list.hot, -1, "CB_GETCURSEL -1 when the list opens")
         XCTAssertTrue(list.items.allSatisfy { $0.icon != nil }, "every entry has an icon")
-        XCTAssertEqual(list.rowRect(1).minY - list.rowRect(0).minY, 18, "LB_GETITEMHEIGHT 18")
+        XCTAssertEqual(list.rowRect(1).minY - list.rowRect(0).minY, AddressPopupMetrics.rowHeight, "a menu row's height")
         XCTAssertEqual(list.items[1].level, 1)
         let comboRect = try XCTUnwrap(panel.pathCombo.window).convertToScreen(panel.pathCombo.convert(panel.pathCombo.bounds, to: nil))
         XCTAssertEqual(popup.panel.frame.width, comboRect.width, "the combo's width")
-        XCTAssertEqual(popup.panel.frame.maxY, comboRect.minY, "right under the combo")
+        XCTAssertEqual(popup.panel.frame.maxY, comboRect.minY - 4, "just under the combo, as a menu opens")
         list.hot = 2
         if let rep = render(list) { save(rep, "address-dropdown") }
         let parent = try XCTUnwrap(panel.addressDropdownPaths.firstIndex(of: scratch + "/"))
@@ -267,31 +192,6 @@ final class Feel3Tests: AppHostTestCase {
     }
 
     // MARK: 8. archive icons
-
-    /// 7-Zip's per-format icons for the extensions it registers: 16 pt from the .ico's 16 px frame,
-    /// 32 pt from its 32 px frame, each enlarged by whole pixels for 2x / 3x (sffont: the
-    /// low-resolution frames, pixel-sharp; SFFontTests checks the pixels); none for other extensions.
-    func testArchiveIconsPerExtension() throws {
-        for (name, ico) in [("a.7z", "7z"), ("a.zip", "zip"), ("b.rar", "rar"), ("x.tgz", "gz"), ("v.001", "split"),
-                            ("d.iso", "iso"), ("e.zst", "zst")] {
-            let small = try XCTUnwrap(PanelArchiveIcons.icon(forName: name, large: false), name)
-            XCTAssertEqual(small.size, NSSize(width: 16, height: 16))
-            XCTAssertEqual(Set(small.representations.map(\.pixelsWide)), [16, 32, 48], "\(name) -> \(ico).ico frames")
-            let large = try XCTUnwrap(PanelArchiveIcons.icon(forName: name, large: true))
-            XCTAssertEqual(large.size, NSSize(width: 32, height: 32))
-            XCTAssertEqual(Set(large.representations.map(\.pixelsWide)), [32, 64, 96])
-        }
-        XCTAssertNil(PanelArchiveIcons.icon(forName: "a.txt", large: false))
-        XCTAssertNil(PanelArchiveIcons.icon(forName: "noext", large: false))
-        // The panel uses them for file-system and archive items alike.
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        let row = try XCTUnwrap(panel.rows.first { $0.name == "arc.7z" })
-        XCTAssertTrue(panel.icon(for: row) === PanelArchiveIcons.icon(forName: "arc.7z", large: false))
-        XCTAssertTrue(panel.largeIcon(for: row) === PanelArchiveIcons.icon(forName: "arc.7z", large: true))
-    }
 
     // MARK: 5. Open archive
 
