@@ -147,7 +147,7 @@ final class ThemeTests: AppHostTestCase {
 
     // MARK: - the setting
 
-    /// fix112: Light is the default (absent or unknown); every choice, System included, is stored.
+    /// System is the default (absent or unknown); every choice, System included, is stored.
     func testThemeSettingDefaultsToSystemAndAppliesAtOnce() {
         Settings.removeKey(Settings.Key.theme)
         XCTAssertEqual(Settings.theme, .system, "absent = System")
@@ -246,8 +246,12 @@ final class ThemeTests: AppHostTestCase {
         let window = try XCTUnwrap(main.window)
         for theme in [AppTheme.light, .dark] {
             force(theme)
-            XCTAssertEqual(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]),
-                           theme == .dark ? .darkAqua : .aqua)
+            // The window takes NSApp's new appearance on a later pass of the run loop when the
+            // Mac itself is in the other mode.
+            let wanted: NSAppearance.Name = theme == .dark ? .darkAqua : .aqua
+            XCTAssertTrue(wait(for: "the window in \(theme)") {
+                window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == wanted
+            })
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
             checkTexts(in: window, "main \(theme)", minimum: 1)

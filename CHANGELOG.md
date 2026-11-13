@@ -19,7 +19,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   name as the window title with its path below and a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. The theme follows the system's
-  Light / Dark until one is chosen. The pixel-exact copy of the Windows window ("Classic") and
+  Light / Dark until one is chosen (Options ▸ macOS ▸ Theme); this applies to everyone who kept the
+  Light default of 1.1.2–1.2.x, while an explicit choice of Light is kept. The pixel-exact copy of the Windows window ("Classic") and
   its switch in Options ▸ macOS are gone.
   - The dialogs look like Mac dialogs: the system font at its regular size, AppKit's own pop-up
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
