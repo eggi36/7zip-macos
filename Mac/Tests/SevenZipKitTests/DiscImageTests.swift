@@ -464,6 +464,63 @@ final class DiscImageTests: XCTestCase {
         XCTAssertThrowsError(try list(path("wii.gcm")))
     }
 
+    // MARK: - Xbox (XDVDFS)
+
+    /// An XDVDFS game partition: the volume descriptor in sector 32, the root table in sector 48
+    /// with default.xex and the folder media/ (its table in sector 49, holding a.bin).
+    private func xdvdfsPartition() -> Data {
+        var d = Data(count: 0x22000)
+        func put(_ bytes: Data, _ at: Int) { d.replaceSubrange(at..<(at + bytes.count), with: bytes) }
+        let magic = Data("MICROSOFT*XBOX*MEDIA".utf8)
+        put(magic, 0x10000)
+        put(le32(48), 0x10000 + 20)
+        put(le32(2048), 0x10000 + 24)
+        put(magic, 0x10000 + 0x7EC)
+        func entry(left: Int, right: Int, sector: Int, size: Int, attrib: UInt8, _ name: String) -> Data {
+            var e = le16(left) + le16(right) + le32(sector) + le32(size) + Data([attrib, UInt8(name.utf8.count)])
+            e += Data(name.utf8)
+            while e.count % 4 != 0 { e.append(0xFF) }
+            return e
+        }
+        // root: "default.xex" with "media" as its right subtree
+        let first = entry(left: 0, right: 0, sector: 0x40, size: 5, attrib: 0x20, "default.xex")
+        let root = entry(left: 0, right: first.count / 4, sector: 0x40, size: 5, attrib: 0x20, "default.xex")
+            + entry(left: 0, right: 0, sector: 49, size: 2048, attrib: 0x10, "media")
+        put(root + Data(repeating: 0xFF, count: 2048 - root.count), 48 * 2048)
+        let media = entry(left: 0, right: 0, sector: 0x41, size: 3, attrib: 0x20, "a.bin")
+        put(media + Data(repeating: 0xFF, count: 2048 - media.count), 49 * 2048)
+        put(Data("xex!\n".utf8), 0x40 * 2048)
+        put(Data([7, 8, 9]), 0x41 * 2048)
+        return d
+    }
+
+    private func checkXbox(_ archive: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        let out = try extract(archive)
+        XCTAssertEqual(data(out, "default.xex"), Data("xex!\n".utf8), file: file, line: line)
+        XCTAssertEqual(data(out, "media/a.bin"), Data([7, 8, 9]), file: file, line: line)
+        XCTAssertEqual(Set(try list(archive).map(\.name)), ["default.xex", "media"], file: file, line: line)
+    }
+
+    func testXboxXiso() throws {
+        try write(xdvdfsPartition(), "game.iso")
+        try checkXbox(path("game.iso"))
+        try write(xdvdfsPartition(), "game.xiso")
+        try checkXbox(path("game.xiso"))
+    }
+
+    /// A whole Xbox 360 disc (XGD2): a DVD-video partition that ISO / UDF can open, the game
+    /// partition at 0xFD90000. The game is what opens.
+    func testWholeXbox360DiscOpensTheGamePartition() throws {
+        XCTAssertGreaterThan(iso.count, 0, "hdiutil made no ISO")
+        let url = URL(fileURLWithPath: path("xgd2.iso"))
+        try iso.write(to: url)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seek(toOffset: 0xFD90000)
+        try handle.write(contentsOf: xdvdfsPartition())
+        try handle.close()
+        try checkXbox(path("xgd2.iso"))
+    }
+
     // MARK: - CSO / ZSO
 
     /// A PSP CSO v1: 2048-byte blocks, deflated, the first stored (bit 31) as the format allows.

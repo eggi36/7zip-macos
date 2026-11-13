@@ -34,7 +34,7 @@ final class CodecsSignatureTests: XCTestCase {
     /// first and the last registered formats must both be there.
     func testNoFormatFellOffTheTable() throws {
         try SZCodecs.loadCodecs()
-        for name in ["7z", "zip", "rar", "tar", "Iso", "Udf", "CUE", "CHD", "ECM", "BIN", "GCM"] {
+        for name in ["7z", "zip", "rar", "tar", "Iso", "Udf", "CUE", "CHD", "ECM", "BIN", "GCM", "XDVDFS"] {
             XCTAssertNotNil(SZCodecs.format(named: name), "\(name) is registered")
         }
     }

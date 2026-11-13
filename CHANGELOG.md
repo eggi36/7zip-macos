@@ -117,6 +117,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - **GameCube disc images** (.gcm, and GameCube .iso files) open: the files of the disc under
   files/, its system data (boot.bin, bi2.bin, apploader.img, main.dol, fst.bin) under sys/, as
   Dolphin extracts a disc. Wii discs are encrypted and are not opened.
+- **Xbox and Xbox 360 disc images** open: an XISO (.iso / .xiso, the game partition alone) and a
+  whole disc image (Redump), whose game partition follows a DVD-video partition -- 7-Zip opens
+  the game's file system (XDVDFS), not the video partition.
 - The address field has no Up button of its own any more: Up One Level is in the toolbar next to
   Back / Forward (Backspace and Go ▸ Enclosing Folder still work).
 - The sorted column's header shows the sort direction, as in Finder (7-Zip on Windows shows none).
