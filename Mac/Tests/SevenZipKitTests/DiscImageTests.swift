@@ -2,6 +2,7 @@
 // builds an image around a real ISO 9660 file system (made with hdiutil) and an audio track,
 // opens it as 7-Zip does, and checks the tracks it shows and the bytes they extract to.
 
+import Compression
 import Foundation
 import XCTest
 @testable import SevenZipKit
@@ -311,5 +312,175 @@ final class DiscImageTests: XCTestCase {
         cdi += le32(0x8000_0006) + le32(total - header)
         try write(cdi, "juggler.cdi")
         try checkDataAndAudio(path("juggler.cdi"))
+    }
+
+    // MARK: - compressed images: encoders for the fixtures
+
+    private func compress(_ data: Data, _ algorithm: compression_algorithm) -> Data {
+        let capacity = data.count + 1024
+        var out = Data(count: capacity)
+        let n = out.withUnsafeMutableBytes { dst in
+            data.withUnsafeBytes { src in
+                compression_encode_buffer(dst.bindMemory(to: UInt8.self).baseAddress!, capacity,
+                                          src.bindMemory(to: UInt8.self).baseAddress!, data.count, nil, algorithm)
+            }
+        }
+        return out.prefix(n)
+    }
+
+    /// Raw deflate (Apple's COMPRESSION_ZLIB writes no zlib header).
+    private func deflate(_ data: Data) -> Data { compress(data, COMPRESSION_ZLIB) }
+
+    /// A zlib stream: header, raw deflate, Adler-32.
+    private func zlib(_ data: Data) -> Data {
+        var a: UInt32 = 1, b: UInt32 = 0
+        for byte in data { a = (a + UInt32(byte)) % 65521; b = (b + a) % 65521 }
+        return Data([0x78, 0x9C]) + deflate(data) + be32(Int(b << 16 | a))
+    }
+
+    private func bzip2(_ data: Data) throws -> Data {
+        let input = path("bz-in-\(UUID().uuidString)")
+        try data.write(to: URL(fileURLWithPath: input))
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/bzip2")
+        p.arguments = ["-k", "-f", input]
+        try p.run()
+        p.waitUntilExit()
+        return try Data(contentsOf: URL(fileURLWithPath: input + ".bz2"))
+    }
+
+    private func blocks(_ data: Data, _ size: Int) -> [Data] {
+        stride(from: 0, to: data.count, by: size).map { data.subdata(in: $0..<min($0 + size, data.count)) }
+    }
+
+    /// A compressed image opens straight into the file system it holds (its image is the
+    /// archive's main subfile, as for VHD); opened as its own format it is one "<name>.iso",
+    /// which extracts to the image byte for byte.
+    private func checkSingleISO(_ archive: String, format: String, expected: Data? = nil,
+                                file: StaticString = #filePath, line: UInt = #line) throws {
+        let want = expected ?? iso
+        let items = try list(archive)
+        XCTAssertTrue(items.contains { $0.name == "hello.txt" }, "\(items.map(\.name))", file: file, line: line)
+        let folder = try SZFolder.folder(forPath: archive, formatHint: format, passwordDelegate: nil)
+        try folder.loadItems()
+        XCTAssertEqual(folder.itemCount, 1, file: file, line: line)
+        XCTAssertEqual(folder.sizeOfItem(at: 0), UInt64(want.count), file: file, line: line)
+        let dest = path("out-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(atPath: dest, withIntermediateDirectories: true)
+        let o = SZExtractOptions()
+        o.outputDirectory = dest
+        o.outDirMode = .direct
+        o.overwriteMode = .overwrite
+        o.formatHint = format
+        let result = try XCTUnwrap(SZArchiveExtractor.extractArchives(at: [archive], options: o, progress: nil))
+        XCTAssertTrue(result.isOK, "\(result.messages)", file: file, line: line)
+        let name = folder.nameOfItem(at: 0)
+        XCTAssertEqual(data(dest, name), want, "\(name)", file: file, line: line)
+    }
+
+    // MARK: - CSO / ZSO
+
+    /// A PSP CSO v1: 2048-byte blocks, deflated, the first stored (bit 31) as the format allows.
+    func testCsoDeflate() throws {
+        let parts = blocks(iso, 2048)
+        var body = Data(), index: [UInt32] = []
+        let start = 0x18 + (parts.count + 1) * 4
+        for (i, part) in parts.enumerated() {
+            index.append(UInt32(start + body.count) | (i == 0 ? 0x8000_0000 : 0))
+            body += i == 0 ? part : deflate(part)
+        }
+        index.append(UInt32(start + body.count))
+        var cso = Data("CISO".utf8) + le32(0x18) + le64(iso.count) + le32(2048) + Data([1, 0]) + le16(0)
+        for v in index { cso += le32(Int(v)) }
+        try write(cso + body, "game.cso")
+        try checkSingleISO(path("game.cso"), format: "CSO")
+    }
+
+    /// ZSO: the same layout, LZ4 blocks.
+    func testZsoLz4() throws {
+        let parts = blocks(iso, 2048)
+        var body = Data(), index: [UInt32] = []
+        let start = 0x18 + (parts.count + 1) * 4
+        for part in parts {
+            index.append(UInt32(start + body.count))
+            body += compress(part, COMPRESSION_LZ4_RAW)
+        }
+        index.append(UInt32(start + body.count))
+        var zso = Data("ZISO".utf8) + le32(0x18) + le64(iso.count) + le32(2048) + Data([1, 0]) + le16(0)
+        for v in index { zso += le32(Int(v)) }
+        try write(zso + body, "game.zso")
+        try checkSingleISO(path("game.zso"), format: "ZSO")
+    }
+
+    /// A Wii compact ISO: 32 KB blocks, an all-zero block left out of the file.
+    func testWiiCiso() throws {
+        let blockSize = 0x8000
+        var image = iso
+        image += Data(count: (blockSize - image.count % blockSize) % blockSize)   // whole blocks
+        image += Data(count: blockSize)                                           // an empty block
+        image += Data(repeating: 0x5A, count: blockSize)                          // and data after it
+        var map = Data(count: 0x8000 - 8), body = Data()
+        for (i, part) in blocks(image, blockSize).enumerated() {
+            if part.allSatisfy({ $0 == 0 }) { continue }
+            map[i] = 1
+            body += part
+        }
+        try write(Data("CISO".utf8) + le32(blockSize) + map + body, "wii.ciso")
+        try checkSingleISO(path("wii.ciso"), format: "CSO", expected: image)
+    }
+
+    // MARK: - ISZ
+
+    /// UltraISO: 64-byte header, an obfuscated table of 3-byte entries (zlib, zero, bzip2,
+    /// stored), the blocks.
+    func testIszMixedBlocks() throws {
+        let blockSize = 0x4000
+        var image = iso
+        image += Data(count: (2048 - image.count % 2048) % 2048)
+        let parts = blocks(image, blockSize)
+        var entries: [(UInt32, UInt32)] = [], body = Data()
+        for (i, part) in parts.enumerated() {
+            if part.allSatisfy({ $0 == 0 }) { entries.append((0, UInt32(part.count))); continue }
+            switch i % 3 {
+            case 0: let z = zlib(part); entries.append((2, UInt32(z.count))); body += z
+            case 1:
+                var bz = try bzip2(part)
+                bz[0] = 0; bz[1] = 0; bz[2] = 0                   // as UltraISO stores it
+                entries.append((3, UInt32(bz.count))); body += bz
+            default: entries.append((1, UInt32(part.count))); body += part
+            }
+        }
+        var table = Data()
+        for (kind, size) in entries {
+            let v = kind << 22 | size
+            table += Data([UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF), UInt8((v >> 16) & 0xFF)])
+        }
+        let key: [UInt8] = [0xB6, 0x8C, 0xA5, 0xDE]
+        for i in 0..<table.count { table[i] ^= key[i % 4] }
+        let ptrOffset = 64, dataOffset = 64 + table.count
+        var h = Data("IsZ!".utf8) + Data([64, 1]) + le32(0) + le16(2048) + le32(image.count / 2048)
+        h += Data([0]) + le64(0) + le32(parts.count) + le32(blockSize) + Data([3, 0])
+        h += le32(ptrOffset) + le32(0) + le32(dataOffset) + Data([0])
+        h += Data(count: 64 - h.count)
+        try write(h + table + body, "ultra.isz")
+        try checkSingleISO(path("ultra.isz"), format: "ISZ", expected: image)
+    }
+
+    // MARK: - zisofs
+
+    func testZisofsFile() throws {
+        let blockSize = 1 << 15
+        let parts = blocks(iso, blockSize)
+        var pointers: [Int] = [], body = Data()
+        let start = 16 + (parts.count + 1) * 4
+        for part in parts {
+            pointers.append(start + body.count)
+            body += zlib(part)
+        }
+        pointers.append(start + body.count)
+        var z = Data([0x37, 0xE4, 0x53, 0x96, 0xC9, 0xDB, 0xD6, 0x07]) + le32(iso.count) + Data([4, 15, 0, 0])
+        for p in pointers { z += le32(p) }
+        try write(z + body, "packed.iso.zisofs")
+        try checkSingleISO(path("packed.iso.zisofs"), format: "zisofs")
     }
 }
