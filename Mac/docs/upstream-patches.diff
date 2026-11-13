@@ -437,10 +437,23 @@ index ca56f72..14a97ad 100644
          && !options.StdInMode)
      {
 diff --git a/CPP/7zip/UI/Common/LoadCodecs.cpp b/CPP/7zip/UI/Common/LoadCodecs.cpp
-index c944ee9..2bfdc5e 100644
+index c944ee9..04fd973 100644
 --- a/CPP/7zip/UI/Common/LoadCodecs.cpp
 +++ b/CPP/7zip/UI/Common/LoadCodecs.cpp
-@@ -814,6 +814,13 @@ HRESULT CCodecs::Load()
+@@ -109,7 +109,12 @@ static bool ReadPathFromRegistry(HKEY baseKey, LPCWSTR value, FString &path)
+ #endif // Z7_EXTERNAL_CODECS
+ 
+ 
++#ifdef __APPLE__
++// macOS port: room for the disc-image handlers of Mac/Core/Handlers (Mac/docs/upstream-patches.md)
++static const unsigned kNumArcsMax = 96;
++#else
+ static const unsigned kNumArcsMax = 72;
++#endif
+ static unsigned g_NumArcs = 0;
+ static const CArcInfo *g_Arcs[kNumArcsMax];
+ 
+@@ -814,6 +819,13 @@ HRESULT CCodecs::Load()
      item.CreateInArchive = arc.CreateInArchive;
      item.IsArcFunc = arc.IsArc;
      item.Flags = arc.Flags;

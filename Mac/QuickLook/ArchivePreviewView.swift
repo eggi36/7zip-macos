@@ -84,7 +84,7 @@ enum PreviewMetrics {
 /// 9971 ("Open in 7-Zip", 1.2.0) is retired with the button: Quick Look's title bar has its own.
 enum PreviewText {
     enum LangID {
-        static let checkbox: UInt32 = 9970        // Options > macOS: "Quick Look preview for archives"
+        static let checkbox: UInt32 = 9970        // Options > Settings: "Quick Look preview for archives"
         static let encrypted: UInt32 = 9972
         static let more: UInt32 = 9973
         static let stopped: UInt32 = 9974

@@ -13,6 +13,9 @@
 
 #include <sys/stat.h>
 
+#include "../../CPP/7zip/Common/FileStreams.h"
+#include "Handlers/DiscRaw.h"          // SZIsXboxDiscImage
+
 // ---------------------------------------------------------------------------
 // The open callback handed to CAgent::Open is the engine's own COpenCallbackImp, exactly as 7zFM
 // builds it (FileFolderPluginOpen.cpp:317-330, 02-engine-api.md 2.5.1). It implements
@@ -755,7 +758,24 @@ static BOOL SZStatFile(NSString *path, uint64_t *size, struct timespec *mtime)
   const UString uPath = inStream
       ? SZUStringFromNSString(openPath)
       : MultiByteToUnicodeString(SZFStringFromNSString(openPath), CP_UTF8);
-  const UString uHint = SZUStringFromNSString(formatHint ?: @"");   // must not be NULL (Appendix A)
+  UString uHint = SZUStringFromNSString(formatHint ?: @"");   // must not be NULL (Appendix A)
+  if (uHint.IsEmpty())
+  {
+    // A whole Xbox / Xbox 360 disc: by its extension the ISO / UDF handlers come first and open
+    // only its DVD-video partition (Handlers/DiscRaw.cpp).
+    if (inStream)
+    {
+      if (SZIsXboxDiscImage(inStream))
+        uHint = L"XDVDFS";
+    }
+    else
+    {
+      CInFileStream *fileSpec = new CInFileStream;
+      CMyComPtr<IInStream> file = fileSpec;
+      if (fileSpec->Open(us2fs(uPath)) && SZIsXboxDiscImage(file))
+        uHint = L"XDVDFS";
+    }
+  }
 
   if (inStream)
   {

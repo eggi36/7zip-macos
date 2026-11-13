@@ -23,7 +23,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         return true
     }()
     private var toolbarsMask = Settings.toolbarsMask
-    /// native-look: the View > Toolbars mask for the Mac toolbar (MacToolbar.swift).
+    /// native-look: the Toolbars mask for the Mac toolbar (MacToolbar.swift).
     var toolbarsMaskForMac: UInt32 { toolbarsMask }
     /// Set when the window closes: it has saved its state then, and must not save again on Quit,
     /// where it would overwrite a window closed later (`MainWindows.saveAllForTermination`).
@@ -229,6 +229,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.toolbarsMask = toolbarsMask
     }
 
+    /// After every event: the toolbar's view switcher shows the focused panel's mode (MacToolbar.swift).
+    func windowDidUpdate(_ notification: Notification) {
+        syncViewModeItems()
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard !isClosed else { return }
         refreshTimer?.invalidate()
@@ -238,7 +243,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         // for write-back into its parent (PanelNestedArchives.swift, 01 §3.8).
         for panel in panels { panel.closeNestedArchivesForShutdown() }
         MainWindows.didClose(self)
-        // Toolbars with one identifier mirror each other's item changes (View > Toolbars, a
+        // Toolbars with one identifier mirror each other's item changes (Icon and Text / Icon Only, a
         // customization). A closed window that something still holds must not take part: its
         // toolbar can be out of step, and AppKit then replays a change at an index it lacks.
         let closing = window
@@ -408,19 +413,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     func setFocusedPanel(_ index: Int) {
         focusedPanelIndex = index
         for (i, panel) in panels.enumerated() { panel.isActive = i == index }
+        focusedPanel.refreshQuickLookIfShown()      // an open preview shows the other panel's selection
         refreshTitle()
     }
 
     /// CApp::RefreshTitle (App.cpp:963): the focused panel's path, "7-Zip" when empty.
-    /// native-look: the Mac look names the folder (or archive) in the title, as Finder does, with the
-    /// full path as the subtitle, and gives a file-system folder its proxy icon and path menu.
+    /// native-look: the Mac look names the folder (or archive) in the title, as Finder does, and
+    /// gives a file-system folder its proxy icon and path menu (Cmd-click on the title). No path
+    /// subtitle: the address bar shows the path already (the user's finding).
     private func refreshTitle() {
         let path = focusedPanel.currentPath
         guard let window else { return }
         let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
         let name = (trimmed as NSString).lastPathComponent
         window.title = path.isEmpty ? "7-Zip" : (name.isEmpty || name == "/" ? trimmed : name)
-        window.subtitle = path.isEmpty ? "" : (trimmed as NSString).deletingLastPathComponent
+        window.subtitle = ""
         if let snapshot = focusedPanel.snapshot, snapshot.isFileSystem, !snapshot.fullPath.isEmpty {
             window.representedURL = URL(fileURLWithPath: snapshot.fullPath, isDirectory: true)
         } else if let snapshot = focusedPanel.snapshot, !snapshot.archivePath.isEmpty {
@@ -529,8 +536,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         return FMToolbarItemSpec(identifier: id.rawValue, label: label, action: action)
     }
 
-    /// ReloadToolbars: the archive buttons, then the standard ones, back to back; labels per
-    /// "Show Buttons Text", bitmaps per "Large Buttons". Also the language switch's re-label.
+    /// ReloadToolbars: puts the window's NSToolbar up (MacToolbar.swift) and saves the mask.
     func reloadToolbars() {
         installMacToolbar()
         Settings.toolbarsMask = toolbarsMask
@@ -551,19 +557,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.autoRefresh = autoRefresh
     }
 
-    @objc func viewArchiveToolbar(_ sender: Any?) {                                                   // IDM_VIEW_ARCHIVE_TOOLBAR 750
-        toggleMacToolbarGroup(Self.macArchiveGroup); syncMaskFromMacToolbar()
-    }
-    @objc func viewStandardToolbar(_ sender: Any?) {                                                  // IDM_VIEW_STANDARD_TOOLBAR 751
-        toggleMacToolbarGroup(Self.macStandardGroup); syncMaskFromMacToolbar()
-    }
-    @objc func viewToolbarsLargeButtons(_ sender: Any?) { toolbarsMask ^= 2; reloadToolbars() }       // IDM_VIEW_TOOLBARS_LARGE_BUTTONS 752: IDB_* 48x36 vs IDB_*2 24x24
-    @objc func viewToolbarsShowButtonsText(_ sender: Any?) {                                          // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
-        toggleMacToolbarText(); syncMaskFromMacToolbar()
-    }
 
-    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the View >
-    /// Toolbars check marks see the same choice.
+    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the saved
+    /// setting sees the user's choice.
     func syncMaskFromMacToolbar() {
         let mask = macToolbarMask(keeping: toolbarsMask)
         guard mask != toolbarsMask else { return }
@@ -681,13 +677,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             return shown
         case #selector(viewTwoPanels(_:)): item.state = numPanels == 2 ? .on : .off
         case #selector(viewAutoRefresh(_:)): item.state = autoRefresh ? .on : .off
-        case #selector(viewArchiveToolbar(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 8) != 0 ? .on : .off
-        case #selector(viewStandardToolbar(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 4) != 0 ? .on : .off
-        case #selector(viewToolbarsShowButtonsText(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 1) != 0 ? .on : .off
-        case #selector(viewToolbarsLargeButtons(_:)): item.state = (toolbarsMask & 2) != 0 ? .on : .off
         case #selector(viewTimestampLevel(_:)):
             item.state = ((item.representedObject as? Int) == Settings.timestampLevel) ? .on : .off
         case #selector(viewTimeUTC(_:)): item.state = Settings.timestampShowUTC ? .on : .off

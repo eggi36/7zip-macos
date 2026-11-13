@@ -631,6 +631,20 @@ targets:
         # dlgfeel (requests.md listfeel -> packaging): the Apple-events entitlement Finder's Get
         # Info needs under the hardened runtime; harmless in the ad-hoc builds.
         CODE_SIGN_ENTITLEMENTS: Resources/App.entitlements
+    # Every build gets a stamp of its own for the About box (PortVersion.buildStamp): the time it
+    # was built and the commit, "+" when the working tree had changes. Runs on every build, after
+    # Info.plist is processed and before signing.
+    postBuildScripts:
+      - name: Build stamp
+        basedOnDependencyAnalysis: false
+        script: |
+          plist="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
+          root="$SRCROOT/.."
+          commit="$(git -C "$root" rev-parse --short=10 HEAD 2>/dev/null || echo unknown)"
+          if ! git -C "$root" diff --quiet HEAD -- 2>/dev/null; then commit="$commit+"; fi
+          stamp="$(date '+%Y-%m-%d %H:%M:%S') $commit"
+          /usr/libexec/PlistBuddy -c "Delete :SZBuildStamp" "$plist" >/dev/null 2>&1 || true
+          /usr/libexec/PlistBuddy -c "Add :SZBuildStamp string $stamp" "$plist"
 
   # ---------------------------------------------------------------------------
   # fastui scope: the test-only app copies (see the SevenZipTestApp template).

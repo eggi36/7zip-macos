@@ -98,7 +98,7 @@ final class MenuAndToolbarTests: AppHostTestCase {
                                            "Invert Selection", "Select...", "Deselect...", "Select by Type",
                                            "Deselect by Type"])
         assertMenu(bar, "View", contains: ["Large Icons", "Small Icons", "List", "Details", "Sort By",
-                                           "Flat View", "2 Panels", "Toolbars", "Refresh", "Auto Refresh"])
+                                           "Flat View", "2 Panels", "Refresh", "Auto Refresh"])
         assertMenu(bar, "Go", contains: ["Back", "Forward", "Enclosing Folder", "Open Root Folder",
                                          "Folders History..."])
         assertMenu(bar, "Tools", contains: ["Benchmark", "Delete Temporary Files..."])

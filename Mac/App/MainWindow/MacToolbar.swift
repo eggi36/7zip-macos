@@ -6,13 +6,18 @@
 //
 // The toolbar is customizable (right-click on it > Customize Toolbar...):
 // besides the seven buttons it offers a few more 7zFM commands (Up, Refresh, Create Folder, Rename,
-// Split, Combine, Flat View, 2 Panels, Folders History, Benchmark), and AppKit saves the arrangement
+// Split, Combine, Flat View, 2 Panels, Folders History, Benchmark, and a Finder-style view
+// switcher for Large Icons / Small Icons / List / Details), and AppKit saves the arrangement
 // and the icon / label mode for every window (`sz.main.mac`).
 //
-// View > Toolbars still works on it: "Archive Toolbar" and "Standard Toolbar" add or remove their
-// group, "Show Buttons Text" switches between icon and label and icon only, and their check marks
-// show what the toolbar holds (`syncMaskFromMacToolbar`). "Large Buttons" has no Mac counterpart
-// (macOS sizes toolbar icons itself) and has no effect.
+// 7zFM's View > Toolbars is not in the menu: Customize Toolbar... adds and removes buttons, the
+// toolbar's right-click menu switches the labels (Icon and Text / Icon Only), and macOS sizes
+// toolbar icons itself. The Toolbars setting still records what a toolbar holds (the groups and
+// the labels, `syncMaskFromMacToolbar`), and a fresh one starts with them.
+//
+// Back, Forward and Up One Level are navigational items: they sit next to the title, and
+// Customize Toolbar... can put Up One Level there (01 §1.3: Up is the address bar's button on
+// Windows).
 
 import AppKit
 
@@ -29,6 +34,24 @@ extension NSToolbarItem.Identifier {
     static let szTwoPanels = NSToolbarItem.Identifier("sz.twoPanels")
     static let szHistory = NSToolbarItem.Identifier("sz.history")
     static let szBenchmark = NSToolbarItem.Identifier("sz.benchmark")
+    static let szViewMode = NSToolbarItem.Identifier("sz.viewMode")
+}
+
+/// The view switcher (View > Large Icons / Small Icons / List / Details, IDM_VIEW_LARGE_ICONS
+/// 700 - IDM_VIEW_DETAILS 703; 01 §3.1), as Finder's toolbar has one: four segments, the focused
+/// panel's mode selected. It is NSToolbarItemGroup's own selection group (only the factory
+/// initializer gives one that keeps a selection, and it cannot make a subclass), so the window
+/// controller syncs the selection in `windowDidUpdate` -- after every event, which covers the
+/// menu, Cmd-1 ... Cmd-4 and a focus change between the panels.
+enum ViewModeToolbarItem {
+    /// Index = 7zFM's _listViewMode: 0 large icons, 1 small icons, 2 list, 3 details.
+    /// Details is Finder's list view (rows with columns), so it gets Finder's list symbol.
+    static let symbols: [[String]] = [["square.grid.2x2"], ["square.grid.3x3"],
+                                      ["tablecells", "list.bullet.rectangle"], ["list.bullet"]]
+    static var titles: [String] {
+        [Lang.text(700, "Large Icons"), Lang.text(701, "Small Icons"), Lang.text(702, "List"),
+         Lang.text(703, "Details")].map { Lang.stripMnemonic($0).components(separatedBy: "\t")[0] }
+    }
 }
 
 extension MainWindowController: NSToolbarDelegate {
@@ -37,7 +60,7 @@ extension MainWindowController: NSToolbarDelegate {
     static let macStandardGroup: [NSToolbarItem.Identifier] = [.szCopy, .szMove, .szDelete, .szInfo]
     static let macExtraItems: [NSToolbarItem.Identifier] = [.szUp, .szRefresh, .szCreateFolder, .szRename,
                                                             .szSplit, .szCombine, .szFlatView, .szTwoPanels,
-                                                            .szHistory, .szBenchmark]
+                                                            .szHistory, .szBenchmark, .szViewMode]
     /// One autosaved configuration shared by every main window.
     static let macToolbarIdentifier = "sz.main.mac"
 
@@ -64,6 +87,7 @@ extension MainWindowController: NSToolbarDelegate {
         case .szTwoPanels: names = ["rectangle.split.2x1"]
         case .szHistory: names = ["clock.arrow.circlepath", "clock"]
         case .szBenchmark: names = ["speedometer", "gauge"]
+        case .szViewMode: names = ["square.grid.2x2"]
         default: return nil
         }
         for name in names {
@@ -98,9 +122,9 @@ extension MainWindowController: NSToolbarDelegate {
         }
     }
 
-    /// The items a fresh toolbar starts with: the View > Toolbars groups of the mask.
+    /// The items a fresh toolbar starts with: Back, Forward, Up, then the groups of the mask.
     var macToolbarItems: [NSToolbarItem.Identifier] {
-        var ids: [NSToolbarItem.Identifier] = [.szBack, .szForward, .flexibleSpace]
+        var ids: [NSToolbarItem.Identifier] = [.szBack, .szForward, .szUp, .flexibleSpace]
         let archive = (toolbarsMaskForMac & 8) != 0
         let standard = (toolbarsMaskForMac & 4) != 0
         if archive { ids += Self.macArchiveGroup }
@@ -109,8 +133,8 @@ extension MainWindowController: NSToolbarDelegate {
         return ids
     }
 
-    /// Puts the window's NSToolbar up once; later View > Toolbars changes edit it in place, so a
-    /// customised arrangement is never thrown away.
+    /// Puts the window's NSToolbar up once; later changes edit it in place, so a customised
+    /// arrangement is never thrown away.
     func installMacToolbar() {
         guard let window, window.toolbar == nil else { return }
         let toolbar = NSToolbar(identifier: Self.macToolbarIdentifier)
@@ -125,8 +149,8 @@ extension MainWindowController: NSToolbarDelegate {
         window.toolbar = toolbar
     }
 
-    /// The View > Toolbars bits that the Mac toolbar currently shows: archive group, standard group,
-    /// labels. The Large Buttons bit is kept as it is.
+    /// The Toolbars mask bits that the Mac toolbar currently shows: archive group, standard group,
+    /// labels. The Large Buttons bit (no Mac counterpart) is kept as it is.
     func macToolbarMask(keeping mask: UInt32) -> UInt32 {
         guard let toolbar = window?.toolbar else { return mask }
         let ids = Set(toolbar.items.map(\.itemIdentifier))
@@ -137,22 +161,42 @@ extension MainWindowController: NSToolbarDelegate {
         return result
     }
 
-    /// View > Archive Toolbar / Standard Toolbar in the Mac look: remove the group when any of it
-    /// is there, else add it at the end.
-    func toggleMacToolbarGroup(_ group: [NSToolbarItem.Identifier]) {
-        guard let toolbar = window?.toolbar else { return }
-        let present = toolbar.items.enumerated().filter { group.contains($0.element.itemIdentifier) }
-        if !present.isEmpty {
-            for (index, _) in present.reversed() { toolbar.removeItem(at: index) }
-            return
+    /// The view switcher (`ViewModeToolbarItem`).
+    func makeViewModeItem() -> NSToolbarItem {
+        let titles = ViewModeToolbarItem.titles
+        let images = ViewModeToolbarItem.symbols.enumerated().map { i, names in
+            names.lazy.compactMap { NSImage(systemSymbolName: $0, accessibilityDescription: titles[i]) }.first
+                ?? NSImage()
         }
-        for id in group { toolbar.insertItem(withItemIdentifier: id, at: toolbar.items.count) }
+        let group = NSToolbarItemGroup(itemIdentifier: .szViewMode, images: images, selectionMode: .selectOne,
+                                       labels: titles, target: self, action: #selector(viewModeChosen(_:)))
+        let label = Lang.stripMnemonic(Lang.menuTitle(MainMenu.idmView, "&View"))
+        group.label = label
+        group.paletteLabel = label
+        group.toolTip = label
+        for (i, sub) in group.subitems.enumerated() { sub.toolTip = titles[i] }
+        group.selectedIndex = focusedPanel.listViewMode
+        return group
     }
 
-    /// View > Show Buttons Text in the Mac look.
-    func toggleMacToolbarText() {
-        guard let toolbar = window?.toolbar else { return }
-        toolbar.displayMode = toolbar.displayMode == .iconOnly ? .iconAndLabel : .iconOnly
+    /// Selects the focused panel's mode in every view switcher of the window's toolbar.
+    func syncViewModeItems() {
+        guard let items = window?.toolbar?.items else { return }
+        Self.selectViewMode(focusedPanel.listViewMode, in: items)
+    }
+
+    static func selectViewMode(_ mode: Int, in items: [NSToolbarItem]) {
+        for case let group as NSToolbarItemGroup in items where group.itemIdentifier == .szViewMode
+            && group.selectedIndex != mode && (0..<group.subitems.count).contains(mode) {
+            group.selectedIndex = mode
+        }
+    }
+
+    /// A segment of the view switcher: the focused panel takes that mode (SetListViewMode).
+    @objc func viewModeChosen(_ sender: Any?) {
+        guard let mode = (sender as? NSToolbarItemGroup)?.selectedIndex else { return }
+        guard (0...3).contains(mode), mode != focusedPanel.listViewMode else { return }
+        focusedPanel.setListViewMode(mode)
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -166,12 +210,13 @@ extension MainWindowController: NSToolbarDelegate {
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        if itemIdentifier == .szViewMode { return makeViewModeItem() }
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         let label: String
         let action: Selector
         if let extra = Self.macExtraSpec(itemIdentifier) {
             (label, action) = extra
-            item.isNavigational = itemIdentifier == .szBack || itemIdentifier == .szForward
+            item.isNavigational = [.szBack, .szForward, .szUp].contains(itemIdentifier)
         } else if let spec = Self.toolbarSpec(itemIdentifier) {
             (label, action) = (spec.label, spec.action)
         } else {

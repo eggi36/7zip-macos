@@ -364,21 +364,38 @@ extension PanelViewController {
         if QLPreviewPanel.sharedPreviewPanelExists() && panel.isVisible {
             panel.orderOut(nil)
         } else {
-            // Only items on disk can be previewed; inside an archive there is nothing to show.
+            // Inside an archive the selected files are extracted to a temp folder first
+            // (PanelArchivePreview.swift); on disk the files themselves are shown.
+            prepareArchivePreviews()
             guard !quickLookPaths.isEmpty else { return }
             panel.makeKeyAndOrderFront(nil)
         }
     }
 
-    /// The selected (or focused) items that exist on disk, in list order.
+    /// The selected (or focused) items to preview, in list order: the files on disk, or the
+    /// temp copies of the selected files inside an archive.
     var quickLookPaths: [String] {
-        operatedRowIndices().map { rows[$0].fullPath }.filter { !$0.isEmpty }
+        let indices = operatedRowIndices()
+        if snapshot?.isArchive == true { return archivePreviewPaths(indices) }
+        return indices.map { rows[$0].fullPath }.filter { !$0.isEmpty }
     }
 
     /// Finder keeps an open preview on the selection: the panel shows what is selected now.
+    ///
+    /// After a switch to another window (Mission Control, Cmd-Tab) Quick Look gives up its
+    /// controller (`endPreviewPanelControl`) and, back in the window, the arrow keys reach the
+    /// list directly -- the preview stayed on the old file (the user's finding). A visible panel
+    /// without this list as its data source is therefore handed back to the responder chain
+    /// (`updateController`) when this panel is the one in front.
     func refreshQuickLookIfShown() {
         guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(),
-              panel.isVisible, panel.dataSource === self else { return }
+              panel.isVisible else { return }
+        if panel.dataSource !== self {
+            guard isActive, view.window?.isKeyWindow == true || panel.isKeyWindow else { return }
+            panel.updateController()
+        }
+        guard panel.dataSource === self else { return }
+        prepareArchivePreviews()
         panel.reloadData()
     }
 }

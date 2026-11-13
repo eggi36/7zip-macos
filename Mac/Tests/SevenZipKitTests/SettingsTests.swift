@@ -454,11 +454,11 @@ final class SettingsTests: XCTestCase {
     func testFileTypesTable() {
         // 7z.dll STRINGTABLE 100 has 40 "ext:index" pairs in 26.03 (the inventory prose says 39);
         // the 12 disc-image extensions follow (Mac/Core/Handlers), with ISO's icon.
-        XCTAssertEqual(FileTypes.all.count, 52)
-        XCTAssertEqual(Set(FileTypes.extensions).count, 52)
+        XCTAssertEqual(FileTypes.all.count, 53)
+        XCTAssertEqual(Set(FileTypes.extensions).count, 53)
         XCTAssertEqual(FileTypes.extensions.first, "7z")
         XCTAssertEqual(FileTypes.extensions[39], "apfs")
-        XCTAssertEqual(FileTypes.extensions.last, "ecm")
+        XCTAssertEqual(FileTypes.extensions.last, "gcm")
         XCTAssertEqual(FileTypes.type(forExtension: "cue")?.iconIndex, 8)
 
         XCTAssertEqual(FileTypes.type(forExtension: "7z")?.iconIndex, 0)

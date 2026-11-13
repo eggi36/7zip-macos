@@ -213,7 +213,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         case 2103: return "square.and.pencil"                   // IDD_EDIT
         case 2500: return "gearshape"                           // IDD_SETTINGS
         case 2101: return "globe"                               // IDD_LANG
-        default: return "paintpalette"                          // macOS page
+        default: return "gearshape"
         }
     }
 
@@ -269,8 +269,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
             OptionsFoldersPage(),     // IDD_FOLDERS 2400
             OptionsEditorPage(),      // IDD_EDIT 2103
             OptionsSettingsPage(),    // IDD_SETTINGS 2500
-            OptionsLanguagePage(),    // IDD_LANG 2101
-            OptionsMacPage(),         // macOS addition (theme): Theme, Show grid lines
+            OptionsLanguagePage(),    // IDD_LANG 2101 (the macOS rows are on Settings: OptionsMacSettings.swift)
         ]
         tabView.tabViewType = .noTabsNoBorder
         tabView.drawsBackground = false

@@ -55,6 +55,8 @@ final class AboutDialog: NSObject {
         y += 2
         let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
         centred(Self.versionText, font: small, color: .secondaryLabelColor, id: "aboutVersion")
+        // macOS addition: the build, unique for every compile (PortVersion.buildStamp).
+        centred(PortVersion.buildLine(), font: small, color: .secondaryLabelColor, id: "aboutBuild")
         centred(SZBenchmark.engineDateText, font: small, color: .secondaryLabelColor)
         y += 8
         centred(SZBenchmark.engineCopyrightText, font: small)

@@ -11,14 +11,12 @@ import AppKit
 /// The address band and the status bar.
 enum AppLook {
     // The address bar is a 32 pt strip with a 24 pt rounded field inset by 4 pt top and bottom and
-    // 8 pt on the right, the Up button a 24 pt square 8 pt in.
+    // 8 pt left and right.
 
     /// The address band (ReBarWindow32).
     static let bandHeight: CGFloat = 32
-    /// The Up button (ToolbarWindow32 1002 on Windows).
-    static let upButtonRect = NSRect(x: 8, y: 4, width: 24, height: 24)
     /// Where the address field (ComboBoxEx32 1003) starts.
-    static let comboX: CGFloat = 38
+    static let comboX: CGFloat = 8
     /// The field's inset from the band's top/bottom and right edge.
     static let comboInset = NSSize(width: 8, height: 4)
     /// The status bar, including its top line.

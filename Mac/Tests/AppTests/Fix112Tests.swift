@@ -244,7 +244,7 @@ final class Fix112Tests: AppHostTestCase {
             "Options.WorkDirType": 2, "Options.WorkDirPath": "/tmp/7z-work"]) { _, new in new })
         XCTAssertNotNil(Settings.domainPlistPath(), "the host runs on its own plist domain")
         let controller = makeWindow()
-        let mac = OptionsMacPage()
+        let mac = OptionsSettingsPage()
         _ = mac.view
         mac.pageDidLoad()
         XCTAssertEqual(mac.resetButton.title, "Reset All Settings...")
@@ -301,7 +301,7 @@ final class Fix112Tests: AppHostTestCase {
         Settings.theme = .system
         XCTAssertEqual(Settings.string(Settings.Key.theme), "system", "an explicit System is kept")
         XCTAssertNil(NSApp.appearance)
-        let mac = OptionsMacPage()
+        let mac = OptionsSettingsPage()
         _ = mac.view
         Settings.removeKey(Settings.Key.theme)
         mac.pageDidLoad()

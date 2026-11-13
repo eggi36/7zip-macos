@@ -462,7 +462,7 @@ public struct SevenZipPanel {
     // .splitter). So `children(matching: .comboBox).element(boundBy: panelIndex)` only works while
     // there is one panel; with two it is the index over *both* panels' combo boxes that matters.
     // `ordinal(of:)` works that index out from one snapshot, using the divider as the boundary, and
-    // every accessor below goes through it -- so `table`, `addressBar`, `upButton` and `statusText`
+    // every accessor below goes through it -- so `table`, `addressBar` and `statusText`
     // are guaranteed to belong to the same panel (requests.md: orchestrator -> harness).
 
     /// The details list (NSTableView). The window's tables really are in panel order -- each
@@ -473,10 +473,6 @@ public struct SevenZipPanel {
     /// The editable path combo box.
     public var addressBar: XCUIElement {
         splitGroup.children(matching: .comboBox).element(boundBy: ordinal(of: .comboBox))
-    }
-    /// The "Up One Level" button left of the address bar (kParentFolderID).
-    public var upButton: XCUIElement {
-        splitGroup.children(matching: .button).element(boundBy: ordinal(of: .button))
     }
     /// Section 0 of the panel's status bar ("N / M object(s) selected").
     ///
@@ -705,9 +701,10 @@ public struct SevenZipPanel {
         cell.doubleClick()
     }
 
-    /// The "Up One Level" button (IDM_OPEN_PARENT_FOLDER / Backspace).
+    /// Up One Level (IDM_OPEN_PARENT_FOLDER): Backspace in this panel's list. The panel has no Up
+    /// button of its own any more (the toolbar's Up One Level is next to Back / Forward).
     public func goUp() {
-        upButton.click()
+        table.typeKey(.delete, modifierFlags: [])
     }
 
     /// Click a column header: sorts by that column, or reverses the order (PanelSort.cpp

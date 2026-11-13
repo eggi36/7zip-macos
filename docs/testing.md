@@ -32,9 +32,7 @@ Mac/scripts/test.sh -A x86_64 -H       # app-hosted tests on x86_64
 
 ## No network
 
-No test reaches the network. The update check (`UpdateCheckTests`) runs against a stubbed
-`UpdateFetching`, and the app never starts a check of its own in a test process (`SZ_TEST_SUPPORT`,
-an XCTest host, or any copy of the app with a test bundle identifier).
+No test reaches the network; the app makes no network request at all.
 
 ## UI tests need permissions
 

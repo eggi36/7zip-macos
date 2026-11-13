@@ -73,7 +73,7 @@ class AppHostTestCase: XCTestCase {
                       + "developer's own preferences domain")
         continueAfterFailure = false
         // Every test starts from the default toolbar: AppKit saves a customized arrangement
-        // (View > Toolbars, Customize Toolbar) per identifier, and it would carry over.
+        // (Icon and Text / Icon Only, Customize Toolbar) per identifier, and it would carry over.
         UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)")
         defects = []
         warnings = []

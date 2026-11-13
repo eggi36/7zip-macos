@@ -378,6 +378,149 @@ final class DiscImageTests: XCTestCase {
         XCTAssertEqual(data(dest, name), want, "\(name)", file: file, line: line)
     }
 
+    // MARK: - BIN without its cue sheet
+
+    /// A raw .bin opened on its own: one data track, the ISO inside.
+    func testRawBinWithoutCue() throws {
+        XCTAssertGreaterThan(iso.count, 0, "hdiutil made no ISO")
+        try write(rawMode1(iso), "alone.bin")
+        let items = try list(path("alone.bin"))
+        XCTAssertEqual(items.map(\.name), ["Track01.iso"])
+        XCTAssertEqual(items.first?.size, UInt64(iso.count))
+        let out = try extract(path("alone.bin"))
+        XCTAssertEqual(data(out, "Track01.iso"), iso)
+    }
+
+    /// The same with 96 bytes of subchannel after every sector (2448-byte stride).
+    func testRawBinWithSubchannel() throws {
+        let raw = rawMode1(iso)
+        var withSub = Data()
+        for i in 0..<(raw.count / 2352) {
+            withSub.append(raw.subdata(in: (i * 2352)..<((i + 1) * 2352)))
+            withSub.append(Data(count: 96))
+        }
+        try write(withSub, "sub.bin")
+        let out = try extract(path("sub.bin"))
+        XCTAssertEqual(data(out, "Track01.iso"), iso)
+    }
+
+    /// Any file named .bin is not a disc: no sync pattern, no archive.
+    func testABinWithoutSyncIsNoDisc() throws {
+        try write(Data(repeating: 0x41, count: 2352 * 20), "firmware.bin")
+        XCTAssertThrowsError(try list(path("firmware.bin")))
+    }
+
+    // MARK: - GameCube
+
+    /// A minimal GameCube disc: header, bi2, apploader, a DOL, and an FST with a folder.
+    private func gameCubeDisc() -> Data {
+        var d = Data(count: 0x6000)
+        func put(_ bytes: Data, _ at: Int) { d.replaceSubrange(at..<(at + bytes.count), with: bytes) }
+        put(Data("GTSTE8".utf8), 0)
+        put(Data([0xC2, 0x33, 0x9F, 0x3D]), 0x1C)
+        put(Data("Test Game".utf8), 0x20)
+        put(be32(0x3000), 0x420)                       // DOL
+        put(be32(0x4000), 0x424)                       // FST offset
+        // apploader: 0x10 bytes of code after its 0x20 header
+        put(be32(0x10), 0x2440 + 0x14)
+        // DOL: text section 0 at 0x100, 0x20 bytes
+        put(be32(0x100), 0x3000)
+        put(be32(0x20), 0x3000 + 0x90)
+        // FST: root (4 entries), "dir" (dir, next 3), "a.txt" in dir, "b.bin" at the root
+        let strings = Data("dir\0a.txt\0b.bin\0".utf8)
+        var fst = Data()
+        fst += Data([1, 0, 0, 0]) + be32(0) + be32(4)
+        fst += Data([1, 0, 0, 0]) + be32(0) + be32(3)
+        fst += Data([0, 0, 0, 4]) + be32(0x5000) + be32(5)
+        fst += Data([0, 0, 0, 10]) + be32(0x5100) + be32(3)
+        fst += strings
+        put(fst, 0x4000)
+        put(be32(fst.count), 0x428)
+        put(Data("hello".utf8), 0x5000)
+        put(Data([1, 2, 3]), 0x5100)
+        return d
+    }
+
+    func testGameCubeDisc() throws {
+        for name in ["game.gcm", "game.iso"] {                 // rippers use either extension
+            try write(gameCubeDisc(), name)
+            let out = try extract(path(name))
+            XCTAssertEqual(data(out, "files/dir/a.txt"), Data("hello".utf8), name)
+            XCTAssertEqual(data(out, "files/b.bin"), Data([1, 2, 3]), name)
+            XCTAssertEqual(data(out, "sys/boot.bin").count, 0x440, name)
+            XCTAssertEqual(data(out, "sys/bi2.bin").count, 0x2000, name)
+            XCTAssertEqual(data(out, "sys/apploader.img").count, 0x30, name)
+            XCTAssertEqual(data(out, "sys/main.dol").count, 0x120, name)
+            XCTAssertEqual(data(out, "sys/fst.bin").count, 4 * 12 + 16, name)
+            XCTAssertEqual(Set(try list(path(name)).map(\.name)), ["files", "sys"], name)
+        }
+    }
+
+    func testAWiiDiscIsNotOpenedAsGameCube() throws {
+        var d = gameCubeDisc()
+        d.replaceSubrange(0x1C..<0x20, with: Data(count: 4))
+        d.replaceSubrange(0x18..<0x1C, with: Data([0x5D, 0x1C, 0x9E, 0xA3]))
+        try write(d, "wii.gcm")
+        XCTAssertThrowsError(try list(path("wii.gcm")))
+    }
+
+    // MARK: - Xbox (XDVDFS)
+
+    /// An XDVDFS game partition: the volume descriptor in sector 32, the root table in sector 48
+    /// with default.xex and the folder media/ (its table in sector 49, holding a.bin).
+    private func xdvdfsPartition() -> Data {
+        var d = Data(count: 0x22000)
+        func put(_ bytes: Data, _ at: Int) { d.replaceSubrange(at..<(at + bytes.count), with: bytes) }
+        let magic = Data("MICROSOFT*XBOX*MEDIA".utf8)
+        put(magic, 0x10000)
+        put(le32(48), 0x10000 + 20)
+        put(le32(2048), 0x10000 + 24)
+        put(magic, 0x10000 + 0x7EC)
+        func entry(left: Int, right: Int, sector: Int, size: Int, attrib: UInt8, _ name: String) -> Data {
+            var e = le16(left) + le16(right) + le32(sector) + le32(size) + Data([attrib, UInt8(name.utf8.count)])
+            e += Data(name.utf8)
+            while e.count % 4 != 0 { e.append(0xFF) }
+            return e
+        }
+        // root: "default.xex" with "media" as its right subtree
+        let first = entry(left: 0, right: 0, sector: 0x40, size: 5, attrib: 0x20, "default.xex")
+        let root = entry(left: 0, right: first.count / 4, sector: 0x40, size: 5, attrib: 0x20, "default.xex")
+            + entry(left: 0, right: 0, sector: 49, size: 2048, attrib: 0x10, "media")
+        put(root + Data(repeating: 0xFF, count: 2048 - root.count), 48 * 2048)
+        let media = entry(left: 0, right: 0, sector: 0x41, size: 3, attrib: 0x20, "a.bin")
+        put(media + Data(repeating: 0xFF, count: 2048 - media.count), 49 * 2048)
+        put(Data("xex!\n".utf8), 0x40 * 2048)
+        put(Data([7, 8, 9]), 0x41 * 2048)
+        return d
+    }
+
+    private func checkXbox(_ archive: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        let out = try extract(archive)
+        XCTAssertEqual(data(out, "default.xex"), Data("xex!\n".utf8), file: file, line: line)
+        XCTAssertEqual(data(out, "media/a.bin"), Data([7, 8, 9]), file: file, line: line)
+        XCTAssertEqual(Set(try list(archive).map(\.name)), ["default.xex", "media"], file: file, line: line)
+    }
+
+    func testXboxXiso() throws {
+        try write(xdvdfsPartition(), "game.iso")
+        try checkXbox(path("game.iso"))
+        try write(xdvdfsPartition(), "game.xiso")
+        try checkXbox(path("game.xiso"))
+    }
+
+    /// A whole Xbox 360 disc (XGD2): a DVD-video partition that ISO / UDF can open, the game
+    /// partition at 0xFD90000. The game is what opens.
+    func testWholeXbox360DiscOpensTheGamePartition() throws {
+        XCTAssertGreaterThan(iso.count, 0, "hdiutil made no ISO")
+        let url = URL(fileURLWithPath: path("xgd2.iso"))
+        try iso.write(to: url)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seek(toOffset: 0xFD90000)
+        try handle.write(contentsOf: xdvdfsPartition())
+        try handle.close()
+        try checkXbox(path("xgd2.iso"))
+    }
+
     // MARK: - CSO / ZSO
 
     /// A PSP CSO v1: 2048-byte blocks, deflated, the first stored (bit 31) as the format allows.

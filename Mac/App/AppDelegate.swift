@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         TestAnimations.installIfNeeded()
         // LoadLangOneTime() before anything reads a string (FM.cpp:615)
         Lang.loadFromSettings()
-        // theme: Options > macOS > Theme (FM.Theme) before the first window (AppTheme.swift)
+        // theme: Options > Settings > Theme (FM.Theme) before the first window (AppTheme.swift)
         AppTheme.applyAtLaunch()
         SZFolder.timestampShowUTC = Settings.timestampShowUTC   // g_Timestamp_Show_UTC
         NSApp.mainMenu = MainMenu.build()
@@ -93,10 +93,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // are both set, and it is started last so the window already exists when the first reset
         // arrives.
         TestResetWatcher.startIfNeeded()
-
-        // pub3: the update check (macOS addition, UpdateCheck.swift): File Manager launches only,
-        // never under test support, at most once a day, a few seconds after launching.
-        UpdateCheck.scheduleStartupCheck()
     }
 
     /// Whether `applicationDidFinishLaunching` creates the default window. Not when the launch
@@ -202,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `g_App.Save()` and `SaveWindowInfo`. `finishAll` is idempotent, so the manager's own
         // willTerminate observer finds nothing left to do.
         TempOpenManager.shared.finishAll()
+        ArchivePreviewStore.shared.removeAll()     // Quick Look copies of archive items
         // g_App.Save() + SaveWindowInfo (FM.cpp:1028-1047) for every open window, backmost first,
         // so the frontmost one's state is what the next launch reads (MainWindows.swift).
         MainWindows.saveAllForTermination()

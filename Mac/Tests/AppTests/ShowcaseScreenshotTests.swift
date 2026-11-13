@@ -146,12 +146,10 @@ final class ShowcaseScreenshotTests: AppHostTestCase {
             XCTAssertTrue(ModalProbe.present({ _ = ExtractDialog.run(extract) }) { w in
                 try? self.write(w, "extract-\(theme.rawValue)")
             })
-            // Options: the macOS tab, and a Windows page
+            // Options: the Settings page (with the macOS rows)
             let options = OptionsWindowController.shared
             let optionsWindow = try XCTUnwrap(options.window)
             XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { _ in })
-            options.selectPage(options.pageCount - 1)
-            try write(optionsWindow, "options-macos-\(theme.rawValue)")
             options.selectPage(4)                                   // Settings
             try write(optionsWindow, "options-\(theme.rawValue)")
             ModalProbe.close(optionsWindow)

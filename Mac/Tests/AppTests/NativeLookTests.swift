@@ -112,10 +112,6 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
         let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
         XCTAssertTrue(ids.contains(.szAdd) && ids.contains(.szInfo), "both groups: \(ids)")
-        let menu = MainMenu.build()
-        let text = try XCTUnwrap(allItems(menu).first { $0.action == #selector(MenuActions.viewToolbarsShowButtonsText(_:)) })
-        _ = controller.validateMenuItem(text)
-        XCTAssertEqual(text.state, .off, "View > Toolbars > Show Buttons Text is off")
     }
 
     func testMacLookFollowsToolbarMenus() throws {
@@ -125,16 +121,16 @@ final class NativeLookTests: AppHostTestCase {
         let controller = try openWindow()
         let window = try XCTUnwrap(controller.window)
         XCTAssertEqual(window.toolbar?.displayMode, .iconAndLabel)
-        controller.viewToolbarsShowButtonsText(nil)              // text off
-        XCTAssertEqual(window.toolbar?.displayMode, .iconOnly)
-        controller.viewArchiveToolbar(nil)                       // archive group off
-        var ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
-        XCTAssertFalse(ids.contains(.szAdd))
-        XCTAssertTrue(ids.contains(.szCopy))
-        XCTAssertEqual(Settings.toolbarsMask & (8 | 4 | 1), 4, "the mask follows the toolbar")
-        controller.viewArchiveToolbar(nil)                       // and back on, at the end
-        ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
-        XCTAssertEqual(Array(ids.suffix(3)), MainWindowController.macArchiveGroup)
+        window.toolbar?.displayMode = .iconOnly                  // the toolbar's right-click menu
+        controller.syncMaskFromMacToolbar()
+        XCTAssertEqual(Settings.toolbarsMask & (8 | 4 | 1), 8 | 4, "the mask follows the toolbar")
+        // View > Toolbars and Show Buttons Text are gone from the menu.
+        let view = try XCTUnwrap(MainMenu.build().items.first { $0.submenu?.title == "View" }?.submenu)
+        XCTAssertFalse(view.items.contains { $0.tag == 733 || $0.tag == 753 || $0.title == "Toolbars" })
+        // Back, Forward and Up One Level are the navigational items next to the title.
+        let ids = window.toolbar?.items.map(\.itemIdentifier) ?? []
+        XCTAssertEqual(Array(ids.prefix(3)), [.szBack, .szForward, .szUp])
+        XCTAssertTrue(window.toolbar?.items.prefix(3).allSatisfy(\.isNavigational) ?? false)
         UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
     }
 
@@ -144,18 +140,44 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(toolbar.allowsUserCustomization, "right-click > Customize Toolbar...")
         XCTAssertTrue(toolbar.autosavesConfiguration)
         let allowed = controller.toolbarAllowedItemIdentifiers(toolbar)
-        for id in MainWindowController.macExtraItems {
+        for id in MainWindowController.macExtraItems where id != .szViewMode {   // a group, tested apart
             XCTAssertTrue(allowed.contains(id))
             let item = controller.toolbar(toolbar, itemForItemIdentifier: id, willBeInsertedIntoToolbar: false)
             XCTAssertNotNil(item?.image, "\(id.rawValue) has an SF Symbol")
             XCTAssertNotNil(item?.action)
             XCTAssertFalse(item?.label.hasSuffix("...") ?? true)
         }
-        // a customised item survives a View > Toolbars change: groups are edited in place
-        toolbar.insertItem(withItemIdentifier: .szRefresh, at: 2)
-        controller.viewStandardToolbar(nil)
+        // a customised item survives a label change: the toolbar is edited in place
+        toolbar.insertItem(withItemIdentifier: .szRefresh, at: 3)
+        toolbar.displayMode = toolbar.displayMode == .iconOnly ? .iconAndLabel : .iconOnly
+        controller.syncMaskFromMacToolbar()
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == .szRefresh })
         UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)
+    }
+
+    /// The view switcher in Customize Toolbar...: four segments for 700-703, the focused panel's
+    /// mode selected, a click switching the panel, and the selection following Cmd-1 ... Cmd-4.
+    func testViewModeSwitcherInTheToolbar() throws {
+        let controller = try openWindow()
+        let toolbar = try XCTUnwrap(controller.window?.toolbar)
+        XCTAssertTrue(controller.toolbarAllowedItemIdentifiers(toolbar).contains(.szViewMode))
+        let group = try XCTUnwrap(controller.makeViewModeItem() as? NSToolbarItemGroup)
+        XCTAssertEqual(group.subitems.count, 4)
+        XCTAssertEqual(group.subitems.map(\.label), ["Large Icons", "Small Icons", "List", "Details"])
+        XCTAssertTrue(group.subitems.allSatisfy { $0.image != nil }, "an SF Symbol per segment")
+        XCTAssertEqual(group.selectionMode, .selectOne)
+        let panel = controller.focusedPanel
+        let saved = panel.listViewMode
+        defer { panel.setListViewMode(saved) }
+        panel.setListViewMode(3)
+        MainWindowController.selectViewMode(panel.listViewMode, in: [group])
+        XCTAssertEqual(group.selectedIndex, 3, "Details selected")
+        group.selectedIndex = 2
+        controller.viewModeChosen(group)
+        XCTAssertEqual(panel.listViewMode, 2, "a segment switches the panel")
+        panel.viewLargeIcons(nil)                                 // Cmd-1
+        MainWindowController.selectViewMode(panel.listViewMode, in: [group])   // what windowDidUpdate does
+        XCTAssertEqual(group.selectedIndex, 0, "the switcher follows the menu")
     }
 
     func testMacLookClickAnywhereInTheRowSelects() throws {
@@ -174,7 +196,7 @@ final class NativeLookTests: AppHostTestCase {
         show(controller, "/Applications")
         let window = try XCTUnwrap(controller.window)
         XCTAssertTrue(wait(for: "title") { window.title == "Applications" })
-        XCTAssertEqual(window.subtitle, "/")
+        XCTAssertEqual(window.subtitle, "", "no path under the name: the address bar has it")
         XCTAssertEqual(window.representedURL?.path, "/Applications")
     }
 
@@ -231,20 +253,19 @@ final class NativeLookTests: AppHostTestCase {
             options.selectPage(options.pageCount - 1)
             let tabView = try XCTUnwrap(optionsWindow.contentView?.subviews.compactMap { $0 as? NSTabView }.first)
             XCTAssertEqual(tabView.tabViewType, .noTabsNoBorder, "a Settings window: the toolbar switches the panes")
-            XCTAssertEqual(tabView.selectedTabViewItem?.label, "macOS")
+            XCTAssertEqual(tabView.selectedTabViewItem?.label, "Language", "the last pane; no macOS pane any more")
             let toolbar = try XCTUnwrap(optionsWindow.toolbar)
             XCTAssertEqual(optionsWindow.toolbarStyle, .preference)
             XCTAssertEqual(toolbar.items.count, options.pageCount)
             XCTAssertFalse(toolbar.items.contains { $0.label.isEmpty || $0.image == nil })
             XCTAssertEqual(toolbar.selectedItemIdentifier, toolbar.items.last?.itemIdentifier)
-            XCTAssertEqual(optionsWindow.title, "macOS", "the title names the pane")
+            XCTAssertEqual(optionsWindow.title, "Language", "the title names the pane")
             XCTAssertEqual(optionsWindow.contentLayoutRect.height,
                            options.macContentHeight(for: try XCTUnwrap(tabView.selectedTabViewItem?.viewController as? OptionsPageBase)),
                            accuracy: 1, "the window fits the pane")
             let buttonTitles = (optionsWindow.contentView?.subviews ?? []).compactMap { ($0 as? NSButton)?.title }
             XCTAssertFalse(buttonTitles.contains("OK") || buttonTitles.contains("Cancel") || buttonTitles.contains("Apply"),
                            "changes apply at once")
-            try writeWholeWindow(optionsWindow, "options-macos-\(theme.rawValue)")
             options.selectPage(4)
             try writeWholeWindow(optionsWindow, "options-settings-\(theme.rawValue)")
             options.selectPage(0)                                   // System: the format icons
@@ -354,7 +375,6 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(settings.title, "Settings…")
         XCTAssertEqual(settings.keyEquivalent, ",")
         XCTAssertEqual(allItems(mac).filter { $0.action == #selector(a.toolsOptions(_:)) }.count, 1, "only in the app menu")
-        XCTAssertNotNil(find(mac.items[0].submenu!, #selector(AppDelegate.helpCheckForUpdates(_:))), "update check under About")
 
         let info = try XCTUnwrap(find(mac, #selector(a.fileProperties(_:))))
         XCTAssertEqual(info.title, "Get Info")
@@ -630,21 +650,23 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacSettingsApplyAtOnce() throws {
-        let wasGrid = Settings.showGrid
+        let wasTheme = Settings.string(Settings.Key.theme)
         defer {
-            Settings.showGrid = wasGrid
+            Settings.setString(wasTheme, Settings.Key.theme)
             if let w = OptionsWindowController.shared.window, w.isVisible { ModalProbe.close(w) }
         }
+        let wanted: AppTheme = Settings.theme == .dark ? .light : .dark
         let options = OptionsWindowController.shared
-        var page: OptionsMacPage?
+        var page: OptionsSettingsPage?
         XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { window in
-            options.selectPage(options.pageCount - 1)
+            options.selectPage(4)                                 // Settings: the macOS rows
             page = window.contentView?.subviews.compactMap { $0 as? NSTabView }.first?
-                .selectedTabViewItem?.viewController as? OptionsMacPage
-            page?.gridBox.performClick(nil)                       // while the window is up
+                .selectedTabViewItem?.viewController as? OptionsSettingsPage
+            page?.selectTheme(wanted)                             // while the window is up
+            page?.themeChosen(nil)
         })
         let macPage = try XCTUnwrap(page)
-        XCTAssertEqual(Settings.showGrid, !wasGrid, "the checkbox took effect without OK or Apply")
+        XCTAssertEqual(Settings.theme, wanted, "the theme took effect without OK or Apply")
         XCTAssertFalse(macPage.pageIsChanged, "nothing left to apply")
     }
 

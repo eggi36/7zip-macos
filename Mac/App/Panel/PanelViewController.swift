@@ -139,7 +139,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
 
     // MARK: views
     let pathBar = PathBarView()
-    private let upButton = PanelUpButton()
     let pathCombo = AddressComboBox()
     /// Finder's path bar under the list (PanelPathControl.swift).
     let pathControlBar = PanelPathControlBar()
@@ -181,12 +180,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         let root = NSView()
         root.translatesAutoresizingMaskIntoConstraints = false
 
-        upButton.setAccessibilityLabel(Lang.text(735, "Up One Level"))
-        upButton.toolTip = Lang.text(735, "Up One Level")   // kParentFolderID button
-        upButton.target = self
-        upButton.action = #selector(upButtonClicked(_:))
-        upButton.translatesAutoresizingMaskIntoConstraints = false
-
         pathCombo.isEditable = true
         pathCombo.completes = true
         pathCombo.usesDataSource = false
@@ -202,9 +195,10 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         // text are the only focus cue (listfeel.md §9). The keyboard focus itself is unchanged.
         pathCombo.focusRingType = .none
 
-        // The band (PanelAddressBar.swift): the Up button @2,1 23 x 22, the combo from x 33, 24 px.
+        // The band (PanelAddressBar.swift): the address field only. 7zFM's Up button
+        // (ToolbarWindow32 1002, kParentFolderID) is the toolbar's Up One Level next to Back /
+        // Forward here; Backspace and Go > Enclosing Folder still go up.
         pathBar.translatesAutoresizingMaskIntoConstraints = false
-        pathBar.addSubview(upButton)
         pathBar.addSubview(pathCombo)
 
         // details list
@@ -301,10 +295,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             pathBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             pathBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             pathBar.heightAnchor.constraint(equalToConstant: AppLook.bandHeight),
-            upButton.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: AppLook.upButtonRect.minX),
-            upButton.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: AppLook.upButtonRect.minY),
-            upButton.widthAnchor.constraint(equalToConstant: AppLook.upButtonRect.width),
-            upButton.heightAnchor.constraint(equalToConstant: AppLook.upButtonRect.height),
             pathCombo.leadingAnchor.constraint(equalTo: pathBar.leadingAnchor, constant: AppLook.comboX),
             pathCombo.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor, constant: -AppLook.comboInset.width),
             pathCombo.topAnchor.constraint(equalTo: pathBar.topAnchor, constant: AppLook.comboInset.height),
@@ -392,7 +382,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
     /// ReloadLangItems (01 §1.1, 01b §4.22): the column titles and the status-bar template come
     /// from the lang file, so a language switch re-creates the columns and reloads.
     @objc private func languageDidChange(_ note: Notification) {
-        upButton.toolTip = Lang.text(735, "Up One Level")
         folderTypeOfColumns = ""
         reload(keepScroll: true)
     }
@@ -693,7 +682,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         }
         updateAddressBar(snap)
         if previousPath != snap.fullPath { noteFolderVisited(snap.fullPath, previous: previousPath) }
-        upButton.isEnabled = !snap.isRoot
         updateSortIndicator()
         refreshStatusBar()
         delegate?.panelDidChangeFolder(self)
@@ -812,11 +800,16 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         restoreSelection(names: names, focusName: focus)
     }
 
-    /// 7zFM draws no sort arrow and no highlighted column in the header: CPanel never sets
-    /// HDF_SORTUP / HDF_SORTDOWN (no use anywhere in CPP/7zip/UI/FileManager; the fresh-default
-    /// capture shows a plain "Name" header). The port used to show the AppKit triangle.
-    private func updateSortIndicator() {
-        for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }
+    /// native-look: the sorted column's header shows the sort direction, as in Finder (the user's
+    /// finding). 7zFM itself sets no HDF_SORTUP / HDF_SORTDOWN; the sort (PanelSort.cpp) is the same.
+    /// No column is highlighted (LVM_SETSELECTEDCOLUMN is not used either), and an unsorted list
+    /// (View > Arrange By > Unsorted) shows no arrow.
+    func updateSortIndicator() {
+        let sorted = tableView.tableColumns.first { UInt32($0.identifier.rawValue) == sortPropID.rawValue }
+        let arrow = NSImage(named: ascending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator")
+        for column in tableView.tableColumns {
+            tableView.setIndicatorImage(column === sorted ? arrow : nil, in: column)
+        }
         tableView.highlightedTableColumn = nil
     }
 
@@ -843,6 +836,8 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         } else {
             view.window?.makeFirstResponder(iconView.collectionView)
         }
+        // Another first responder: an open Quick Look panel is bound to this list again.
+        refreshQuickLookIfShown()
     }
 
     // MARK: - Flat view (ChangeFlatMode, Panel.cpp:894-903)
@@ -1220,7 +1215,6 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
 
     // MARK: - Actions
 
-    @objc private func upButtonClicked(_ sender: Any?) { goUp() }
 
     @objc func doubleClicked(_ sender: Any?) {
         if tableView.clickedRow >= 0 {

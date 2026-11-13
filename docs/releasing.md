@@ -45,8 +45,7 @@ What the release workflow then does:
    - writes `<dmg>.sha256` and the release notes (`Mac/scripts/release-notes.sh`).
 2. **release**: creates the GitHub Release *7-Zip &lt;upstream&gt; for macOS &lt;port&gt;* on the tag,
    with the image and its `.sha256`. The body is the version's CHANGELOG section, then the install
-   steps (with the *Open Anyway* steps while the build is not notarized) and the SHA-256. The app's
-   update check shows the release's first lines, so the changelog comes first. Re-running the job
+   steps (with the *Open Anyway* steps while the build is not notarized) and the SHA-256. Re-running the job
    replaces the assets and the notes of the existing release.
 3. **tap**: if the secret `TAP_TOKEN` exists, rewrites `version` and `sha256` (and nothing else, so
    the cask's quarantine step is kept) in

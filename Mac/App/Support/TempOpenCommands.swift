@@ -167,6 +167,11 @@ enum ItemOpenCommands {
 
     /// Step 2 of OpenItemInArchive, under the Progress dialog (WaitMode: no dialog for a small
     /// item that finishes in under 500 ms).
+    /// Quick Look inside an archive (PanelArchivePreview.swift): the item in a temp folder.
+    static func extractForPreview(context: OperationContext, index: Int) -> SZTempFile? {
+        extractToTemp(context: context, index: index, editMode: false)
+    }
+
     private static func extractToTemp(context: OperationContext, index: Int, editMode: Bool) -> SZTempFile? {
         var runnerOptions = OperationRunner.Options(title: Lang.text(3300, "Extracting"))
         runnerOptions.initialStatus = .extracting

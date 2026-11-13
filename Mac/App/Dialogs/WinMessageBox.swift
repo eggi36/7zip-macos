@@ -33,14 +33,9 @@ import AppKit
 
 enum WinMessageBox {
 
-    /// MB_OK 0, MB_OKCANCEL 1, MB_YESNOCANCEL 3, MB_YESNO 4 -- the four 7zFM uses -- plus `custom`.
+    /// MB_OK 0, MB_OKCANCEL 1, MB_YESNOCANCEL 3, MB_YESNO 4 -- the four 7zFM uses.
     enum Buttons {
         case ok, okCancel, yesNo, yesNoCancel
-        /// macOS addition (pub3, the update check): up to three buttons with titles of their own,
-        /// answered as `.button1` ... `.button3` in this order; `escape` is the index of the button
-        /// Esc and the close box press (nil: none). Each button is at least the 75 px of a Windows
-        /// message-box button and wider when its title needs it (TaskDialog's custom buttons).
-        case custom([String], escape: Int?)
 
         var results: [Result] {
             switch self {
@@ -48,23 +43,11 @@ enum WinMessageBox {
             case .okCancel: return [.ok, .cancel]
             case .yesNo: return [.yes, .no]
             case .yesNoCancel: return [.yes, .no, .cancel]
-            case .custom(let titles, _): return Array(Result.customButtons.prefix(titles.count))
             }
         }
 
-        /// The button's caption: the lang text of a standard answer, or the custom title.
-        func title(of result: Result) -> String {
-            if case .custom(let titles, _) = self, let i = Result.customButtons.firstIndex(of: result), i < titles.count {
-                return Lang.stripMnemonic(titles[i])
-            }
-            return result.title
-        }
-
-        /// Custom titles: buttons as wide as their text needs (nil: the fixed Windows width).
-        var customTitles: [String]? {
-            if case .custom(let titles, _) = self { return titles.map(Lang.stripMnemonic) }
-            return nil
-        }
+        /// The button's caption: the lang text of the answer.
+        func title(of result: Result) -> String { result.title }
 
         /// What Esc, the close box and Cmd+W answer: IDCANCEL when there is a Cancel button, IDOK for
         /// a lone OK (measured: Esc ends an MB_OK box with 1), nothing for MB_YESNO.
@@ -73,9 +56,6 @@ enum WinMessageBox {
             case .ok: return .ok
             case .okCancel, .yesNoCancel: return .cancel
             case .yesNo: return nil
-            case .custom(let titles, let escape):
-                guard let escape, escape >= 0, escape < min(titles.count, Result.customButtons.count) else { return nil }
-                return Result.customButtons[escape]
             }
         }
     }
@@ -87,10 +67,6 @@ enum WinMessageBox {
     /// IDOK 1, IDCANCEL 2, IDYES 6, IDNO 7.
     enum Result: Int {
         case ok = 1, cancel = 2, yes = 6, no = 7
-        /// The buttons of `Buttons.custom`, first to third (pub3).
-        case button1 = 101, button2 = 102, button3 = 103
-
-        static let customButtons: [Result] = [.button1, .button2, .button3]
 
         var title: String {
             switch self {
@@ -98,7 +74,6 @@ enum WinMessageBox {
             case .cancel: return Lang.text(402, "Cancel")
             case .yes: return Lang.text(406, "Yes")
             case .no: return Lang.text(407, "No")
-            case .button1, .button2, .button3: return ""     // Buttons.title(of:) has the text
             }
         }
 
@@ -107,7 +82,7 @@ enum WinMessageBox {
             switch self {
             case .yes: return Self.mnemonic(Lang.get(406, "&Yes"))
             case .no: return Self.mnemonic(Lang.get(407, "&No"))
-            case .ok, .cancel, .button1, .button2, .button3: return nil
+            case .ok, .cancel: return nil
             }
         }
 
@@ -246,7 +221,7 @@ final class WinMessageBoxWindow: NSWindow {
             button.tag = answer.rawValue
             if i == 0 {
                 button.keyEquivalent = "\r"
-            } else if answer == .cancel || (answer == boxButtons.escapeResult && WinMessageBox.Result.customButtons.contains(answer)) {
+            } else if answer == .cancel {
                 button.keyEquivalent = "\u{1b}"
             }
             button.frame = mac.buttonFrames[i]

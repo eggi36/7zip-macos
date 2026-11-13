@@ -112,6 +112,45 @@ final class MacLookUITests: SevenZipUITestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: scratch + "/keep-me.txt"))
     }
 
+    // MARK: Quick Look follows the selection
+
+    /// Something in the Quick Look window that names the file it shows: its title bar's name or
+    /// the text preview (each scratch file holds its own name).
+    private func quickLookWindow(showing name: String) -> XCUIElement {
+        app.windows["Quick Look"].descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@ OR title CONTAINS %@ OR value CONTAINS %@", name, name, name))
+            .firstMatch
+    }
+
+    /// Space opens Quick Look on the selection; the arrows move the list under it and the preview
+    /// follows -- in Details, after switching to Large Icons (Cmd-1) and back (Cmd-4), where it
+    /// used to keep the old file (the user's finding).
+    func testQuickLookFollowsTheSelectionAcrossViewModes() throws {
+        let scratch = try makeScratch("ql", files: ["a.txt", "b.txt", "c.txt", "d.txt"])
+        launchMac([SettingsDomain.Key.panelPath0: scratch])
+        let panel = sevenZip.panel(0)
+        XCTAssertTrue(panel.waitForRow(named: "a.txt"))
+        panel.select("a.txt")
+        app.typeKey(" ", modifierFlags: [])
+        let opened = quickLookWindow(showing: "a.txt").waitForExistence(timeout: 15)
+        if !opened { sevenZip.dumpTree("maclook-ql-open"); print(app.windows["Quick Look"].debugDescription) }
+        XCTAssertTrue(opened, "Space opened no preview of a.txt: \(app.windows.allElementsBoundByIndex.map(\.title))")
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(quickLookWindow(showing: "b.txt").waitForExistence(timeout: 10),
+                      "Details, Down: \(app.windows.allElementsBoundByIndex.map(\.title))")
+        sevenZip.window.click()                                     // the main window in front again
+        app.typeKey("1", modifierFlags: .command)                   // View > Large Icons
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(quickLookWindow(showing: "c.txt").waitForExistence(timeout: 10),
+                      "Large Icons, Right: \(app.windows.allElementsBoundByIndex.map(\.title))")
+        app.typeKey("4", modifierFlags: .command)                   // View > Details
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(quickLookWindow(showing: "d.txt").waitForExistence(timeout: 10),
+                      "Details again, Down: \(app.windows.allElementsBoundByIndex.map(\.title))")
+        screenshot("quicklook-follows")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     // MARK: Undo Move to Trash
 
     func testMoveToTrashAndUndoPutsTheFileBack() throws {

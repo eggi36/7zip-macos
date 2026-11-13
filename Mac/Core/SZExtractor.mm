@@ -33,6 +33,8 @@
 #include "../../CPP/7zip/UI/Common/Extract.h"
 #include "../../CPP/7zip/UI/Common/ExtractingFilePath.h"
 #include "../../CPP/7zip/UI/Common/HashCalc.h"
+#include "../../CPP/7zip/Common/FileStreams.h"
+#include "Handlers/DiscRaw.h"          // SZIsXboxDiscImage
 #pragma pop_macro("BOOL")
 
 #import "Internal/SZHashBundleBridge.h"
@@ -850,8 +852,24 @@ HRESULT CSZExtractUICallback::Open_CryptoGetTextPassword(BSTR *password)
     // -t<type>: COpenType list for every archive of the batch.
     CObjectVector<COpenType> types;
     if (options.formatHint.length != 0)
+    {
       if (!ParseOpenTypes(*g_CodecsObj, SZUStringFromNSString(options.formatHint), types))
         return E_INVALIDARG;
+    }
+    else if (archivePaths.count != 0)
+    {
+      // Whole Xbox / Xbox 360 discs open as XDVDFS, not as their DVD-video partition
+      // (Handlers/DiscRaw.cpp) -- when every archive of the batch is one.
+      bool allXbox = true;
+      for (NSString *path in archivePaths)
+      {
+        CInFileStream *fileSpec = new CInFileStream;
+        CMyComPtr<IInStream> file = fileSpec;
+        if (!fileSpec->Open(SZFStringFromNSString(path)) || !SZIsXboxDiscImage(file)) { allXbox = false; break; }
+      }
+      if (allXbox && !ParseOpenTypes(*g_CodecsObj, UString(L"XDVDFS"), types))
+        return E_INVALIDARG;
+    }
     CIntVector excludedFormats;
 
     // "everything inside the archive": one include item "*", which makes

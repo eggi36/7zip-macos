@@ -109,7 +109,12 @@ static bool ReadPathFromRegistry(HKEY baseKey, LPCWSTR value, FString &path)
 #endif // Z7_EXTERNAL_CODECS
 
 
+#ifdef __APPLE__
+// macOS port: room for the disc-image handlers of Mac/Core/Handlers (Mac/docs/upstream-patches.md)
+static const unsigned kNumArcsMax = 96;
+#else
 static const unsigned kNumArcsMax = 72;
+#endif
 static unsigned g_NumArcs = 0;
 static const CArcInfo *g_Arcs[kNumArcsMax];
 

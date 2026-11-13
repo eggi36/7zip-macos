@@ -76,6 +76,7 @@
 				<string>org.7-zip.zso-archive</string>
 				<string>org.7-zip.isz-archive</string>
 				<string>org.7-zip.ecm-archive</string>
+				<string>org.7-zip.gcm-archive</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

@@ -1,7 +1,7 @@
 // AppTheme.swift -- the app-wide appearance (theme), a macOS addition: 7zFM has no theme setting
 // (reports/theme.md).
 //
-// Options > macOS > "Theme:" chooses System (follow the Mac's Light / Dark setting, the default),
+// Options > Settings > "Theme:" chooses System (follow the Mac's Light / Dark setting, the default),
 // Light or Dark. The choice is `NSApp.appearance` -- nil, `.aqua` or `.darkAqua` -- so it reaches
 // every window of the process at once: the file-manager windows, every dialog, the message boxes,
 // the progress windows and the 7zG-mode dialogs. Every custom-drawn component already picks its

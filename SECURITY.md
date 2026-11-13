@@ -16,7 +16,7 @@ answer as soon as possible; this is a volunteer project, so please allow some da
   A crash or memory-safety bug while listing, extracting or testing an archive may be exploitable.
 - **The Mac-specific code** is in scope: the SevenZipKit bridge (`Mac/Core/`), the app, the Finder
   extensions, the `sevenzip://` URL scheme and command mode, path handling during extraction
-  (path traversal, symbolic links), the quarantine attribute, and the update check.
+  (path traversal, symbolic links) and the quarantine attribute.
 - **The Quick Look preview extension** (`Mac/QuickLook/`), which lists an archive as soon as it is
   selected in Finder.
 - **Engine vulnerabilities** that also affect 7-Zip on other platforms (the same archive crashes

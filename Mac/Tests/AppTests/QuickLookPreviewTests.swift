@@ -263,8 +263,8 @@ final class QuickLookPreviewTests: AppHostTestCase {
         "\(election)    com.yrambler2001.7zip.QuickLook(1.2.0)\tA0FC853A-E8B3-4C0B-AA62-55563A0BD9F4\t2026-10-08 00:00:00 +0000\t\(path ?? appex)"
     }
 
-    func testCheckboxIsOnTheMacPageAndDisabledWithoutTheExtension() {
-        let page = OptionsMacPage()
+    func testCheckboxIsOnTheSettingsPageAndDisabledWithoutTheExtension() {
+        let page = OptionsSettingsPage()
         _ = page.view
         page.pageDidLoad()
         XCTAssertEqual(page.quickLookBox.title, "Quick Look preview for archives")
@@ -278,7 +278,7 @@ final class QuickLookPreviewTests: AppHostTestCase {
     func testCheckboxFollowsPlugInKitAndApplyElects() {
         var election: Character = " "
         let calls = stubPluginKit { self.registration(election) }
-        let page = OptionsMacPage()
+        let page = OptionsSettingsPage()
         page.quickLookAppexPath = appex
         _ = page.view
         page.pageDidLoad()

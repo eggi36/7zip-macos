@@ -2,7 +2,7 @@
 // handed from the app to the sandboxed extension (quicklook scope, a macOS addition).
 //
 // The extension draws an archive the way the app's list does, so it needs four of the app's
-// settings: the language (`Lang`, 01 §7.1), the theme (`FM.Theme`, Options > macOS), and the time
+// settings: the language (`Lang`, 01 §7.1), the theme (`FM.Theme`, Options > Settings), and the time
 // format of the Modified column (`FM.TimestampLevel`, `FM.TimestampShowUTC`, View > Time, 01 §2.3).
 // The extension is sandboxed and holds *no* entitlement besides the sandbox -- in particular not
 // the read-only shared-preference exception the Finder extension uses, because the app's domain

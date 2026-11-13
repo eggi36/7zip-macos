@@ -99,12 +99,11 @@ UPSTREAM_VERSION = 26.06     the 7-Zip engine (must equal MY_VERSION in C/7zVers
 - `CFBundleVersion` is the **build number**: `$BUILD_NUMBER` when set (CI), else the commit count of
   `HEAD`. `build.sh` and `test.sh` write it to `Mac/build/BuildNumber.xcconfig`, which the xcconfig
   includes optionally; a build straight from Xcode gets `1`.
-- The user-visible name is **7-Zip 26.06 for macOS 1.3.0**: the About box, the update check, the
+- The user-visible name is **7-Zip 26.06 for macOS 1.3.0**: the About box, the
   disk image `7-Zip-26.06-macOS-1.3.0.dmg` and its volume name. `Mac/scripts/version.sh` prints
   each form.
 - Releases are tagged `v<PORT_VERSION>` (`v1.3.0`) at
-  <https://github.com/yrambler2001/7zip-macos/releases>; the app's update check compares that tag
-  with its own version.
+  <https://github.com/yrambler2001/7zip-macos/releases>.
 
 To release a new version:
 
