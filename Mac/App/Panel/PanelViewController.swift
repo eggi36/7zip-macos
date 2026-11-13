@@ -141,6 +141,9 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
     let pathBar = PathBarView()
     private let upButton = PanelUpButton()
     let pathCombo = AddressComboBox()
+    /// native-look: Finder's path bar under the list (PanelPathControl.swift); never shown in Classic.
+    let pathControlBar = PanelPathControlBar()
+    private let hasPathControlBar = AppLook.isMac
     /// The list's themed WS_EX_CLIENTEDGE (recheck §2): a 1 px line, 1 px of white, then the list.
     private let listFrame = PanelListFrameView()
     private let listContainer = NSView()
@@ -300,8 +303,11 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         root.addSubview(pathBar)
         root.addSubview(listFrame)
         root.addSubview(listContainer)
+        root.addSubview(pathControlBar)
         root.addSubview(statusLine)
         root.addSubview(status)
+        pathControlBar.isShown = isMacLook && MacPathBar.isShown
+        pathControlBar.onOpen = { [weak self] path in self?.openFromPathControl(path) }
 
         let inset = PanelListFrameView.inset
         NSLayoutConstraint.activate([
@@ -320,7 +326,10 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
             listFrame.topAnchor.constraint(equalTo: pathBar.bottomAnchor),
             listFrame.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             listFrame.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            listFrame.bottomAnchor.constraint(equalTo: statusLine.topAnchor),
+            listFrame.bottomAnchor.constraint(equalTo: pathControlBar.topAnchor),
+            pathControlBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            pathControlBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            pathControlBar.bottomAnchor.constraint(equalTo: statusLine.topAnchor),
             listContainer.topAnchor.constraint(equalTo: listFrame.topAnchor, constant: inset),
             listContainer.leadingAnchor.constraint(equalTo: listFrame.leadingAnchor, constant: inset),
             listContainer.trailingAnchor.constraint(equalTo: listFrame.trailingAnchor, constant: -inset),
@@ -373,6 +382,27 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
                            name: Settings.Group.view.notificationName, object: nil)
         center.addObserver(self, selector: #selector(languageDidChange(_:)),
                            name: Settings.Group.language.notificationName, object: nil)
+        if hasPathControlBar {
+            center.addObserver(self, selector: #selector(pathBarVisibilityDidChange(_:)),
+                               name: MacPathBar.didChange, object: nil)
+        }
+    }
+
+    /// native-look: View > Show / Hide Path Bar, for every panel at once (as Finder).
+    @objc private func pathBarVisibilityDidChange(_ note: Notification) {
+        pathControlBar.isShown = MacPathBar.isShown
+    }
+
+    /// native-look: a click on a part of the path bar opens that folder; the folder this panel
+    /// came from is selected in it, as Up does.
+    private func openFromPathControl(_ path: String) {
+        let current = snapshot?.fullPath ?? ""
+        var child: String?
+        if current.hasPrefix(path) {
+            let rest = current.dropFirst(path.count).split(separator: "/")
+            child = rest.first.map(String.init)
+        }
+        navigate(to: path, select: child, focusListOnSuccess: true)
     }
 
     /// ReloadLangItems (01 §1.1, 01b §4.22): the column titles and the status-bar template come
@@ -1195,6 +1225,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         }
         pathCombo.addressCell?.icon = sized
         pathCombo.needsDisplay = true
+        if hasPathControlBar { pathControlBar.show(path: snap.isRoot ? "" : snap.fullPath) }
     }
 
     func focusList() {

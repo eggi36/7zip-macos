@@ -449,6 +449,49 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
     }
 
+    // MARK: native-look: path bar
+
+    func testMacPathBarClimbsThePath() throws {
+        XCTAssertEqual(MacPathBar.parts(of: "/Users/a/b"), ["/", "/Users", "/Users/a", "/Users/a/b"])
+        XCTAssertEqual(MacPathBar.parts(of: "/Volumes/Disk/x"), ["/Volumes/Disk", "/Volumes/Disk/x"])
+        XCTAssertEqual(MacPathBar.parts(of: ""), [])
+        defer { UserDefaults.standard.removeObject(forKey: "Mac.ShowPathBar") }
+        MacPathBar.isShown = true
+
+        let controller = try openWindow(look: .mac)
+        show(controller, "/Applications/Utilities")
+        let panel = controller.focusedPanel
+        let bar = panel.pathControlBar
+        XCTAssertFalse(bar.isHidden)
+        XCTAssertEqual(bar.shownPaths.last, "/Applications/Utilities")
+        XCTAssertEqual(bar.control.pathItems.last?.title, "Utilities")
+        XCTAssertEqual(bar.control.pathItems.first?.title, FileManager.default.displayName(atPath: "/"))
+        controller.window?.layoutIfNeeded()
+        XCTAssertEqual(bar.frame.height, PanelPathControlBar.height)
+
+        // A click on "Applications" opens it, with Utilities selected.
+        let index = try XCTUnwrap(bar.shownPaths.firstIndex(of: "/Applications"))
+        bar.openPart(at: index)
+        XCTAssertTrue(wait(for: "Applications listed") { panel.snapshot?.fullPath.hasPrefix("/Applications/Utilities") == false
+            && panel.rows.contains { $0.name == "Utilities" } })
+        XCTAssertEqual(panel.focusedRow()?.name, "Utilities")
+
+        // View > Hide Path Bar hides it in every panel; the menu item says what it will do.
+        let item = try XCTUnwrap(allItems(MainMenu.build()).first { $0.action == #selector(AppDelegate.toggleMacPathBar(_:)) })
+        XCTAssertEqual(item.keyEquivalent, "p")
+        XCTAssertEqual(item.keyEquivalentModifierMask, [.command, .option])
+        MacPathBar.isShown = false
+        controller.window?.layoutIfNeeded()
+        XCTAssertTrue(bar.isHidden)
+        XCTAssertEqual(bar.frame.height, 0)
+
+        let classic = try openWindow(look: .classic)
+        show(classic, "/Applications")
+        MacPathBar.isShown = true
+        XCTAssertTrue(classic.focusedPanel.pathControlBar.isHidden, "Classic has no path bar")
+        XCTAssertFalse(allItems(MainMenu.build()).contains { $0.action == #selector(AppDelegate.toggleMacPathBar(_:)) })
+    }
+
     // MARK: native-look: window tabs
 
     func testMacWindowsOpenAsTabs() throws {

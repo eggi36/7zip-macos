@@ -46,6 +46,9 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   - Windows can be tabs: *File ▸ New Tab* (Cmd+T), the tab bar's **+** and the Window menu's tab
     commands (*Merge All Windows*, *Move Tab to New Window* ...); a new tab starts from the saved
     settings like a new window. System Settings' "Prefer tabs" is followed.
+  - A Finder path bar under each panel's list (*View ▸ Show / Hide Path Bar*, Option+Cmd+P): the
+    folder's chain from its volume down with icons, archive folders included; a click opens that
+    folder with the one you came from selected. The editable address field stays above.
   - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
     window title, the window fitting each pane's height, and every change taking effect at once
     -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the

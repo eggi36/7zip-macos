@@ -10,7 +10,7 @@ import SevenZipKit
 
 enum MacTerm: String {
     case settings, newTab, newFolder, newFile, getInfo, moveToTrash, deleteImmediately, closeWindow
-    case go, enclosingFolder, sortBy, customizeToolbar, showToolbar, help
+    case go, enclosingFolder, sortBy, customizeToolbar, showToolbar, showPathBar, hidePathBar, help
 
     private var table: [String: String] {
         switch self {
@@ -27,6 +27,8 @@ enum MacTerm: String {
         case .sortBy: return ["en": "Sort By", "de": "Sortieren nach"]
         case .customizeToolbar: return ["en": "Customize Toolbar…", "de": "Symbolleiste anpassen …"]
         case .showToolbar: return ["en": "Show Toolbar", "de": "Symbolleiste einblenden"]
+        case .showPathBar: return ["en": "Show Path Bar", "de": "Pfadleiste einblenden"]
+        case .hidePathBar: return ["en": "Hide Path Bar", "de": "Pfadleiste ausblenden"]
         case .help: return ["en": "7-Zip Help", "de": "7-Zip-Hilfe"]
         }
     }

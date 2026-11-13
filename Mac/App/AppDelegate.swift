@@ -165,6 +165,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// native-look: View > Show / Hide Path Bar (Option+Cmd+P, as Finder).
+    @objc func toggleMacPathBar(_ sender: Any?) {
+        MacPathBar.isShown.toggle()
+    }
+
     /// File > New Window (macOS addition, no Windows resource ID): what a second 7zFM.exe launch
     /// gives on Windows -- a window that starts from the saved settings.
     @objc func fileNewWindow(_ sender: Any?) {
@@ -197,5 +202,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.synchronize()
         // `FreeGlobalCodecs()` (FM.cpp:776) is left to process exit: a Cmd+Q can arrive while an
         // operation's worker still holds the codecs, and freeing them under it would crash.
+    }
+}
+
+// native-look: View > Show / Hide Path Bar names what it will do, as Finder's item does.
+extension AppDelegate: NSMenuItemValidation {
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleMacPathBar(_:)) {
+            menuItem.title = MacPathBar.isShown ? MacTerm.hidePathBar.title : MacTerm.showPathBar.title
+        }
+        return true
     }
 }

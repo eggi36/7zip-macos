@@ -340,6 +340,11 @@ enum MainMenu {
             menu.addItem(show)
             menu.addItem(NSMenuItem(title: MacTerm.customizeToolbar.title,
                                     action: #selector(NSWindow.runToolbarCustomizationPalette(_:)), keyEquivalent: ""))
+            // Finder's path bar (PanelPathControl.swift); AppDelegate retitles Show / Hide.
+            let pathBar = NSMenuItem(title: MacTerm.showPathBar.title,
+                                     action: #selector(AppDelegate.toggleMacPathBar(_:)), keyEquivalent: "p")
+            pathBar.keyEquivalentModifierMask = [.command, .option]
+            menu.addItem(pathBar)
             menu.addItem(.separator())
         } else {
             addGoItems(to: menu)
