@@ -135,8 +135,13 @@ final class FinderIntegrationTests: SevenZipUITestCase {
         let app = XCUIApplication()
         app.launchArguments = ["x", "-o" + out + "/", "-ad", "-an",
                               "-aiw-!" + TestPaths.fixture("test.7z")]
+        // A settings domain of its own, as `SevenZipApp.launch` gives every launch: never the
+        // user's preferences (whose language would title the dialog in another language).
+        let seed = try SettingsSeedFile.make(name: "finder-argv", values: SettingsSeed.clean.preferences ?? [:])
+        addTeardownBlock { seed.remove() }
         app.launchEnvironment = ["SEVENZIP_UITEST": "1"]
             .merging(TestShard.environment(for: "FinderIntegrationTests")) { mine, _ in mine }
+            .merging(seed.launchEnvironment) { _, new in new }
         if app.state != .notRunning && app.state != .unknown { app.terminate() }
         app.launch()
 
