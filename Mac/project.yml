@@ -187,6 +187,10 @@ targets:
       # 02-engine-api.md section 4.3). Warnings are errors here.
       - path: Core/Platform
         compilerFlags: "-Wall -Wextra -Werror"
+      # Disc-image formats after Iso7z (CUE/BIN, CCD/IMG, GDI, MDS/MDF, NRG, CDI, CSO, CISO,
+      # ISZ, ECM, CHD, zisofs): handlers of our own, registered like upstream's (REGISTER_ARC).
+      - path: Core/Handlers
+        compilerFlags: "-Wall -Wextra -Werror"
       # Agent (archive-as-folder), patched per 02-engine-api.md section 4.2
       - path: ../CPP/7zip/UI/Agent/Agent.cpp
       - path: ../CPP/7zip/UI/Agent/AgentOut.cpp
@@ -531,6 +535,7 @@ targets:
         headerVisibility: project
         excludes:
           - "Platform/**"
+          - "Handlers/**"
           - "include/**"
           - "Info.plist"
       - path: Core/include
