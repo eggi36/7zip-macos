@@ -520,9 +520,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate, NSTab
         OptionsPostApply.reloadLangItems()
     }
 
-    /// PSN_APPLY on every changed page, in page order.
+    /// PSN_APPLY on every changed page, in page order (what closing the window and every change
+    /// on screen do; internal for the tests, whose probe has closed the window already).
     @discardableResult
-    private func applyChangedPages() -> Bool {
+    func applyChangedPages() -> Bool {
         for (i, page) in pages.enumerated() where page.pageIsChanged {
             if page.applyPage() {
                 page.clearChanged()

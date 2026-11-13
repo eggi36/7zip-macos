@@ -99,10 +99,6 @@ final class ThemeTests: AppHostTestCase {
         try XCTUnwrap(tabs.tabViewItems.compactMap { $0.viewController as? T }.first)
     }
 
-    private func applyButton(_ window: NSWindow) throws -> NSButton {
-        try XCTUnwrap(views(NSButton.self, in: window.contentView).first { $0.title == "Apply" })
-    }
-
     private func shot(_ window: NSWindow, _ name: String) {
         guard let data = DlgSnap.png(window) else { return XCTFail("no image for \(name)") }
         try? FileManager.default.createDirectory(atPath: TestPaths.screenshots, withIntermediateDirectories: true)
@@ -186,7 +182,7 @@ final class ThemeTests: AppHostTestCase {
         XCTAssertEqual(panel.tableView.gridStyleMask, [], "the list draws no grid by default")
         XCTAssertEqual(gridInk(panel), 0, "no grid pixels by default")
 
-        let (_, window, tabs) = try openOptions()
+        let (controller, window, tabs) = try openOptions()
         let mac = try page(OptionsMacPage.self, tabs)
         let settings = try page(OptionsSettingsPage.self, tabs)
         let settingsBox = try XCTUnwrap(views(NSButton.self, in: settings.view).first { $0.tag == 2505 })
@@ -194,16 +190,18 @@ final class ThemeTests: AppHostTestCase {
         XCTAssertEqual(settingsBox.state, .off)
         XCTAssertEqual(mac.gridBox.title, settingsBox.title, "the same caption (lang 2505)")
 
-        mac.gridBox.performClick(nil)                      // on, on the macOS tab
-        XCTAssertEqual(settingsBox.state, .on, "the Settings tab follows")
-        try applyButton(window).performClick(nil)
+        // On screen a change applies at once; the probe has closed the window, so the test commits
+        // as closing it would.
+        mac.gridBox.performClick(nil)                      // on, on the macOS pane
+        XCTAssertEqual(settingsBox.state, .on, "the Settings pane follows")
+        controller.applyChangedPages()
         XCTAssertTrue(Settings.showGrid)
         XCTAssertTrue(wait(for: "grid on in the panel") { panel.tableView.gridStyleMask != [] })
         XCTAssertGreaterThan(gridInk(panel), 0, "Apply redraws the list with grid lines")
 
-        settingsBox.performClick(nil)                      // off, on the Settings tab
-        XCTAssertEqual(mac.gridBox.state, .off, "the macOS tab follows")
-        try applyButton(window).performClick(nil)
+        settingsBox.performClick(nil)                      // off, on the Settings pane
+        XCTAssertEqual(mac.gridBox.state, .off, "the macOS pane follows")
+        controller.applyChangedPages()
         XCTAssertFalse(Settings.showGrid)
         XCTAssertTrue(wait(for: "grid off in the panel") { panel.tableView.gridStyleMask == [] })
         XCTAssertEqual(gridInk(panel), 0, "Apply redraws the list without them: \(gridInkInfo)")
@@ -217,7 +215,8 @@ final class ThemeTests: AppHostTestCase {
         XCTAssertEqual(box2.state, .on)
     }
 
-    /// Non-white pixels in a 3 px strip on the first column's right edge, over the listed rows.
+    /// Pixels on the first column's right edge that differ from the row background 10 pt to the
+    /// left of it (the rows are striped, so "not white" is no grid), over the listed rows.
     private var gridInkInfo = ""
 
     private func gridInk(_ panel: PanelViewController) -> Int {
@@ -230,8 +229,9 @@ final class ThemeTests: AppHostTestCase {
         let column = table.rect(ofColumn: 0)
         let strip = NSRect(x: column.maxX - 2, y: 0, width: 3, height: rows)
         let pixels = ContrastProbe.pixels(of: table, in: strip)
+        let background = ContrastProbe.pixels(of: table, in: strip.offsetBy(dx: -10, dy: 0))
         panel.listFocusOverride = nil
-        let ink = pixels.filter { !$0.isClose(to: .white, tolerance: 6) }
+        let ink = zip(pixels, background).filter { !$0.0.isClose(to: $0.1, tolerance: 6) }.map(\.0)
         gridInkInfo = "mask=\(table.gridStyleMask.rawValue) strip=\(strip) colours=\(Set(ink).prefix(6)) window=\(table.window?.title ?? "nil") rows=\(table.numberOfRows)"
         return ink.count
     }
