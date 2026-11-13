@@ -256,7 +256,7 @@ final class LinkDialog: NSObject {
                     parent: NSWindow? = nil) -> Bool {
         let dialog = LinkDialog(currentDirPrefix: currentDirPrefix, filePath: filePath,
                                 anotherPath: anotherPath, parent: parent)
-        DialogKit.runModal(for: dialog.window)
+        DialogKit.runModal(for: dialog.window, asSheet: true)   // native-look: a sheet
         dialog.window.orderOut(nil)
         return dialog.didCreateLink
     }

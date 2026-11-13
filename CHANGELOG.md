@@ -26,6 +26,21 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
     Cancel left of OK and Help as the round "?" button at the left. Every control stays where
     the Windows layout puts it, so nothing moves out of reach.
+  - Dialogs about a window's content open as sheets of that window, as the HIG asks: Add to
+    Archive, Extract, Copy, Move, Rename, Create Folder, Split, Link, the password and overwrite
+    questions and every message box -- while a progress window, the benchmark or a 7zG command
+    owns them they stay windows of their own. Each still answers the code that asked, so nothing
+    else changes. The one-field dialog (Rename, Create Folder, Comment, Select) shows its caption
+    as a bold heading, since a sheet has no title bar.
+  - The menus use the Mac's names and shortcuts: *Settings…* (Cmd+,), *About* and *Check for
+    Updates…* in the 7-Zip menu; *New Window* Cmd+N, *New Folder* Shift+Cmd+N, *New File*
+    Option+Cmd+N, *Open* Cmd+O, *Move to Trash* with *Delete Immediately…* under Option, *Get
+    Info* Cmd+I, *Close Window*; Cut, Copy and Paste first in Edit; a *Sort By* submenu with
+    Finder's Control+Option+Cmd+1-5, *Show Toolbar* and *Customize Toolbar…* in View; Finder's
+    **Go** menu with Back, Forward, *Enclosing Folder*, Open Root Folder and Folders History;
+    *7-Zip Help* with Cmd+?. Comment moves to Option+Cmd+K so Cmd+Z is left for Undo. 7-Zip's
+    Windows keys (F1, F7, Alt+Enter, Cmd+F3 ...) keep working. The new names exist in English and
+    German; other languages keep their translation of the Windows name.
   - Options is a Mac Settings window: a toolbar of panes with symbols, the pane's name as the
     window title, the window fitting each pane's height, and every change taking effect at once
     -- no OK, Cancel or Apply (a text field commits when you leave it; an invalid value keeps the

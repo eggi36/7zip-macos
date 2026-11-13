@@ -67,6 +67,7 @@ enum AppLook: String, CaseIterable {
                 guard now != applied else { return }
                 applied = now
                 MainWindows.rebuildForLookChange()
+                NSApp.mainMenu = MainMenu.build()       // native-look: the menus follow the look
             }
         }
     }

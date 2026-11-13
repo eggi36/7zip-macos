@@ -424,6 +424,39 @@ extension DialogKit {
     }
 }
 
+// MARK: - native-look: dialogs as sheets
+
+extension DialogKit {
+
+    /// The window a dialog attaches to as a sheet in the Mac look (HIG "Sheets": a dialog about a
+    /// window's content belongs to that window): its owner when that is a main 7-Zip window, or a
+    /// dialog that is itself a sheet of one (a question asked from the Add to Archive sheet), on
+    /// screen and without a sheet already. nil = run it as a window of its own -- Classic, 7zG
+    /// mode, or a dialog owned by a progress window, the benchmark or nothing.
+    static func sheetParent(for window: NSWindow) -> NSWindow? {
+        guard AppLook.isMac, !GMode.isActive else { return nil }
+        let hint = (window as? DialogWindow)?.owner ?? (window as? WinMessageBoxWindow)?.ownerWindow
+        guard let owner = owner(for: window, parent: hint), owner.isVisible, !owner.isMiniaturized,
+              owner.attachedSheet == nil else { return nil }
+        if owner.windowController is MainWindowController { return owner }
+        if let grand = owner.sheetParent, grand.windowController is MainWindowController { return owner }
+        return nil
+    }
+
+    /// `runModal(for:)` as a sheet of the owner in the Mac look (`sheetParent(for:)`), kept
+    /// synchronous like the browse panel's sheet: a modal session for the sheet window itself, so
+    /// every caller still gets its answer on return. Without a sheet parent it is `runModal(for:)`.
+    @discardableResult
+    static func runModal(for window: NSWindow, asSheet: Bool) -> NSApplication.ModalResponse {
+        guard asSheet, let parent = sheetParent(for: window) else { return runModal(for: window) }
+        if window.isVisible { window.orderOut(nil) }
+        parent.beginSheet(window) { _ in }
+        let response = runModal(for: window)
+        if window.sheetParent != nil || parent.attachedSheet === window { parent.endSheet(window) }
+        return response
+    }
+}
+
 // MARK: - control factories
 
 /// Small helpers so every dialog is laid out the same way (GuiCommon.rc: margin m = 8,

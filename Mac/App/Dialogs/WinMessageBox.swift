@@ -444,7 +444,7 @@ final class WinMessageBoxWindow: NSWindow {
     func runModal() -> WinMessageBox.Result {
         for observer in WinMessageBox.observers { observer(self) }
         placeOnOwnersScreen()
-        if result == nil { _ = DialogKit.runModal(for: self) }
+        if result == nil { _ = DialogKit.runModal(for: self, asSheet: true) }   // native-look: a sheet
         if isVisible { orderOut(nil) }
         ownerWindow?.makeKeyAndOrderFront(nil)
         return result ?? boxButtons.escapeResult ?? .no

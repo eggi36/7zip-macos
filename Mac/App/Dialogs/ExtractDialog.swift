@@ -415,7 +415,7 @@ final class ExtractDialog: NSObject, NSTextFieldDelegate {
     /// Runs the dialog modally. nil = Cancel. Main thread only.
     static func run(_ options: Options) -> Result? {
         let dialog = ExtractDialog(options: options)
-        DialogKit.runModal(for: dialog.window)
+        DialogKit.runModal(for: dialog.window, asSheet: true)   // native-look: a sheet
         dialog.window.orderOut(nil)
         return dialog.result
     }

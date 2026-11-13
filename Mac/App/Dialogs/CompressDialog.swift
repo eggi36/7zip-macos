@@ -63,7 +63,7 @@ final class CompressDialogController: NSObject, NSTextFieldDelegate, NSComboBoxD
         }
         controller.buildWindow()
         controller.loadInitialState()
-        DialogKit.runModal(for: controller.window)
+        DialogKit.runModal(for: controller.window, asSheet: true)   // native-look: a sheet
         controller.window.orderOut(nil)
         return controller.result
     }

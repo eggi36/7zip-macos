@@ -374,6 +374,168 @@ final class NativeLookTests: AppHostTestCase {
                        "Classic: Space calculates the folder size, as 7zFM does")
     }
 
+    // MARK: native-look: Mac menus
+
+    /// Every command item (selector + tag) of a menu tree, hidden twins included.
+    private func commands(_ menu: NSMenu) -> Set<String> {
+        var out = Set<String>()
+        for item in menu.items {
+            if let action = item.action { out.insert("\(NSStringFromSelector(action))#\(item.tag)") }
+            if let sub = item.submenu { out.formUnion(commands(sub)) }
+        }
+        return out
+    }
+
+    private func allItems(_ menu: NSMenu) -> [NSMenuItem] {
+        menu.items.flatMap { [$0] + ($0.submenu.map(allItems) ?? []) }
+    }
+
+    private func find(_ menu: NSMenu, _ action: Selector, tag: Int? = nil) -> NSMenuItem? {
+        allItems(menu).first { $0.action == action && !$0.isHidden && (tag == nil || $0.tag == tag) }
+    }
+
+    func testMacMenusUseMacNamesAndKeepEveryCommand() throws {
+        defer { Settings.look = .classic; NSApp.mainMenu = MainMenu.build() }
+        Settings.look = .classic
+        let classic = MainMenu.build()
+        Settings.look = .mac
+        let mac = MainMenu.build()
+        let lost = commands(classic).subtracting(commands(mac))
+        XCTAssertTrue(lost.isEmpty, "no command is lost in the Mac menus: \(lost.sorted())")
+
+        let a = MenuActions.self
+        let settings = try XCTUnwrap(find(mac.items[0].submenu!, #selector(a.toolsOptions(_:))))
+        XCTAssertEqual(settings.title, "Settings…")
+        XCTAssertEqual(settings.keyEquivalent, ",")
+        XCTAssertEqual(allItems(mac).filter { $0.action == #selector(a.toolsOptions(_:)) }.count, 1, "only in the app menu")
+        XCTAssertNotNil(find(mac.items[0].submenu!, #selector(AppDelegate.helpCheckForUpdates(_:))), "update check under About")
+
+        let info = try XCTUnwrap(find(mac, #selector(a.fileProperties(_:))))
+        XCTAssertEqual(info.title, "Get Info")
+        XCTAssertEqual(info.keyEquivalent, "i")
+        let folder = try XCTUnwrap(find(mac, #selector(a.fileCreateFolder(_:))))
+        XCTAssertEqual(folder.title, "New Folder")
+        XCTAssertEqual(folder.keyEquivalentModifierMask, [.command, .shift])
+        let f7 = try XCTUnwrap(allItems(mac).first { $0.action == #selector(a.fileCreateFolder(_:)) && $0.isHidden },
+                               "F7 still works through a hidden twin")
+        XCTAssertTrue(f7.allowsKeyEquivalentWhenHidden)
+        XCTAssertEqual(find(mac, #selector(a.fileDelete(_:)), tag: 548)?.title, "Move to Trash")
+        XCTAssertEqual(find(mac, #selector(a.fileDelete(_:)), tag: MainMenu.deleteImmediatelyTag)?.isAlternate, true)
+        XCTAssertEqual(find(mac, #selector(a.fileExit(_:)))?.title, "Close Window")
+        XCTAssertEqual(find(mac, #selector(a.fileNewWindow(_:)))?.keyEquivalent, "n")
+        XCTAssertEqual(find(mac, #selector(a.fileNewWindow(_:)))?.keyEquivalentModifierMask, [.command])
+
+        let titles = mac.items.compactMap { $0.submenu?.title }
+        XCTAssertTrue(titles.contains("Go"), "Finder's Go menu: \(titles)")
+        let go = try XCTUnwrap(mac.items.first { $0.submenu?.title == "Go" }?.submenu)
+        XCTAssertNotNil(find(go, #selector(a.viewGoBack(_:))))
+        XCTAssertEqual(find(go, #selector(a.viewOpenParentFolder(_:)))?.title, "Enclosing Folder")
+        XCTAssertNotNil(find(mac, #selector(NSWindow.runToolbarCustomizationPalette(_:))))
+        XCTAssertEqual(find(mac, #selector(a.helpContents(_:)))?.keyEquivalent, "?")
+        let edit = try XCTUnwrap(mac.items[2].submenu)
+        XCTAssertEqual(edit.items.first?.action, #selector(NSText.cut(_:)), "Cut, Copy, Paste first")
+
+        // Cmd+Z is Undo on the Mac: nothing else may take it, and no two items share a shortcut.
+        var seen: [String: String] = [:]
+        for item in allItems(mac) where !item.keyEquivalent.isEmpty && !item.isAlternate {
+            let key = "\(item.keyEquivalentModifierMask.rawValue)-\(item.keyEquivalent.lowercased())"
+            if let other = seen[key] {
+                XCTFail("'\(item.title)' and '\(other)' share a shortcut")
+            }
+            seen[key] = item.title
+        }
+        XCTAssertNil(seen["\(NSEvent.ModifierFlags.command.rawValue)-z"], "Cmd+Z stays free for Undo")
+        XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
+    }
+
+    // MARK: native-look: sheets
+
+    func testMacDialogsAreSheetsOfTheirWindow() throws {
+        defer { while NSApp.modalWindow != nil { NSApp.abortModal() } }
+        for look in [AppLook.mac, .classic] {
+            let controller = try openWindow(look: look)
+            show(controller, "/Applications")
+            let window = try XCTUnwrap(controller.window)
+            window.makeKeyAndOrderFront(nil)
+            var parent: NSWindow?
+            var answered: WinMessageBox.Result?
+            XCTAssertTrue(ModalProbe.present({
+                answered = WinMessageBox.run("Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
+                                             buttons: .yesNo, icon: .question, owner: window)
+            }) { box in
+                parent = box.sheetParent
+                if look == .mac { try? self.writeSheet(box, on: window, "sheet-alert") }
+                (box as? WinMessageBoxWindow)?.answer(.yes)
+            })
+            XCTAssertEqual(answered, .yes, "the caller still gets its answer")
+            // A DialogKit dialog: Extract, cancelled through its close path (IDCANCEL).
+            var extractParent: NSWindow?
+            var extract = ExtractDialog.Options()
+            extract.directoryPath = "/Users/Shared/"
+            extract.archivePath = "/Users/Shared/demo.zip"
+            extract.parentWindow = window          // as the panel passes it (the test app may be inactive)
+            var returned = false, extractResult: ExtractDialog.Result?
+            XCTAssertTrue(ModalProbe.present({ extractResult = ExtractDialog.run(extract); returned = true }) { dialog in
+                extractParent = dialog.sheetParent
+                if look == .mac { try? self.writeSheet(dialog, on: window, "sheet-extract") }
+                dialog.performClose(nil)
+            })
+            XCTAssertTrue(returned, "run() returned")
+            XCTAssertNil(extractResult, "cancelled")
+            XCTAssertTrue(look == .mac ? extractParent === window : extractParent == nil)
+            XCTAssertNil(window.attachedSheet)
+            // The one-field dialog (Create Folder, Rename, ...): as a sheet its caption is a heading.
+            var labels: [String] = []
+            XCTAssertTrue(ModalProbe.present({
+                _ = ComboDialog.run(title: "Create Folder", label: "Folder name:", value: "New Folder", parent: window)
+            }) { dialog in
+                func texts(_ v: NSView) -> [String] {
+                    ((v as? NSTextField).map { [$0.stringValue] } ?? []) + v.subviews.flatMap(texts)
+                }
+                labels = dialog.contentView.map(texts) ?? []
+                if look == .mac { try? self.writeSheet(dialog, on: window, "sheet-create-folder") }
+                dialog.performClose(nil)
+            })
+            XCTAssertEqual(labels.contains("Create Folder"), look == .mac, "the heading names the command: \(labels)")
+            if look == .mac {
+                XCTAssertTrue(parent === window, "Mac: the question is a sheet of its window")
+                XCTAssertNil(window.attachedSheet, "and it is gone afterwards")
+            } else {
+                XCTAssertNil(parent, "Classic: a window of its own")
+            }
+            controller.closeDiscardingState()
+            // The test keeps the closed window alive; its toolbar would go on syncing with the
+            // next test's (same identifier), so it is detached here.
+            window.toolbar = nil
+        }
+    }
+
+    /// The window with its sheet drawn in place.
+    private func writeSheet(_ sheet: NSWindow, on window: NSWindow, _ name: String) throws {
+        func image(_ w: NSWindow) throws -> NSBitmapImageRep {
+            let view = try XCTUnwrap(w.contentView?.superview)
+            view.layoutSubtreeIfNeeded()
+            view.displayIfNeeded()
+            let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: rep)
+            return rep
+        }
+        _ = wait(for: "draw", timeout: 0.5) { false }
+        let base = try image(window), top = try image(sheet)
+        let out = NSImage(size: window.frame.size, flipped: false) { _ in
+            base.draw(in: NSRect(origin: .zero, size: window.frame.size))
+            top.draw(in: NSRect(origin: NSPoint(x: sheet.frame.minX - window.frame.minX, y: sheet.frame.minY - window.frame.minY),
+                                size: sheet.frame.size))
+            return true
+        }
+        let tiff = try XCTUnwrap(out.tiffRepresentation)
+        let png = try XCTUnwrap(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]))
+        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+        attachment.name = "\(screenshotPrefix)-\(name).png"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testMacSettingsApplyAtOnce() throws {
         Settings.look = .mac
         let wasGrid = Settings.showGrid

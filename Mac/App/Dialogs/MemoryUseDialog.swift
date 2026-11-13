@@ -179,7 +179,7 @@ final class MemoryUseDialog: NSObject {
     /// k_Stop + E_ABORT.
     static func run(_ options: Options, parent: NSWindow? = nil) -> Result? {
         let dialog = MemoryUseDialog(options: options, parent: parent)
-        DialogKit.runModal(for: dialog.window)
+        DialogKit.runModal(for: dialog.window, asSheet: true)   // native-look: a sheet
         dialog.window.orderOut(nil)
         return dialog.result
     }
