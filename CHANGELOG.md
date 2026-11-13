@@ -16,7 +16,7 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - **A Mac look replaces the Windows look.** The same window, panels, menus, keys and commands,
   drawn with macOS's own chrome: the toolbar in the title bar with SF Symbols and Back /
   Forward / Up next to the title, the folder's
-  name as the window title with its path below and a proxy icon, a Finder-style list (system font,
+  name as the window title with a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. The theme follows the system's
   Light / Dark until one is chosen (Options ▸ macOS ▸ Theme); this applies to everyone who kept the
@@ -107,6 +107,7 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 - The About box shows the build: its number, when it was built and from which commit
   ("Build 402 (2026-11-13 21:50:07 1faab4b0c2)", "+" for uncommitted changes), so every compile
   can be told apart.
+- The sorted column's header shows the sort direction, as in Finder (7-Zip on Windows shows none).
 - The leftovers of the Windows look are gone: the old 7-Zip logo, the Windows toolbar bitmaps, the
   `.ico` document icons and the scripts that converted them. The address bar's history list now
   shows the system icon for an archive and highlights in the accent colour, and the selection

@@ -259,16 +259,26 @@ final class Fix111Tests: AppHostTestCase {
         }
     }
 
-    private func assertNoSortIndicator(_ panel: PanelViewController, _ when: String, line: UInt = #line) {
+    /// native-look: the sorted column, and only it, shows the direction as in Finder; no column is
+    /// highlighted (no LVM_SETSELECTEDCOLUMN).
+    private func assertSortIndicator(_ panel: PanelViewController, _ propID: SZPropID?, ascending: Bool,
+                                     _ when: String, line: UInt = #line) {
+        let up = NSImage(named: "NSAscendingSortIndicator"), down = NSImage(named: "NSDescendingSortIndicator")
         for column in panel.tableView.tableColumns {
-            XCTAssertNil(panel.tableView.indicatorImage(in: column), "\(when): 7zFM sets no HDF_SORTUP/HDF_SORTDOWN", line: line)
+            let image = panel.tableView.indicatorImage(in: column)
+            if let propID, UInt32(column.identifier.rawValue) == propID.rawValue {
+                XCTAssertTrue(image != nil && image === (ascending ? up : down),
+                              "\(when): \(column.title) shows the \(ascending ? "ascending" : "descending") arrow", line: line)
+            } else {
+                XCTAssertNil(image, "\(when): \(column.title) shows no arrow", line: line)
+            }
         }
         XCTAssertNil(panel.tableView.highlightedTableColumn, "\(when): no LVM_SETSELECTEDCOLUMN", line: line)
     }
 
     /// 7zFM 26.0x (PanelSort.cpp SortItemsWithPropID, OnColumnClick; MyLoadMenu.cpp GetSortControlID;
     /// PanelItems.cpp InitColumns / SaveListViewInfo): a header click sorts by that column, a second
-    /// click reverses it; Size and the times start descending; the header shows no arrow; View >
+    /// click reverses it; Size and the times start descending; the header shows the direction (native-look; 7zFM shows none); View >
     /// Arrange By checks the sort's item, Name for a column without one; the sort is kept per folder
     /// type (the file system and each archive format apart).
     func testHeaderClickSortsReversesAndPersistsPerFolderType() throws {
@@ -296,15 +306,15 @@ final class Fix111Tests: AppHostTestCase {
         navigate(panel, to: dir)
         waitOrder(panel, ["sub", "a.txt", "b.bin", "c.tar", "notes.md"], "fresh: Name ascending")
         XCTAssertEqual(checkedArrangeItem(panel), ["Name"])
-        assertNoSortIndicator(panel, "fresh")
+        assertSortIndicator(panel, .name, ascending: true, "fresh")
 
         try clickHeader(panel, .size)
         waitOrder(panel, ["sub", "b.bin", "c.tar", "a.txt", "notes.md"], "Size starts descending")
         XCTAssertEqual(checkedArrangeItem(panel), ["Size"])
-        assertNoSortIndicator(panel, "size 1")
+        assertSortIndicator(panel, .size, ascending: false, "size 1")
         try clickHeader(panel, .size)
         waitOrder(panel, ["sub", "notes.md", "a.txt", "c.tar", "b.bin"], "a second click reverses")
-        assertNoSortIndicator(panel, "size 2")
+        assertSortIndicator(panel, .size, ascending: true, "size 2")
         try clickHeader(panel, .name)
         waitOrder(panel, ["sub", "a.txt", "b.bin", "c.tar", "notes.md"], "order")
         try clickHeader(panel, .name)
@@ -312,7 +322,7 @@ final class Fix111Tests: AppHostTestCase {
         try clickHeader(panel, .ctime)
         waitOrder(panel, ["sub", "b.bin", "notes.md", "a.txt", "c.tar"], "Created starts descending")
         XCTAssertEqual(checkedArrangeItem(panel), ["Name"], "GetSortControlID: a column without an item checks Name")
-        assertNoSortIndicator(panel, "created")
+        assertSortIndicator(panel, .ctime, ascending: false, "created")
 
         // Ctrl+F6 / View > Arrange By > Size: the same SortItemsWithPropID
         panel.viewArrangeBySize(nil)
@@ -321,6 +331,7 @@ final class Fix111Tests: AppHostTestCase {
         XCTAssertEqual(checkedArrangeItem(panel), ["Date"])
         panel.viewArrangeNoSort(nil)
         XCTAssertEqual(checkedArrangeItem(panel), ["Unsorted"])
+        assertSortIndicator(panel, nil, ascending: true, "unsorted")
         panel.viewArrangeBySize(nil)
         try clickHeader(panel, .size)                     // size ascending, kept for the file system
 
@@ -345,7 +356,7 @@ final class Fix111Tests: AppHostTestCase {
         navigate(second.focusedPanel, to: dir)
         XCTAssertEqual(second.focusedPanel.sortPropID, .size)
         waitOrder(second.focusedPanel, ["sub", "notes.md", "a.txt", "c.tar", "b.bin"], "new window")
-        assertNoSortIndicator(second.focusedPanel, "new window")
+        assertSortIndicator(second.focusedPanel, .size, ascending: true, "new window")
     }
 
     // MARK: - 4. status bar insets

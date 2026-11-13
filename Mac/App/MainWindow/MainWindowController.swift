@@ -412,15 +412,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     }
 
     /// CApp::RefreshTitle (App.cpp:963): the focused panel's path, "7-Zip" when empty.
-    /// native-look: the Mac look names the folder (or archive) in the title, as Finder does, with the
-    /// full path as the subtitle, and gives a file-system folder its proxy icon and path menu.
+    /// native-look: the Mac look names the folder (or archive) in the title, as Finder does, and
+    /// gives a file-system folder its proxy icon and path menu (Cmd-click on the title). No path
+    /// subtitle: the address bar shows the path already (the user's finding).
     private func refreshTitle() {
         let path = focusedPanel.currentPath
         guard let window else { return }
         let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
         let name = (trimmed as NSString).lastPathComponent
         window.title = path.isEmpty ? "7-Zip" : (name.isEmpty || name == "/" ? trimmed : name)
-        window.subtitle = path.isEmpty ? "" : (trimmed as NSString).deletingLastPathComponent
+        window.subtitle = ""
         if let snapshot = focusedPanel.snapshot, snapshot.isFileSystem, !snapshot.fullPath.isEmpty {
             window.representedURL = URL(fileURLWithPath: snapshot.fullPath, isDirectory: true)
         } else if let snapshot = focusedPanel.snapshot, !snapshot.archivePath.isEmpty {

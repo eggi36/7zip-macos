@@ -812,11 +812,16 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         restoreSelection(names: names, focusName: focus)
     }
 
-    /// 7zFM draws no sort arrow and no highlighted column in the header: CPanel never sets
-    /// HDF_SORTUP / HDF_SORTDOWN (no use anywhere in CPP/7zip/UI/FileManager; the fresh-default
-    /// capture shows a plain "Name" header). The port used to show the AppKit triangle.
-    private func updateSortIndicator() {
-        for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }
+    /// native-look: the sorted column's header shows the sort direction, as in Finder (the user's
+    /// finding). 7zFM itself sets no HDF_SORTUP / HDF_SORTDOWN; the sort (PanelSort.cpp) is the same.
+    /// No column is highlighted (LVM_SETSELECTEDCOLUMN is not used either), and an unsorted list
+    /// (View > Arrange By > Unsorted) shows no arrow.
+    func updateSortIndicator() {
+        let sorted = tableView.tableColumns.first { UInt32($0.identifier.rawValue) == sortPropID.rawValue }
+        let arrow = NSImage(named: ascending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator")
+        for column in tableView.tableColumns {
+            tableView.setIndicatorImage(column === sorted ? arrow : nil, in: column)
+        }
         tableView.highlightedTableColumn = nil
     }
 

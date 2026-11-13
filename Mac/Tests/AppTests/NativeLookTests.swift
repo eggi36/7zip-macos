@@ -178,7 +178,7 @@ final class NativeLookTests: AppHostTestCase {
         show(controller, "/Applications")
         let window = try XCTUnwrap(controller.window)
         XCTAssertTrue(wait(for: "title") { window.title == "Applications" })
-        XCTAssertEqual(window.subtitle, "/")
+        XCTAssertEqual(window.subtitle, "", "no path under the name: the address bar has it")
         XCTAssertEqual(window.representedURL?.path, "/Applications")
     }
 
