@@ -32,8 +32,8 @@ pages.
 ## Added on macOS
 
 - **Theme**: Options ▸ macOS ▸ Theme — System, Light or Dark, independent of the system setting.
-- **Options ▸ macOS tab**: the theme, grid lines, the update check and the Quick Look preview; the
-  other tabs are the Windows ones.
+- **Options ▸ macOS tab**: the theme, the Quick Look preview and Reset All Settings; the other tabs
+  are the Windows ones.
 - **Finder integration**: the 7-Zip submenu on Finder's right-click menu (configurable like the
   Windows one), Quick Actions, Services, document icons for 40 archive types.
 - **Back / Forward** (Command-[ / Command-]) over each panel's folder history.
@@ -42,8 +42,6 @@ pages.
   method, solid, counts, sizes, ratio) and its contents with the Details list's columns, icons and
   font, folders first; a tree instead of folder navigation. Read-only, no password prompt, capped
   at about 2 s / 10 000 entries. Options ▸ macOS ▸ *Quick Look preview for archives* (on by default).
-- **Update check** (1.0.0): the app checks GitHub Releases for a new version at startup and from
-  Help ▸ Check for Updates.
 
 ## Known limitations
 

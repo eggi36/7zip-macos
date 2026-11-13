@@ -9,10 +9,15 @@
 // Split, Combine, Flat View, 2 Panels, Folders History, Benchmark), and AppKit saves the arrangement
 // and the icon / label mode for every window (`sz.main.mac`).
 //
-// View > Toolbars still works on it: "Archive Toolbar" and "Standard Toolbar" add or remove their
-// group, "Show Buttons Text" switches between icon and label and icon only, and their check marks
-// show what the toolbar holds (`syncMaskFromMacToolbar`). "Large Buttons" has no Mac counterpart
-// (macOS sizes toolbar icons itself) and has no effect.
+// View > Show Buttons Text (IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753) switches between icon and
+// label and icon only, and its check mark shows what the toolbar does (`syncMaskFromMacToolbar`).
+// 7zFM's Archive Toolbar / Standard Toolbar / Large Buttons are not in the menu: Customize
+// Toolbar... adds and removes buttons, and macOS sizes toolbar icons itself. The Toolbars setting
+// still records which groups a toolbar holds, and a fresh one starts with them.
+//
+// Back, Forward and Up One Level are navigational items: they sit next to the title, and
+// Customize Toolbar... can put Up One Level there (01 §1.3: Up is the address bar's button on
+// Windows).
 
 import AppKit
 
@@ -98,9 +103,9 @@ extension MainWindowController: NSToolbarDelegate {
         }
     }
 
-    /// The items a fresh toolbar starts with: the View > Toolbars groups of the mask.
+    /// The items a fresh toolbar starts with: Back, Forward, Up, then the groups of the mask.
     var macToolbarItems: [NSToolbarItem.Identifier] {
-        var ids: [NSToolbarItem.Identifier] = [.szBack, .szForward, .flexibleSpace]
+        var ids: [NSToolbarItem.Identifier] = [.szBack, .szForward, .szUp, .flexibleSpace]
         let archive = (toolbarsMaskForMac & 8) != 0
         let standard = (toolbarsMaskForMac & 4) != 0
         if archive { ids += Self.macArchiveGroup }
@@ -109,8 +114,8 @@ extension MainWindowController: NSToolbarDelegate {
         return ids
     }
 
-    /// Puts the window's NSToolbar up once; later View > Toolbars changes edit it in place, so a
-    /// customised arrangement is never thrown away.
+    /// Puts the window's NSToolbar up once; later changes edit it in place, so a customised
+    /// arrangement is never thrown away.
     func installMacToolbar() {
         guard let window, window.toolbar == nil else { return }
         let toolbar = NSToolbar(identifier: Self.macToolbarIdentifier)
@@ -125,8 +130,8 @@ extension MainWindowController: NSToolbarDelegate {
         window.toolbar = toolbar
     }
 
-    /// The View > Toolbars bits that the Mac toolbar currently shows: archive group, standard group,
-    /// labels. The Large Buttons bit is kept as it is.
+    /// The Toolbars mask bits that the Mac toolbar currently shows: archive group, standard group,
+    /// labels. The Large Buttons bit (no Mac counterpart) is kept as it is.
     func macToolbarMask(keeping mask: UInt32) -> UInt32 {
         guard let toolbar = window?.toolbar else { return mask }
         let ids = Set(toolbar.items.map(\.itemIdentifier))
@@ -135,18 +140,6 @@ extension MainWindowController: NSToolbarDelegate {
         if Self.macStandardGroup.contains(where: ids.contains) { result |= 4 }
         if toolbar.displayMode != .iconOnly { result |= 1 }
         return result
-    }
-
-    /// View > Archive Toolbar / Standard Toolbar in the Mac look: remove the group when any of it
-    /// is there, else add it at the end.
-    func toggleMacToolbarGroup(_ group: [NSToolbarItem.Identifier]) {
-        guard let toolbar = window?.toolbar else { return }
-        let present = toolbar.items.enumerated().filter { group.contains($0.element.itemIdentifier) }
-        if !present.isEmpty {
-            for (index, _) in present.reversed() { toolbar.removeItem(at: index) }
-            return
-        }
-        for id in group { toolbar.insertItem(withItemIdentifier: id, at: toolbar.items.count) }
     }
 
     /// View > Show Buttons Text in the Mac look.
@@ -171,7 +164,7 @@ extension MainWindowController: NSToolbarDelegate {
         let action: Selector
         if let extra = Self.macExtraSpec(itemIdentifier) {
             (label, action) = extra
-            item.isNavigational = itemIdentifier == .szBack || itemIdentifier == .szForward
+            item.isNavigational = [.szBack, .szForward, .szUp].contains(itemIdentifier)
         } else if let spec = Self.toolbarSpec(itemIdentifier) {
             (label, action) = (spec.label, spec.action)
         } else {

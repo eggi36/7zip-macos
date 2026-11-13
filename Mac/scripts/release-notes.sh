@@ -7,9 +7,7 @@
 #   --notarized  the image is Developer ID signed and notarized: leave out the Open Anyway steps
 #
 # The body is the version's section of CHANGELOG.md (its "## [X.Y.Z]" heading and the link
-# definitions at the bottom left out, relative links made absolute at the tag), then how to install, then the image's SHA-256. The first
-# lines matter: the app's update check shows the first six non-blank lines of the body
-# (Mac/App/Support/UpdateCheck.swift), so the changelog comes first.
+# definitions at the bottom left out, relative links made absolute at the tag), then how to install, then the image's SHA-256.
 # Exit: 0, 1 when CHANGELOG.md has no section for the version, 2 bad usage.
 set -euo pipefail
 

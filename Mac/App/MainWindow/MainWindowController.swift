@@ -23,7 +23,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         return true
     }()
     private var toolbarsMask = Settings.toolbarsMask
-    /// native-look: the View > Toolbars mask for the Mac toolbar (MacToolbar.swift).
+    /// native-look: the Toolbars mask for the Mac toolbar (MacToolbar.swift).
     var toolbarsMaskForMac: UInt32 { toolbarsMask }
     /// Set when the window closes: it has saved its state then, and must not save again on Quit,
     /// where it would overwrite a window closed later (`MainWindows.saveAllForTermination`).
@@ -238,7 +238,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         // for write-back into its parent (PanelNestedArchives.swift, 01 §3.8).
         for panel in panels { panel.closeNestedArchivesForShutdown() }
         MainWindows.didClose(self)
-        // Toolbars with one identifier mirror each other's item changes (View > Toolbars, a
+        // Toolbars with one identifier mirror each other's item changes (View > Show Buttons Text, a
         // customization). A closed window that something still holds must not take part: its
         // toolbar can be out of step, and AppKit then replays a change at an index it lacks.
         let closing = window
@@ -529,8 +529,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         return FMToolbarItemSpec(identifier: id.rawValue, label: label, action: action)
     }
 
-    /// ReloadToolbars: the archive buttons, then the standard ones, back to back; labels per
-    /// "Show Buttons Text", bitmaps per "Large Buttons". Also the language switch's re-label.
+    /// ReloadToolbars: puts the window's NSToolbar up (MacToolbar.swift) and saves the mask.
     func reloadToolbars() {
         installMacToolbar()
         Settings.toolbarsMask = toolbarsMask
@@ -551,19 +550,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         Settings.autoRefresh = autoRefresh
     }
 
-    @objc func viewArchiveToolbar(_ sender: Any?) {                                                   // IDM_VIEW_ARCHIVE_TOOLBAR 750
-        toggleMacToolbarGroup(Self.macArchiveGroup); syncMaskFromMacToolbar()
-    }
-    @objc func viewStandardToolbar(_ sender: Any?) {                                                  // IDM_VIEW_STANDARD_TOOLBAR 751
-        toggleMacToolbarGroup(Self.macStandardGroup); syncMaskFromMacToolbar()
-    }
-    @objc func viewToolbarsLargeButtons(_ sender: Any?) { toolbarsMask ^= 2; reloadToolbars() }       // IDM_VIEW_TOOLBARS_LARGE_BUTTONS 752: IDB_* 48x36 vs IDB_*2 24x24
     @objc func viewToolbarsShowButtonsText(_ sender: Any?) {                                          // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
         toggleMacToolbarText(); syncMaskFromMacToolbar()
     }
 
-    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the View >
-    /// Toolbars check marks see the same choice.
+    /// native-look: the mask follows what the (customizable) Mac toolbar holds, so View > Show
+    /// Buttons Text's check mark and the saved setting see the same choice.
     func syncMaskFromMacToolbar() {
         let mask = macToolbarMask(keeping: toolbarsMask)
         guard mask != toolbarsMask else { return }
@@ -681,13 +673,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             return shown
         case #selector(viewTwoPanels(_:)): item.state = numPanels == 2 ? .on : .off
         case #selector(viewAutoRefresh(_:)): item.state = autoRefresh ? .on : .off
-        case #selector(viewArchiveToolbar(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 8) != 0 ? .on : .off
-        case #selector(viewStandardToolbar(_:)):
-            syncMaskFromMacToolbar(); item.state = (toolbarsMask & 4) != 0 ? .on : .off
         case #selector(viewToolbarsShowButtonsText(_:)):
             syncMaskFromMacToolbar(); item.state = (toolbarsMask & 1) != 0 ? .on : .off
-        case #selector(viewToolbarsLargeButtons(_:)): item.state = (toolbarsMask & 2) != 0 ? .on : .off
         case #selector(viewTimestampLevel(_:)):
             item.state = ((item.representedObject as? Int) == Settings.timestampLevel) ? .on : .off
         case #selector(viewTimeUTC(_:)): item.state = Settings.timestampShowUTC ? .on : .off

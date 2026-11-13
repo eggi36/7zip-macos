@@ -148,25 +148,4 @@ final class Sec113Tests: AppHostTestCase {
         // The snapshot the extensions read carries the new one.
         XCTAssertEqual(FinderSettingsBridge.snapshotDictionary()[URLCommandToken.settingsKey] as? String, second)
     }
-
-    // MARK: - the update checker's Download button
-
-    func testDownloadOpensOnlyThisRepositorysReleasePages() throws {
-        func release(_ s: String) throws -> ReleaseInfo { ReleaseInfo(tagName: "v9.9.9", htmlURL: try XCTUnwrap(URL(string: s))) }
-        let good = "https://github.com/yrambler2001/7zip-macos/releases/tag/v9.9.9"
-        XCTAssertEqual(UpdateCheck.downloadURL(for: try release(good)).absoluteString, good)
-        for bad in ["http://github.com/yrambler2001/7zip-macos/releases/tag/v9.9.9",
-                    "https://evil.example/yrambler2001/7zip-macos/releases/tag/v9.9.9",
-                    "https://github.com.evil.example/yrambler2001/7zip-macos/releases/tag/v1",
-                    "https://user@github.com/yrambler2001/7zip-macos/releases/tag/v1",
-                    "https://github.com:444/yrambler2001/7zip-macos/releases/tag/v1",
-                    "https://github.com/someone/7zip-macos/releases/tag/v1",
-                    "https://github.com/yrambler2001/7zip-macos/releases/../../evil",
-                    "https://github.com/yrambler2001/7zip-macos/releases/%2e%2e/x",
-                    "https://github.com/yrambler2001/7zip-macos/releasesX/tag/v1",
-                    "file:///Applications/Calculator.app",
-                    "x-7zip:///run?argv=W10"] {
-            XCTAssertEqual(UpdateCheck.downloadURL(for: try release(bad)), UpdateCheck.releasesPageURL, bad)
-        }
-    }
 }

@@ -340,15 +340,10 @@ final class NavGapsTests: AppHostTestCase {
         for id in [NSToolbarItem.Identifier.szAdd, .szExtract, .szTest, .szCopy, .szMove, .szDelete, .szInfo] {
             XCTAssertNotNil(MainWindowController.macToolbarSymbol(id), "\(id)")
         }
-        // Both logical toolbars off: no command in the window's toolbar; one back on: its commands.
+        // Both groups of the mask: the window's toolbar has its commands.
         controller.window?.contentView?.layoutSubtreeIfNeeded()
         XCTAssertFalse(controller.commandToolbarItems.isEmpty)
         _ = attach(try XCTUnwrap(controller.window), "navgaps-03-toolbar-bitmaps")
-        controller.viewArchiveToolbar(nil)
-        controller.viewStandardToolbar(nil)
-        XCTAssertTrue(controller.commandToolbarItems.isEmpty, "no logical toolbar, no commands")
-        controller.viewStandardToolbar(nil)
-        XCTAssertFalse(controller.commandToolbarItems.isEmpty)
         XCTAssertEqual(PanelSplitView().dividerThickness, 1)
     }
 

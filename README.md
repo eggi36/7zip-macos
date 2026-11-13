@@ -38,9 +38,9 @@ Current version: **7-Zip 26.06 for macOS 1.3.0**.
   click away.
   Options ▸ macOS turns it off.
 - **93 languages** — the official 7-Zip translations, switchable while the app runs.
-- **Light and Dark** themes: Light by default, Dark or following the system in Options ▸ macOS.
+- **Light and Dark** themes: following the system by default, or fixed to Light or Dark in Options ▸ macOS.
 - **Native**: Swift and AppKit on top of the unchanged C/C++ engine. No emulation, no
-  third-party code, no network access except the optional update check.
+  third-party code, no network access.
 
 **Add to archive**
 
@@ -162,16 +162,9 @@ default application. A single type can also be switched in Finder with **Get Inf
 
 ## Updates
 
-When the File Manager starts, at most once a day, the app asks GitHub whether a newer release
-exists; **Help ▸ Check for Updates…** asks at any time. If there is one, a message box shows the
-new version and the first lines of its release notes, with **Download** (opens the release page in
-your browser), **Later** and **Skip This Version**. Nothing is downloaded or installed by the app.
-Homebrew users can also `brew upgrade --cask 7zip-macos`.
-
-**Privacy:** the app contacts `api.github.com` once a day at startup
-(`GET /repos/yrambler2001/7zip-macos/releases/latest`, with nothing but the standard `Accept` and
-`User-Agent` headers) and makes no other network request. Turn it off in **Options ▸ macOS ▸
-Check for updates at startup**; Finder commands (7-Zip's right-click menu) never check.
+The app does not check for updates and makes no network request. New versions are on the
+[releases page](https://github.com/yrambler2001/7zip-macos/releases); Homebrew users can
+`brew upgrade --cask 7zip-macos`.
 
 ## Differences from 7-Zip on Windows
 

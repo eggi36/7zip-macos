@@ -15,7 +15,7 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
 - **A Mac look replaces the Windows look.** The same window, panels, menus, keys and commands,
   drawn with macOS's own chrome: the toolbar in the title bar with SF Symbols and Back /
-  Forward next to the title (View ▸ Toolbars still picks the groups and the labels), the folder's
+  Forward / Up next to the title, the folder's
   name as the window title with its path below and a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
   file icons), a rounded address field and a quiet status bar. The theme follows the system's
@@ -90,14 +90,23 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
   of Apple's utilities with the same grey zipper, its pull in 7-Zip blue, and no lettering (as the
   HIG asks of app icons). `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
   - A click anywhere on a row selects it, as in Finder.
-  - A fresh install shows the toolbar's symbols without labels, as Mac apps do (*View ▸ Toolbars
-    ▸ Show Buttons Text* adds them).
+  - A fresh install shows the toolbar's symbols without labels, as Mac apps do (*View ▸ Show
+    Buttons Text* adds them).
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
     Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
-    arrangement is saved. View ▸ Toolbars adds or removes the archive and standard groups in place.
+    arrangement is saved. Up One Level can go next to Back / Forward. The View ▸ Toolbars submenu is
+    gone: Customize Toolbar… adds and removes buttons, Large Buttons has no Mac counterpart, and
+    Show Buttons Text is directly in the View menu.
 
 ### Changed
 
+- **The update check is removed**, until further notice: no Check for Updates… menu item, no
+  "Check for updates at startup" option, and the app makes no network request at all.
+- Options ▸ macOS no longer repeats "Show grid lines"; it is on the Settings page, where 7-Zip on
+  Windows has it (the same setting as before).
+- The About box shows the build: its number, when it was built and from which commit
+  ("Build 402 (2026-11-13 21:50:07 1faab4b0c2)", "+" for uncommitted changes), so every compile
+  can be told apart.
 - The leftovers of the Windows look are gone: the old 7-Zip logo, the Windows toolbar bitmaps, the
   `.ico` document icons and the scripts that converted them. The address bar's history list now
   shows the system icon for an archive and highlights in the accent colour, and the selection

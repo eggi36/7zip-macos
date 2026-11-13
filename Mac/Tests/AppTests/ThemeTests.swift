@@ -172,7 +172,7 @@ final class ThemeTests: AppHostTestCase {
 
     // MARK: - Show grid lines
 
-    func testGridLinesAreOffByDefaultAndBothCheckboxesAgree() throws {
+    func testGridLinesAreOffByDefaultAndOnlyOnTheSettingsPage() throws {
         Settings.removeKey(Settings.Key.showGrid)
         force(.light)
         XCTAssertFalse(Settings.showGrid, "LVS_EX_GRIDLINES off on a fresh install")
@@ -186,31 +186,28 @@ final class ThemeTests: AppHostTestCase {
         let mac = try page(OptionsMacPage.self, tabs)
         let settings = try page(OptionsSettingsPage.self, tabs)
         let settingsBox = try XCTUnwrap(views(NSButton.self, in: settings.view).first { $0.tag == 2505 })
-        XCTAssertEqual(mac.gridBox.state, .off)
         XCTAssertEqual(settingsBox.state, .off)
-        XCTAssertEqual(mac.gridBox.title, settingsBox.title, "the same caption (lang 2505)")
+        XCTAssertFalse(views(NSButton.self, in: mac.view).contains { $0.title == settingsBox.title },
+                       "the macOS page has no second grid box")
 
         // On screen a change applies at once; the probe has closed the window, so the test commits
         // as closing it would.
-        mac.gridBox.performClick(nil)                      // on, on the macOS pane
-        XCTAssertEqual(settingsBox.state, .on, "the Settings pane follows")
+        settingsBox.performClick(nil)                      // on
         controller.applyChangedPages()
         XCTAssertTrue(Settings.showGrid)
         XCTAssertTrue(wait(for: "grid on in the panel") { panel.tableView.gridStyleMask != [] })
         XCTAssertGreaterThan(gridInk(panel), 0, "Apply redraws the list with grid lines")
 
-        settingsBox.performClick(nil)                      // off, on the Settings pane
-        XCTAssertEqual(mac.gridBox.state, .off, "the macOS pane follows")
+        settingsBox.performClick(nil)                      // off
         controller.applyChangedPages()
         XCTAssertFalse(Settings.showGrid)
         XCTAssertTrue(wait(for: "grid off in the panel") { panel.tableView.gridStyleMask == [] })
         XCTAssertEqual(gridInk(panel), 0, "Apply redraws the list without them: \(gridInkInfo)")
 
-        // persisted, and a fresh open shows it on both tabs
+        // persisted, and a fresh open shows it
         Settings.showGrid = true
         ModalProbe.close(window)
         let (_, _, tabs2) = try openOptions()
-        XCTAssertEqual(try page(OptionsMacPage.self, tabs2).gridBox.state, .on)
         let box2 = try XCTUnwrap(views(NSButton.self, in: try page(OptionsSettingsPage.self, tabs2).view).first { $0.tag == 2505 })
         XCTAssertEqual(box2.state, .on)
     }
