@@ -873,19 +873,6 @@
 		     open and everything else to the compress command. -->
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Any file or folder (drop to compress)</string>
-			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
-			<key>LSHandlerRank</key>
-			<string>None</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>public.item</string>
-				<string>public.folder</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleTypeName</key>
 			<string>CUE Archive</string>
 			<key>CFBundleTypeExtensions</key>
 			<array>
@@ -1123,6 +1110,19 @@
 			</array>
 			<key>LSTypeIsPackage</key>
 			<false/>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Any file or folder (drop to compress)</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>None</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.item</string>
+				<string>public.folder</string>
+			</array>
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
