@@ -152,11 +152,9 @@ final class ThemeTests: AppHostTestCase {
     // MARK: - the setting
 
     /// fix112: Light is the default (absent or unknown); every choice, System included, is stored.
-    func testThemeSettingDefaultsToLightAndAppliesAtOnce() {
+    func testThemeSettingDefaultsToSystemAndAppliesAtOnce() {
         Settings.removeKey(Settings.Key.theme)
-        XCTAssertEqual(Settings.theme, .light, "absent = Light")
-        AppTheme.applyStored()
-        XCTAssertEqual(NSApp.appearance?.name, .aqua, "the default forces Light")
+        XCTAssertEqual(Settings.theme, .system, "absent = System")
         force(.dark)
         XCTAssertEqual(Settings.string(Settings.Key.theme), "dark")
         force(.light)
@@ -166,7 +164,7 @@ final class ThemeTests: AppHostTestCase {
         XCTAssertNil(NSApp.appearance, "System leaves the appearance to macOS")
         XCTAssertEqual(Settings.theme, .system)
         Settings.setString("bogus", Settings.Key.theme)
-        XCTAssertEqual(Settings.theme, .light, "an unknown value reads as the default")
+        XCTAssertEqual(Settings.theme, .system, "an unknown value reads as the default")
         // A test reset replaces the domain and posts keyless notifications: the theme follows.
         Settings.setString("dark", Settings.Key.theme)
         NSApp.appearance = nil
@@ -175,37 +173,6 @@ final class ThemeTests: AppHostTestCase {
     }
 
     // MARK: - Options > macOS
-
-    func testMacTabIsLastAndAppliesTheThemeOnApply() throws {
-        Settings.theme = .system
-        AppTheme.applyStored()
-        let (controller, window, tabs) = try openOptions()
-        XCTAssertEqual(tabs.tabViewItems.last?.label, "macOS")
-        XCTAssertEqual(tabs.tabViewItems.map(\.label).prefix(6),
-                       ["System", "7-Zip", "Folders", "Editor", "Settings", "Language"], "the Windows pages first, unchanged")
-        let mac = try page(OptionsMacPage.self, tabs)
-        controller.selectPage(controller.pageCount - 1)
-        XCTAssertEqual(mac.themePopup.itemTitles, ["System", "Light", "Dark"])
-        XCTAssertEqual(mac.themeLabel.stringValue, "Theme:")
-        XCTAssertEqual(mac.selectedTheme, .system)
-        mac.themePopup.selectItem(at: 2)
-        mac.themeChosen(mac.themePopup)
-        XCTAssertNil(NSApp.appearance, "nothing changes before Apply")
-        let apply = try applyButton(window)
-        XCTAssertTrue(apply.isEnabled)
-        apply.performClick(nil)
-        XCTAssertEqual(NSApp.appearance?.name, .darkAqua, "Apply switches the whole app to Dark")
-        XCTAssertEqual(window.effectiveAppearance.name, .darkAqua, "the Options window itself too")
-        // persisted in the domain's file
-        Settings.synchronize()
-        if let path = Settings.domainPlistPath(), let dict = NSDictionary(contentsOfFile: path) {
-            XCTAssertEqual(dict[Settings.Key.theme] as? String, "dark", "FM.Theme on disk")
-        }
-        // reopening shows the stored value
-        ModalProbe.close(window)
-        let (_, _, tabs2) = try openOptions()
-        XCTAssertEqual(try page(OptionsMacPage.self, tabs2).selectedTheme, .dark)
-    }
 
     // MARK: - Show grid lines
 
@@ -271,39 +238,6 @@ final class ThemeTests: AppHostTestCase {
 
     // MARK: - fits
 
-    /// The macOS tab: every control inside the page, every text inside its frame, and the tab row
-    /// (now seven tabs) inside the sheet, in the six test languages.
-    func testMacTabFitsWithoutScrollingInSixLanguages() throws {
-        continueAfterFailure = true
-        for code in ["-", "de", "ru", "fr", "ja", "ar"] {
-            useLanguage(code)
-            let (controller, window, tabs) = try openOptions()
-            controller.selectPage(controller.pageCount - 1)
-            window.contentView?.layoutSubtreeIfNeeded()
-            let mac = try page(OptionsMacPage.self, tabs)
-            let pageView = mac.view
-            for child in pageView.subviews where !child.isHidden {
-                XCTAssertTrue(pageView.bounds.insetBy(dx: -1, dy: -1).contains(child.frame),
-                              "\(code): \(type(of: child)) \(child.frame) leaves \(pageView.bounds)")
-            }
-            XCTAssertTrue(views(NSScrollView.self, in: pageView).isEmpty, "\(code): nothing scrolls")
-            XCTAssertLessThanOrEqual(mac.themeLabel.intrinsicContentSize.width, mac.themeLabel.frame.width + 0.5,
-                                     "\(code): '\(mac.themeLabel.stringValue)' fits")
-            XCTAssertLessThan(mac.themeLabel.frame.maxX, mac.themePopup.frame.minX + 1, "\(code): label left of the combo")
-            let checkText = (mac.gridBox.title as NSString).size(withAttributes: [.font: mac.gridBox.font ?? DialogMetrics.font]).width
-            XCTAssertLessThanOrEqual(checkText + 20, mac.gridBox.frame.width, "\(code): '\(mac.gridBox.title)' fits")
-            for title in mac.themePopup.itemTitles {
-                let w = (title as NSString).size(withAttributes: [.font: DialogMetrics.font]).width
-                XCTAssertLessThanOrEqual(w, mac.themePopup.frame.width - 24, "\(code): '\(title)' fits the combo")
-            }
-            let tabControl = try XCTUnwrap(views(OptionsTabControl.self, in: window.contentView).first)
-            let tabEnd = tabControl.tabRects().last?.maxX ?? 0
-            XCTAssertLessThanOrEqual(tabEnd + 2, tabControl.bounds.width, "\(code): the seven tabs fit in one row")
-            ModalProbe.close(window)
-        }
-        useLanguage("-")
-    }
-
     // MARK: - forced themes: contrast + screenshots
 
     func testMainWindowIsReadableInBothForcedThemes() throws {
@@ -343,22 +277,10 @@ final class ThemeTests: AppHostTestCase {
                     XCTAssertGreaterThanOrEqual(m.ratio, 4.5, "\(theme) header \(c): \(m.text) on \(m.background)")
                 }
             }
-            for button in main.toolbarView.buttons.prefix(4) {
-                let r = button.bounds
-                let label = NSRect(x: r.minX + 2, y: button.isFlipped ? r.maxY - 16 : r.minY, width: r.width - 4, height: 15)
-                guard let m = ContrastProbe.measure(button, label) else { continue }
-                XCTAssertGreaterThanOrEqual(m.ratio, 4.5, "\(theme) toolbar '\(button.title)': \(m.text) on \(m.background)")
-            }
             // the address field's text
             let combo = panel.pathCombo
             if let m = ContrastProbe.measure(combo, combo.bounds.insetBy(dx: 30, dy: 4)) {
                 XCTAssertGreaterThanOrEqual(m.ratio, 4.5, "\(theme) address: \(m.text) on \(m.background)")
-            }
-            // the Windows-grey face: light (240) in Light, dark in Dark
-            let face = ContrastProbe.pixels(of: main.toolbarView, in: NSRect(x: main.toolbarView.bounds.maxX - 6, y: 2, width: 4, height: 4))
-            if let p = face.first {
-                if theme == .dark { XCTAssertLessThan(p.luminance, 0.1, "Dark face \(p)") }
-                else { XCTAssertTrue(p.isClose(to: RGB(r: 240, g: 240, b: 240), tolerance: 4), "Light face \(p)") }
             }
             panel.listFocusOverride = nil
             shot(window, "main-\(theme.rawValue)")
@@ -416,7 +338,7 @@ final class ThemeTests: AppHostTestCase {
                                       icon: .question, owner: nil)
             }) { w in
                 self.checkTexts(in: w, "message box \(theme)", minimum: 0)
-                if let text = self.views(WinMessageBoxText.self, in: w.contentView).first,
+                if let text = self.views(NSTextField.self, in: w.contentView).first,
                    let m = ContrastProbe.measure(text, text.bounds) {
                     XCTAssertGreaterThanOrEqual(m.ratio, 4.5, "message box text \(theme): \(m.text) on \(m.background)")
                 }

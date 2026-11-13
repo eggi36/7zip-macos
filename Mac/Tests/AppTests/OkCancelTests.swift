@@ -280,21 +280,6 @@ final class OkCancelTests: AppHostTestCase {
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
     }
 
-    /// The combo's hover state really follows the mouse now (it never did: the messages raised).
-    func testComboHoverFollowsTheMouse() {
-        let combo = WinComboBox(frame: NSRect(x: 0, y: 0, width: 100, height: 21))
-        let event = NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0,
-                                           windowNumber: 0, context: nil, eventNumber: 0, trackingNumber: 0,
-                                           userData: nil)!
-        guard let owner = combo.trackingAreas.first?.owner as? NSResponder else {
-            return XCTFail("the combo's tracking area has no responder owner")
-        }
-        owner.mouseEntered(with: event)
-        XCTAssertTrue(combo.hover.isInside)
-        owner.mouseExited(with: event)
-        XCTAssertFalse(combo.hover.isInside)
-    }
-
     // MARK: - an exception inside a modal session
 
     /// An Objective-C exception raised while a dialog is modal (here from a timer inside the
@@ -369,15 +354,6 @@ final class OkCancelTests: AppHostTestCase {
         }
         XCTAssertNotNil(weakIcon, "AddressComboCell: the icon was freed by a copy")
         XCTAssertTrue(address.icon === weakIcon)
-
-        // WinPopUpButtonCell.hover
-        let popup = WinPopUpButtonCell()
-        weak var weakHover: WinComboHover?
-        autoreleasepool {
-            weakHover = popup.hover
-            for _ in 0..<3 { _ = popup.copy() }
-        }
-        XCTAssertNotNil(weakHover, "WinPopUpButtonCell: the hover owner was freed by a copy")
 
         // WinHeaderCell.titleFont: a font is shared, so count its references instead.
         let header = WinHeaderCell(textCell: "Name")

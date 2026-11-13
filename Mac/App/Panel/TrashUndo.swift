@@ -1,6 +1,6 @@
 // TrashUndo.swift -- native-look: Edit > Undo Move to Trash (HIG "Undo and redo"; Finder's
-// "Put Back"). 7zFM has no undo; Windows leaves it to the Recycle Bin, so the Classic look keeps
-// that and only the Mac look registers the moves with the window's undo manager.
+// "Put Back"). 7zFM has no undo (Windows leaves it to the Recycle Bin); here the moves are
+// registered with the window's undo manager.
 //
 // The engine trashes on the operation thread (FSFolderMac.cpp DeleteItems -> NMacFileOps::
 // TrashItem), which posts "SZFileSystemDidTrashItem" with the old and the new path; the recorder

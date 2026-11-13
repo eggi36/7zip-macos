@@ -61,9 +61,9 @@ final class LocalizationFittingTests: AppHostTestCase {
 
             let bar = MainMenu.build()
             let top = bar.items.map { $0.submenu?.title ?? $0.title }
-            // 7-Zip, File, Edit, View, Favorites, Tools, Window, Help (the Apple menu is the
+            // 7-Zip, File, Edit, View, Go, Favorites, Tools, Window, Help (the Apple menu is the
             // system's and is not in the bar).
-            if top.count != 8 { problems.append("\(top.count) top-level menus") }
+            if top.count != 9 { problems.append("\(top.count) top-level menus") }
             let blankTop = top.filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
             if blankTop > 0 { problems.append("\(blankTop) top-level menu(s) with an empty title") }
 

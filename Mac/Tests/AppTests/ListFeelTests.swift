@@ -153,113 +153,7 @@ final class ListFeelTests: AppHostTestCase {
 
     // MARK: - 1. rows, header, cells
 
-    /// 19 pt rows with no gap, a 24 pt header, the list font with Segoe UI 9 pt metrics.
-    func testRowPitchHeaderAndFont() {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        let table = panel.tableView
-        XCTAssertEqual(table.rect(ofRow: 1).minY - table.rect(ofRow: 0).minY, 19, "LVIR_BOUNDS height 19 px")
-        XCTAssertEqual(table.rect(ofRow: 0).height, 19)
-        XCTAssertEqual(table.intercellSpacing, .zero)
-        XCTAssertEqual(table.headerView?.frame.height, 24, "SysHeader32 24 px")
-        let font = PanelMetrics.listDigitsFont
-        // Segoe UI 9 pt advance widths, measured on the PC (LVM_GETSTRINGWIDTH / pixel ink), are
-        // 22, 51 and 88 px; sffont's SF Pro 12.2 is ~10 % wider (reports/sffont.md §1), the date
-        // with tabular digits.
-        XCTAssertEqual(PanelMetrics.textWidth("a.txt"), 26, accuracy: 1)
-        XCTAssertEqual(PanelMetrics.textWidth("vol.7z.001"), 58, accuracy: 1)
-        XCTAssertEqual(ceil(("2024-01-15 11:30" as NSString).size(withAttributes: [.font: font]).width), 111, accuracy: 1)
-        // Tabular digits (Segoe UI's are): every digit is as wide as every other.
-        let digitWidths = Set((0...9).map { ("\($0)" as NSString).size(withAttributes: [.font: font]).width })
-        XCTAssertEqual(digitWidths.count, 1, "tabular digits: \(digitWidths)")
-        for c in 0..<table.numberOfColumns {
-            XCTAssertNil(table.indicatorImage(in: table.tableColumns[c]), "7zFM draws no sort arrow")
-            XCTAssertEqual(table.tableColumns[c].headerCell.font, PanelMetrics.listFont)
-        }
-        XCTAssertNil(table.highlightedTableColumn, "no highlighted column")
-    }
-
-    /// The name cell's icon at x 4 (1 pt from the row top), its text 2 pt into the label at x 20,
-    /// the other columns' text 6 pt from the edge it is aligned to; ink rows as on Windows
-    /// ("b.bin": 5 pt below the row's top to 13).
-    func testCellLayoutMatchesTheWindowsList() throws {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        let table = panel.tableView
-        let b = row(panel, "b.bin")
-        let nameColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .name })
-        let sizeColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .size })
-        let mtimeColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .mtime })
-        let cell = try XCTUnwrap(table.view(atColumn: nameColumn, row: b, makeIfNecessary: true) as? PanelCellView)
-        cell.layoutSubtreeIfNeeded()
-        let icon = try XCTUnwrap(cell.imageView).convert(cell.imageView!.bounds, to: table)
-        let rowRect = table.rect(ofRow: b)
-        XCTAssertEqual(icon.minX - table.rect(ofColumn: nameColumn).minX, 4, "LVIR_ICON x 4")
-        XCTAssertEqual(icon.width, 16)
-        XCTAssertEqual(icon.minY - rowRect.minY, 1, "the icon 1 px from the row top")
-
-        // The ink, rendered: name text from x 22-23, b.bin's 'b' 5 pt from the row top to 13.
-        let nameRect = NSRect(x: table.rect(ofColumn: nameColumn).minX + 20, y: rowRect.minY,
-                              width: 100, height: rowRect.height)
-        let ink = try XCTUnwrap(render(table, nameRect)?.bbox(Self.isInk), "no name ink")
-        XCTAssertEqual(ink.minX, 3, accuracy: 1, "Windows: ink 3 px into the label (x 23)")
-        XCTAssertEqual(ink.minY, 5, accuracy: 1, "Windows: 'b' ascender 5 px below the row top")
-        XCTAssertEqual(ink.maxY, 14, accuracy: 1, "Windows: baseline 14 px below the row top")
-
-        // Size, right-aligned: the ink ends 6 pt before the column's right edge.
-        let sizeRect = table.rect(ofColumn: sizeColumn).intersection(rowRect)
-        let sizeInk = try XCTUnwrap(render(table, sizeRect)?.bbox(Self.isInk), "no size ink")
-        XCTAssertEqual(sizeRect.width - sizeInk.maxX, 6, accuracy: 1.5, "Windows: 6 px right margin")
-        // Modified, left-aligned: the ink starts 6 pt into the column, and the whole date fits.
-        let timeRect = table.rect(ofColumn: mtimeColumn).intersection(rowRect)
-        let timeInk = try XCTUnwrap(render(table, timeRect)?.bbox(Self.isInk), "no date ink")
-        XCTAssertEqual(timeInk.minX, 6, accuracy: 1.5, "Windows: 6 px left margin")
-        let timeCell = try XCTUnwrap(table.view(atColumn: mtimeColumn, row: b, makeIfNecessary: true) as? NSTableCellView)
-        let field = try XCTUnwrap(timeCell.textField)
-        XCTAssertLessThanOrEqual(field.intrinsicContentSize.width, field.frame.width + 0.5,
-                                 "the date '\(field.stringValue)' is cut in a \(table.tableColumns[mtimeColumn].width) pt column")
-    }
-
     // MARK: - 2. the selection fill
-
-    /// The name's fill: from the label (x 20) to 6 pt after the text, the text 2 pt in -- "a.txt"
-    /// is 30 px wide on Windows. White ink starts 3 pt into the fill and ends 6-7 pt before its end.
-    func testSelectionFillPaddingMatchesWindows() throws {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        controller.window?.makeFirstResponder(panel.tableView)
-        panel.listFocusOverride = true
-        defer { panel.listFocusOverride = nil }
-        select(panel, ["a.txt"], focus: "b.bin")
-        let table = panel.tableView
-        let a = row(panel, "a.txt")
-        let rowRect = table.rect(ofRow: a)
-        let r = try XCTUnwrap(render(table, NSRect(x: 0, y: rowRect.minY, width: 160, height: rowRect.height)))
-        let fill = try XCTUnwrap(r.bbox { $0.isClose(to: .highlight) }, "no fill")
-        XCTAssertEqual(fill.minX, 20, accuracy: 0.5, "LVIR_LABEL starts at 20")
-        // Windows fills 30 px for a.txt (2 + 22 + 6); the same padding around SF Pro's 26 pt.
-        XCTAssertEqual(fill.width, 2 + PanelMetrics.textWidth("a.txt") + 6, accuracy: 1.5, "2 px, the text, 6 px")
-        XCTAssertEqual(fill.height, 19, accuracy: 0.5, "the fill is the row's full height")
-        // White ink inside the fill only.
-        var minX = CGFloat.greatestFiniteMagnitude, maxX: CGFloat = 0
-        for y in Int(fill.minY * 2)..<Int(fill.maxY * 2) {
-            for x in Int(fill.minX * 2)..<Int(fill.maxX * 2) {
-                let p = r.rgb(x, y)
-                if p.r > 170 && p.g > 170 && p.b > 200 { minX = min(minX, CGFloat(x) / 2); maxX = max(maxX, CGFloat(x + 1) / 2) }
-            }
-        }
-        XCTAssertEqual(minX - fill.minX, 3, accuracy: 1, "Windows: text ink 3 px after the fill starts")
-        // Windows: 6 px of fill after the text's advance (its ink ends at the advance in Segoe UI;
-        // Helvetica Neue's 't' has 1-2 pt of right side bearing).
-        XCTAssertEqual(fill.maxX - maxX, 7, accuracy: 1.6, "fill after the text ink")
-        if let window = controller.window { _ = attach(window, "listfeel-01-selection") }
-    }
 
     // MARK: - 3. columns
 
@@ -310,43 +204,6 @@ final class ListFeelTests: AppHostTestCase {
     }
 
     // MARK: - 4. rubber band
-
-    /// LVHT_ONITEM, measured with real input on 7zFM: FullRow off -- the icon and the label's fill
-    /// are the item, the rest of the name column, the other columns and the space below the rows
-    /// are the background; FullRow on -- the whole row up to the last column is the item.
-    func testRubberBandHitZones() throws {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        let table = panel.tableView
-        let a = row(panel, "a.txt"), b = row(panel, "b.bin")
-        let nameColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .name })
-        let sizeColumn = try XCTUnwrap(table.tableColumns.firstIndex { PanelViewController.propID(of: $0) == .size })
-        let name = table.rect(ofColumn: nameColumn), size = table.rect(ofColumn: sizeColumn)
-        let last = table.rect(ofColumn: table.numberOfColumns - 1)
-        func point(_ x: CGFloat, _ r: Int) -> NSPoint { NSPoint(x: x, y: table.rect(ofRow: r).midY) }
-
-        Settings.fullRow = false
-        XCTAssertTrue(table.isOnItem(point(name.minX + 10, a), row: a), "the icon")
-        XCTAssertTrue(table.isOnItem(point(name.minX + 30, a), row: a), "the name's text")
-        XCTAssertFalse(table.isOnItem(point(name.minX + 140, a), row: a), "the blank part of the name column")
-        XCTAssertFalse(table.isOnItem(point(size.midX, a), row: a), "the Size cell")
-        XCTAssertFalse(table.isOnItem(point(last.maxX + 20, a), row: a), "right of the last column")
-        XCTAssertFalse(table.isOnItem(NSPoint(x: 30, y: table.rect(ofRow: panel.rows.count - 1).maxY + 40), row: -1), "below the rows")
-        // The marquee selects by the item area: over Size / Modified nothing, over the names those rows.
-        let rows = table.rect(ofRow: a).union(table.rect(ofRow: b))
-        XCTAssertEqual(table.rowsHit(by: NSRect(x: size.minX + 10, y: rows.minY, width: 150, height: rows.height)), [])
-        XCTAssertEqual(table.rowsHit(by: NSRect(x: name.minX + 10, y: rows.minY, width: 20, height: rows.height)),
-                       IndexSet(min(a, b)...max(a, b)))
-
-        Settings.fullRow = true
-        XCTAssertTrue(table.isOnItem(point(size.midX, a), row: a), "FullRow: the Size cell is the item")
-        XCTAssertTrue(table.isOnItem(point(name.minX + 140, a), row: a))
-        XCTAssertFalse(table.isOnItem(point(last.maxX + 20, a), row: a), "FullRow: right of the columns is background")
-        XCTAssertEqual(table.rowsHit(by: NSRect(x: last.maxX - 30, y: rows.minY, width: 80, height: rows.height)),
-                       IndexSet(min(a, b)...max(a, b)), "FullRow: the rows the band crosses")
-    }
 
     // MARK: - 5. address bar
 
@@ -495,40 +352,6 @@ final class ListFeelTests: AppHostTestCase {
         if let table = view as? NSTableView { return table }
         for sub in view.subviews { if let t = firstTable(in: sub) { return t } }
         return nil
-    }
-
-    // MARK: - 7. toolbar
-
-    /// comctl32 v6 on Windows 11: while pressed, the bitmap and the label move 1 px right, no rows
-    /// move (Info button, real mouse-down on 7zFM 26.03).
-    func testToolbarPressedOffset() throws {
-        let controller = makeWindow()
-        let toolbar = try XCTUnwrap(Self.find(FMToolbarView.self, in: controller.window?.contentView))
-        let button = try XCTUnwrap(toolbar.button("sz.info") ?? toolbar.buttons.last)
-        func inkBox() -> NSRect? {
-            let rep = try? XCTUnwrap(button.bitmapImageRepForCachingDisplay(in: button.bounds))
-            guard let rep else { return nil }
-            button.cacheDisplay(in: button.bounds, to: rep)
-            var minX = Int.max, minY = Int.max, maxX = -1, maxY = -1
-            for y in 0..<rep.pixelsHigh {
-                for x in 0..<rep.pixelsWide {
-                    guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), c.alphaComponent > 0.5,
-                          (c.redComponent + c.greenComponent + c.blueComponent) / 3 < 0.45 else { continue }
-                    minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
-                }
-            }
-            let scale = CGFloat(rep.pixelsWide) / button.bounds.width
-            return maxX < 0 ? nil : NSRect(x: CGFloat(minX) / scale, y: CGFloat(minY) / scale,
-                                           width: CGFloat(maxX - minX) / scale, height: CGFloat(maxY - minY) / scale)
-        }
-        button.isHighlighted = false
-        let rest = try XCTUnwrap(inkBox())
-        button.isHighlighted = true
-        let pressed = try XCTUnwrap(inkBox())
-        button.isHighlighted = false
-        XCTAssertEqual(pressed.minX - rest.minX, 1, accuracy: 0.01)
-        XCTAssertEqual(pressed.minY - rest.minY, 0, accuracy: 0.01)
-        XCTAssertEqual(FMToolbarView.pressedOffset, NSSize(width: 1, height: 0))
     }
 
     private static func find<T: NSView>(_ type: T.Type, in view: NSView?) -> T? {

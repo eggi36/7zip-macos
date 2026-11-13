@@ -256,21 +256,10 @@ final class PanelTableView: NSTableView {
     /// whole row with FullRow, else the icon plus the label's fill. Computed without a row view so
     /// rows scrolled out of sight are hit too.
     func itemHitRect(row: Int) -> NSRect {
-        guard let panel, row >= 0, row < numberOfRows else { return .zero }
-        let rowRect = rect(ofRow: row)
-        // native-look: as in Finder, the whole row is the item in the Mac look -- a click anywhere on
-        // it selects, and the rubber band starts only on the empty list below the rows.
-        if AppLook.isMac { return rowRect }
-        if Settings.fullRow {
-            let last = tableColumns.indices.last.map { rect(ofColumn: $0).maxX } ?? rowRect.maxX
-            return NSRect(x: rowRect.minX, y: rowRect.minY, width: max(0, last - rowRect.minX), height: rowRect.height)
-        }
-        guard let index = tableColumns.firstIndex(where: { PanelViewController.propID(of: $0) == .name }),
-              row < panel.rows.count else { return .zero }
-        let column = rect(ofColumn: index)
-        let fill = PanelMetrics.labelFill(columnMinX: column.minX, columnMaxX: column.maxX, text: panel.rows[row].displayName)
-        let start = min(column.minX + PanelMetrics.iconX, fill.start)
-        return NSRect(x: start, y: rowRect.minY, width: max(0, fill.end - start), height: rowRect.height)
+        guard row >= 0, row < numberOfRows else { return .zero }
+        // As in Finder, the whole row is the item: a click anywhere on it selects, and the rubber
+        // band starts only on the empty list below the rows.
+        return rect(ofRow: row)
     }
 
     /// LVHT_ONITEM: a mouse-down here selects / drags the item; anywhere else in the list it is
@@ -353,8 +342,7 @@ final class PanelTableHeaderView: NSTableHeaderView {
 /// Windows list control draws it (PanelSelectionStyle.swift, selcolors.md).
 final class PanelRowView: NSTableRowView {
 
-    /// native-look: the Mac look leaves the selection, the drop target and the focus to AppKit.
-    private let isMacLook = AppLook.isMac
+    /// AppKit draws the selection, the drop target and the focus.
     weak var panel: PanelViewController?
     var rowIndex = -1
     var isMySelected = false
@@ -391,69 +379,5 @@ final class PanelRowView: NSTableRowView {
             PanelSelectionStyle.mySelected.setFill()
             bounds.fill()
         }
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        if !isMacLook { drawFocusRectangle() }
-    }
-
-    /// The name column's rect in this row, or nil when it is hidden.
-    private var nameColumnRect: NSRect? {
-        guard let table = panel?.tableView else { return nil }
-        guard let index = table.tableColumns.firstIndex(where: { PanelViewController.propID(of: $0) == .name }) else { return nil }
-        var rect = table.rect(ofColumn: index)
-        rect.origin.y = bounds.minY
-        rect.size.height = bounds.height
-        return rect
-    }
-
-    /// Where the label starts (after the icon) and where its fill ends: LVIR_LABEL clipped to the
-    /// text, i.e. 2 px before the text and 6 px after it (PanelMetrics, listfeel.md §3).
-    private var labelSpan: (start: CGFloat, textEnd: CGFloat)? {
-        guard let column = nameColumnRect else { return nil }
-        let name = panel.flatMap { rowIndex >= 0 && rowIndex < $0.rows.count ? $0.rows[rowIndex].displayName : nil } ?? ""
-        let fill = PanelMetrics.labelFill(columnMinX: column.minX, columnMaxX: column.maxX, text: name)
-        return (fill.start, fill.end)
-    }
-
-    /// Where the fill goes (and the focus rectangle): from the label to the end of the row
-    /// (FullRow) or the label only (LVIR_LABEL clipped to the text).
-    var highlightRect: NSRect {
-        guard panel != nil else { return bounds }
-        guard let span = labelSpan else { return Settings.fullRow ? bounds : .zero }
-        let end = Settings.fullRow ? bounds.maxX : span.textEnd
-        return NSRect(x: span.start, y: bounds.minY, width: max(0, end - span.start), height: bounds.height)
-    }
-
-    override func drawSelection(in dirtyRect: NSRect) {
-        guard panel != nil, !isMacLook else { super.drawSelection(in: dirtyRect); return }
-        guard drawsHighlight else { return }                 // no LVS_SHOWSELALWAYS
-        fillHighlight()
-    }
-
-    override func drawDraggingDestinationFeedback(in dirtyRect: NSRect) {
-        guard panel != nil, !isMacLook else { super.drawDraggingDestinationFeedback(in: dirtyRect); return }
-        fillHighlight()
-    }
-
-    private func fillHighlight() {
-        PanelSelectionStyle.highlight.setFill()
-        if Settings.fullRow, let column = nameColumnRect, column.minX > bounds.minX {
-            // The name column was dragged away from the left: the columns before it are filled too.
-            NSRect(x: bounds.minX, y: bounds.minY, width: column.minX - bounds.minX, height: bounds.height).fill()
-            highlightRect.fill()
-        } else {
-            highlightRect.fill()
-        }
-    }
-
-    /// The list control's dotted focus rectangle around the focused item, selected or not, while
-    /// the list has the keyboard focus (winmatch, selcolors): around the label, or around the
-    /// full-row fill with FullRow.
-    private func drawFocusRectangle() {
-        guard let panel, rowIndex >= 0, panel.focusedIndex == rowIndex, panel.listHasKeyboardFocus,
-              panel.tableView.numberOfColumns > 0 else { return }
-        PanelSelectionStyle.drawFocusRectangle(highlightRect, onHighlight: drawsHighlight)
     }
 }

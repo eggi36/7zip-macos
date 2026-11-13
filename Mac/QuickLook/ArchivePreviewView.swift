@@ -37,11 +37,10 @@ import SevenZipKit
 
 /// Geometry of the preview (the panel's, PanelMetrics: rows 19, header 24, icon 16 at x 4).
 enum PreviewMetrics {
-    /// native-look: the Mac look (the app's `FM.Look`, pushed into the container) draws the list
-    /// with AppKit's metrics, font, header, selection, stripes and the system's file icons, as
-    /// the app's Mac-look file list does. Set once from the preferences (`PreviewSettings`).
-    /// Mac by default, Classic under XCTest (whose parity tests describe the Windows list).
-    static var isMac = NSClassFromString("XCTestCase") == nil
+    /// The list draws with AppKit's metrics, font, header, selection, stripes and the system's file
+    /// icons, as the app's file list does. (The Windows-style list is kept behind `false` for the
+    /// render tests that compare the two.)
+    static var isMac = true
 
     static var rowHeight: CGFloat { isMac ? 22 : 19 }
     static var headerHeight: CGFloat { isMac ? 28 : 24 }

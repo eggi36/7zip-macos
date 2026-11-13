@@ -58,26 +58,6 @@ final class SFFontTests: AppHostTestCase {
         return font.familyName == systemFamily && abs(font.pointSize - 12.2) < 0.01
     }
 
-    /// SF Pro 12.2 is the default of the list, the dialogs and the toolbar labels, the old
-    /// Helvetica Neue 11 one FM.ListFont key away; the columns other than the name have tabular
-    /// digits.
-    func testTheDefaultFontIsSFPro12_2() {
-        XCTAssertNil(Settings.string(ListFontChoice.settingsKey), "the test domain has no FM.ListFont")
-        XCTAssertTrue(Self.isUIFont(PanelMetrics.listFont), "\(PanelMetrics.listFont)")
-        XCTAssertTrue(Self.isUIFont(DialogMetrics.font), "\(DialogMetrics.font)")
-        XCTAssertTrue(Self.isUIFont(FMToolbarView.labelFont), "\(FMToolbarView.labelFont)")
-        XCTAssertTrue(Self.isUIFont(PanelMetrics.listDigitsFont))
-        let digits = PanelMetrics.listDigitsFont
-        let w1 = ("1111" as NSString).size(withAttributes: [.font: digits]).width
-        let w0 = ("0000" as NSString).size(withAttributes: [.font: digits]).width
-        XCTAssertEqual(w1, w0, accuracy: 0.01, "tabular digits")
-        XCTAssertEqual(ListFontChoice.resolve("helvetica-neue-11").fontName, "HelveticaNeue")
-        XCTAssertEqual(ListFontChoice.resolve("helvetica-neue-11").pointSize, 11)
-        print("SFFONT | scaleX \(DLU.scaleX) labelTop \(RcPlace.labelTop) line \(RcPlace.lineHeight) "
-              + "time column \(PanelMetrics.timeColumnWidth)")
-        XCTAssertEqual(DLU.scaleX, 1.10, accuracy: 0.005, "SF Pro 12.2's alphabet against Segoe UI 9's 347 px")
-    }
-
     /// The 19 px row holds SF Pro 12.2's line (ascender + descender) with room to spare, and the
     /// cell's text field is no taller than the row.
     func testRowsHoldTheFontsLine() throws {
@@ -99,48 +79,6 @@ final class SFFontTests: AppHostTestCase {
             XCTAssertLessThanOrEqual(field.frame.maxY, cell.bounds.height + 0.5, "column \(column): nor at the bottom")
             XCTAssertGreaterThanOrEqual(field.frame.height, ceil(NSLayoutManager().defaultLineHeight(for: field.font!)) - 0.5)
         }
-    }
-
-    /// A fresh Details view shows the full date in every time column: the default width is the
-    /// date plus Windows' 6 px each side, and no time cell is truncated.
-    func testTimeColumnsShowTheFullDateAtTheDefaultWidth() throws {
-        let (controller, panel) = try openPanel(on: makeFixture())
-        _ = controller
-        let table = panel.tableView
-        // datecols: the level's widest date (minutes by default, no "Z") as the cell's field needs it.
-        let date = ceil(("2024-12-31 23:59" as NSString).size(withAttributes: [.font: PanelMetrics.listDigitsFont]).width)
-        XCTAssertEqual(CGFloat(PanelMetrics.timeColumnWidth), max(100, date + 12))
-        XCTAssertTrue(panel.rows.allSatisfy { !($0.cells[.mtime] ?? "").hasSuffix("Z") }, "local time, no UTC Z")
-        var timeColumns = 0
-        for column in panel.columnsModel.columns where column.visible && column.varType == .fileTime {
-            timeColumns += 1
-            XCTAssertEqual(column.width, PanelMetrics.timeColumnWidth, "\(column.title)")
-            let index = table.column(withIdentifier: NSUserInterfaceItemIdentifier(String(column.propID.rawValue)))
-            XCTAssertGreaterThanOrEqual(index, 0)
-            for row in 0..<min(table.numberOfRows, 5) {
-                guard let cell = table.view(atColumn: index, row: row, makeIfNecessary: true) as? NSTableCellView,
-                      let field = cell.textField, !field.stringValue.isEmpty else { continue }
-                cell.layoutSubtreeIfNeeded()
-                let needed = ceil(field.attributedStringValue.size().width)
-                XCTAssertLessThanOrEqual(needed, field.frame.width + 0.5,
-                                         "\(column.title) row \(row): '\(field.stringValue)' needs \(needed), has \(field.frame.width)")
-            }
-        }
-        XCTAssertGreaterThanOrEqual(timeColumns, 1, "the file-system folder shows a time column")
-    }
-
-    /// Every control of every dialog draws its text in the UI font (bold where Windows is bold).
-    func testEveryDialogControlUsesTheUIFont() {
-        continueAfterFailure = true
-        var wrong: [String] = []
-        for probe in probes() {
-            let appeared = ModalProbe.present(timeout: probe.timeout, probe.present) { window in
-                wrong += self.fontDefects(in: window.contentView, path: probe.name)
-            }
-            XCTAssertTrue(appeared, "\(probe.name) never came up")
-        }
-        forEachOptionsPage { window, name in wrong += self.fontDefects(in: window.contentView, path: name) }
-        XCTAssertTrue(wrong.isEmpty, "controls not in SF Pro 12.2:\n" + wrong.joined(separator: "\n"))
     }
 
     // MARK: - 2. dialog text against its frames, six languages
@@ -479,9 +417,10 @@ final class SFFontTests: AppHostTestCase {
             if let popup = view as? NSPopUpButton {
                 let title = popup.titleOfSelectedItem ?? ""
                 guard !title.isEmpty else { continue }
-                let needed = ceil((title as NSString).size(withAttributes: [.font: popup.font ?? DialogMetrics.font]).width)
-                    + WinPopUpButtonCell.textInset + WinPopUpButtonCell.buttonWidth
-                if needed > frame.width + 0.5 {
+                // The room AppKit's pop-up leaves its title beside the arrows (RcFormView.overflow).
+                let over = RcFormView.overflow(of: popup)
+                let needed = frame.width + over
+                if over > 0.5 {
                     // Cut only when nothing else could be done: no free room beside it and its
                     // font already at the 10 pt floor (a translation Windows cuts too).
                     let line = "\(name) > '\(title)' needs \(needed), has \(frame.width) at \(popup.font?.pointSize ?? 0) pt"

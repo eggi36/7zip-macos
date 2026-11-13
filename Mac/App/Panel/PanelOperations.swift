@@ -37,8 +37,8 @@ extension PanelViewController {
         var options = OperationRunner.Options(title: Lang.text(6106, "Deleting"))
         options.mainTitle = Lang.text(6107, "Error deleting file or folder")   // IDS_ERROR_DELETING
         options.initialStatus = .deleting
-        // native-look: a move to the Trash can be undone (TrashUndo.swift).
-        let recorder = AppLook.isMac && snap.isFileSystem && toTrash
+        // A move to the Trash can be undone (TrashUndo.swift).
+        let recorder = snap.isFileSystem && toTrash
             ? TrashRecorder(paths: targets.map(\.fullPath).filter { !$0.isEmpty }) : nil
         _ = runFolderOperation(options) { folder, runner -> Bool in
             if let fs = folder as? SZFileSystemFolder {

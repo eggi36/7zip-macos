@@ -117,17 +117,17 @@ final class NewWindowTests: AppHostTestCase {
 
     // MARK: - File > New Window (macOS addition)
 
-    /// The item exists, sits first in File, has Option+Cmd+N (Cmd+N stays IDM_CREATE_FILE's
-    /// Ctrl+N), and sending its action opens a window cascaded off the front one.
+    /// The item exists, sits first in File, has Cmd+N as in Finder (New File moves to
+    /// Option+Cmd+N), and sending its action opens a window cascaded off the front one.
     func testNewWindowMenuItemOpensACascadedWindow() throws {
         let item = try XCTUnwrap(fileMenuItem(#selector(MenuActions.fileNewWindow(_:))), "no File > New Window")
         XCTAssertEqual(item.title, "New Window")
         XCTAssertEqual(item.keyEquivalent, "n")
-        XCTAssertEqual(item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask), [.command, .option])
+        XCTAssertEqual(item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask), [.command])
         XCTAssertTrue(item.menu?.items.first === item, "New Window is the first item of File")
         let createFile = try XCTUnwrap(fileMenuItem(#selector(MenuActions.fileCreateFile(_:))))
         XCTAssertEqual(createFile.keyEquivalent, "n")
-        XCTAssertEqual(createFile.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask), [.command])
+        XCTAssertEqual(createFile.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask), [.command, .option])
 
         let front = MainWindows.frontToBack.first?.window
         XCTAssertTrue(NSApp.sendAction(item.action!, to: nil, from: item), "nobody handles New Window")
@@ -156,23 +156,6 @@ final class NewWindowTests: AppHostTestCase {
                 && controller.panels[0].currentPath.hasPrefix(self.scratch + "/a")
                 && controller.panels[1].currentPath.hasPrefix(self.scratch + "/b")
         }, "\(controller.panels.map(\.currentPath))")
-    }
-
-    /// Each window has its own Toolbars mask (one per 7zFM process). AppKit mirrors item changes
-    /// between toolbars that share an identifier, so with a shared one a toggle in one window was
-    /// replayed into the other and raised "already contains an item" -- found by this scope.
-    func testToolbarToggleInOneWindowLeavesTheOtherAlone() throws {
-        let first = delegate.openNewWindow()
-        let second = delegate.openNewWindow()
-        let before = second.toolbarView.buttons.map(\.title)
-        XCTAssertFalse(before.isEmpty)
-        XCTAssertFalse(first.toolbarView === second.toolbarView)
-        first.viewArchiveToolbar(nil)               // IDM_VIEW_ARCHIVE_TOOLBAR 750
-        first.viewArchiveToolbar(nil)
-        first.viewStandardToolbar(nil)              // IDM_VIEW_STANDARD_TOOLBAR 751
-        XCTAssertEqual(second.toolbarView.buttons.map(\.title), before,
-                       "the other window's toolbar changed with this one's")
-        first.viewStandardToolbar(nil)
     }
 
     // MARK: - saved state: the window closed last wins

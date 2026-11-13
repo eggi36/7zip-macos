@@ -27,25 +27,23 @@ import SevenZipKit
 
 enum PanelMetrics {
 
-    /// native-look: the Mac look uses AppKit's list metrics (24 pt rows like Finder's list, a 28 pt
-    /// header, the system font at 13 pt); every value below is the Windows one in the Classic look.
-    static var isMac: Bool { AppLook.isMac }
+    /// AppKit's list metrics: 24 pt rows like Finder's list, a 28 pt header, the system font at 13 pt.
 
     /// Row pitch (LVIR_BOUNDS height).
-    static var rowHeight: CGFloat { isMac ? 24 : 19 }
+    static var rowHeight: CGFloat { 24 }
     /// SysHeader32 height.
-    static var headerHeight: CGFloat { isMac ? 28 : 24 }
+    static var headerHeight: CGFloat { 28 }
     /// LVIR_ICON: x and size of the small icon in the name column, and its offset from the row top.
-    static var iconX: CGFloat { isMac ? 6 : 4 }
+    static var iconX: CGFloat { 6 }
     static let iconSize: CGFloat = 16
-    static var iconTop: CGFloat { isMac ? 4 : 1 }
+    static var iconTop: CGFloat { 4 }
     /// LVIR_LABEL: where the label (and the selection fill) starts in the name column.
-    static var labelX: CGFloat { isMac ? 28 : 20 }
+    static var labelX: CGFloat { 28 }
     /// The text's origin inside the label, and the fill after the text.
     static let labelTextInset: CGFloat = 2
     static let labelTrailing: CGFloat = 6
     /// The text margin of the other columns, on the side they are aligned to.
-    static var subitemPadding: CGFloat { isMac ? 8 : 6 }
+    static var subitemPadding: CGFloat { 8 }
     /// How far inside its frame an `NSTextField(labelWithString:)` starts its text: 0 (measured
     /// in ListFeelTests; the old layout assumed 2 and so left the name flush with the fill).
     static let textFieldInset: CGFloat = 0
@@ -74,11 +72,11 @@ enum PanelMetrics {
     static var listDigitsFont: NSFont { ListFontChoice.withTabularDigits(listFont) }
 
     /// native-look: the panel's own font -- the list, the address field. The system font at 13 pt in
-    /// the Mac look (Finder's list), the list font in the Classic look. Dialogs keep `listFont`.
-    static var panelFont: NSFont { isMac ? NSFont.systemFont(ofSize: 13) : listFont }
+    /// Finder's list. Dialogs keep `listFont`.
+    static var panelFont: NSFont { NSFont.systemFont(ofSize: 13) }
     static var panelDigitsFont: NSFont { ListFontChoice.withTabularDigits(panelFont) }
     /// The status bar's font: the small system font in the Mac look.
-    static var statusFont: NSFont { isMac ? NSFont.systemFont(ofSize: NSFont.smallSystemFontSize) : listFont }
+    static var statusFont: NSFont { NSFont.systemFont(ofSize: NSFont.smallSystemFontSize) }
 
     /// A time column's default width: the widest date View > Time prints (ConvertUtcFileTimeToString2:
     /// "2024-12-31 23:59" at the default minute level, ":59" more at SEC, 7 / 9 more digits at
@@ -217,22 +215,9 @@ extension PanelViewController {
     /// One Details column (InitColumns / AddColumn): the property's title, width and alignment.
     static func makeTableColumn(_ info: PanelColumn) -> NSTableColumn {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(String(info.propID.rawValue)))
-        if AppLook.isMac {
-            // native-look: AppKit's own header cell, font and colour.
-            column.headerCell.stringValue = info.title
-            column.headerCell.alignment = PanelFormat.alignment(for: info.varType, propID: info.propID)
-            column.title = info.title
-            column.width = CGFloat(info.width)
-            column.minWidth = 24
-            column.maxWidth = 2000
-            return column
-        }
-        let header = PanelHeaderCell(textCell: info.title)
-        header.alignment = PanelFormat.alignment(for: info.varType, propID: info.propID)
-        header.font = PanelMetrics.listFont                       // SysHeader32: the list's font
-        header.titleFont = PanelMetrics.listFont                  // datecols: drawn in it (WinHeaderCell)
-        header.textColor = WinChrome.text                         // COLOR_WINDOWTEXT, not AppKit grey
-        column.headerCell = header
+        // native-look: AppKit's own header cell, font and colour.
+        column.headerCell.stringValue = info.title
+        column.headerCell.alignment = PanelFormat.alignment(for: info.varType, propID: info.propID)
         column.title = info.title
         column.width = CGFloat(info.width)
         column.minWidth = 24

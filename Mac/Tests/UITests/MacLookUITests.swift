@@ -2,8 +2,7 @@
 // and its toolbar of panes, dialogs and alerts as sheets of the main window, the Mac menus and
 // keys, window tabs, the Finder path bar and Undo for Move to Trash (CHANGELOG "Mac look").
 //
-// Input shard: every test types or clicks. Each test gets a process of its own, launched with
-// `FM.Look = mac` in its settings seed (the harness's default look is Classic).
+// Input shard: every test types or clicks. Each test gets a process of its own.
 
 import Foundation
 import XCTest
@@ -13,11 +12,8 @@ final class MacLookUITests: SevenZipUITestCase {
     override var screenshotPrefix: String { "maclook" }
     override class var reusesTheApp: Bool { false }
 
-    private static let look = "FM.Look"
-
     private func launchMac(_ values: [String: String] = [:]) {
         var seed = values
-        seed[Self.look] = "mac"
         if seed[SettingsDomain.Key.panelPath0] == nil { seed[SettingsDomain.Key.panelPath0] = TestPaths.fixtures }
         launch(seed: .values(seed))
         XCTAssertTrue(sevenZip.panel(0).waitForRow(named: "test.7z") || values[SettingsDomain.Key.panelPath0] != nil)

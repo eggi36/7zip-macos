@@ -53,109 +53,7 @@ final class DlgFeelTests: AppHostTestCase {
 
     // MARK: - sizes and resizability (findings 8, 14, 23, 25 and the sweep)
 
-    func testDialogSizesAndResizabilityMatchWindows() throws {
-        continueAfterFailure = true
-        probe("About") { AboutDialog.show(parent: nil) } _: {
-            self.assertWindow($0, "About", size: NSSize(width: 240, height: 260), resizable: false)
-        }
-        probe("Copy") {
-            _ = CopyMoveDialog.run(move: false, value: "/tmp/", history: [], info: "", parent: nil)
-        } _: { self.assertWindow($0, "Copy", size: NSSize(width: 504, height: 260), resizable: true) }
-        probe("Create Folder") {
-            _ = ComboDialog.run(title: "Create Folder", label: "Folder name:", value: "New Folder", parent: nil)
-        } _: { self.assertWindow($0, "Combo", size: NSSize(width: 384, height: 130), resizable: true) }
-        probe("Split") {
-            _ = SplitDialog.run(filePath: self.archive, path: self.fixtures, parent: nil)
-        } _: { self.assertWindow($0, "Split", size: NSSize(width: 456, height: 182), resizable: true) }
-        probe("Link") {
-            _ = LinkDialog.run(currentDirPrefix: self.fixtures + "/", filePath: self.archive,
-                               anotherPath: TestPaths.realHome, parent: nil)
-        } _: { self.assertWindow($0, "Link", size: NSSize(width: 456, height: 374), resizable: true) }
-        var history = ListViewDialogOptions()
-        history.title = "Folders History"
-        history.strings = ["/tmp"]
-        probe("ListView") { _ = ListViewDialog.run(history, parent: nil) } _: {
-            self.assertWindow($0, "ListView", size: NSSize(width: 744, height: 546), resizable: true)
-        }
-        var extract = ExtractDialog.Options()
-        extract.directoryPath = fixtures + "/"
-        extract.archivePath = archive
-        probe("Extract") { _ = ExtractDialog.run(extract) } _: {
-            self.assertWindow($0, "Extract", size: NSSize(width: 528, height: 299), resizable: false)
-        }
-        var input = CompressDialogInput()
-        input.directoryPrefix = fixtures + "/"
-        input.archiveBaseName = "a"
-        input.itemPaths = [archive]
-        probe("Add to Archive", timeout: 60) { _ = CompressDialogController.run(input) } _: {
-            self.assertWindow($0, "Add to Archive", size: NSSize(width: 624, height: 546), resizable: false)
-        }
-        let old = OverwriteDialog.FileInfo(path: archive, size: 1, time: Date())
-        probe("Overwrite") { _ = OverwriteDialog.run(oldFile: old, newFile: old, parent: nil) } _: {
-            self.assertWindow($0, "Overwrite", size: NSSize(width: 534, height: 351), resizable: false)
-        }
-        probe("Password") { _ = PasswordDialog.run(PasswordDialog.Options(), parent: nil) } _: {
-            self.assertWindow($0, "Password", size: NSSize(width: 324, height: 143), resizable: false)
-        }
-        probe("Benchmark", timeout: 60) { BenchmarkDialog.run(totalMode: false, parent: nil) } _: {
-            self.assertWindow($0, "Benchmark", size: NSSize(width: 732, height: 429), resizable: true)
-        }
-        probe("Delete Temporary Files") { ToolsTempFilesDialog.show(parent: nil) } _: {
-            self.assertWindow($0, "Temp files", size: NSSize(width: 699, height: 559), resizable: true)
-        }
-        let progress = ProgressDialog(title: "Extracting", showCompressionInfo: false)
-        assertWindow(progress.window, "Progress", size: NSSize(width: 564, height: 332), resizable: true)
-
-        let controller = OptionsWindowController.shared
-        let window = try XCTUnwrap(controller.window)
-        XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { _ in })
-        assertWindow(window, "Options", size: NSSize(width: 494, height: 550), resizable: false)
-        ModalProbe.close(window)
-    }
-
-    /// Compress Options (IDD_COMPRESS_OPTIONS): a modal dialog of its own, 384 x 403, fixed, with
-    /// the timestamp-precision set box and combo on their template rects (finding 25).
-    func testCompressOptionsDialogIsTheWindowsOne() throws {
-        try SZCodecs.loadCodecs()
-        let zip = try XCTUnwrap(SZCodecs.format(named: "zip"))
-        var state = CompressOptionsSheet.State(
-            formatName: zip.name, formatTimeFlags: zip.timeFlags, formatFlags: zip.flags,
-            supportsMTime: zip.supportsMTime, supportsCTime: zip.supportsCTime, supportsATime: zip.supportsATime,
-            supportsSymLinks: zip.supportsSymLinks, supportsHardLinks: zip.supportsHardLinks,
-            supportsAltStreams: zip.supportsAltStreams, supportsNtSecurity: zip.supportsNtSecurity,
-            isTar: false, isZip: true, isGZip: false, isKeepName: zip.keepName, tarMethodName: "")
-        probe("Compress Options") { _ = CompressOptionsSheet.run(&state, parent: nil) } _: { window in
-            self.assertWindow(window, "Compress Options", size: NSSize(width: 384, height: 403), resizable: false)
-            XCTAssertNil(window.sheetParent, "not a sheet: a dialog with its own caption")
-            let boxes = self.views(NSButton.self, in: window.contentView)
-            // IDX_COMPRESS_PREC_SET 201 ":" at 24,185 next to "Timestamp precision:" (51,185).
-            let precSet = boxes.first { $0.title == ":" && abs($0.frame.minY - 185) < 1 && $0.frame.minX < 30 }
-            XCTAssertNotNil(precSet, "the precision set box")
-            XCTAssertTrue(self.views(NSPopUpButton.self, in: window.contentView).contains {
-                abs($0.frame.minX - DLU.px(246)) < 1.5 && abs($0.frame.minY - 182) < 1 && abs($0.frame.width - DLU.px(114)) < 1.5
-            }, "IDC_COMPRESS_TIME_PREC 190 at 246,182 114 wide")
-        }
-    }
-
     // MARK: - About (finding 8)
-
-    func testAboutIsWindowsLayoutWithTheMacCredit() {
-        probe("About") { AboutDialog.show(parent: nil) } _: { window in
-            let all = self.texts(in: window.contentView)
-            XCTAssertTrue(all.contains(AboutDialog.macCredit), "the macOS credit line")
-            let fields = self.views(NSTextField.self, in: window.contentView)
-            let copyright = fields.first { $0.stringValue.hasPrefix("Copyright") }
-            let credit = fields.first { $0.stringValue == AboutDialog.macCredit }
-            XCTAssertNotNil(copyright)
-            if let copyright, let credit {
-                // the next line at the copyright line's 21 px pitch (y 130 -> 151)
-                XCTAssertEqual(credit.frame.minY - copyright.frame.minY, 21, accuracy: 0.5)
-                XCTAssertEqual(credit.frame.minX, copyright.frame.minX, accuracy: 0.5)
-            }
-            XCTAssertEqual(self.views(NSButton.self, in: window.contentView).map(\.title).sorted(),
-                           ["OK", "www.7-zip.org"])
-        }
-    }
 
     // MARK: - Options (findings 12-22)
 
@@ -216,15 +114,6 @@ final class DlgFeelTests: AppHostTestCase {
             XCTAssertLessThan(label.frame.maxY, field.frame.maxY, "label above its field")
             XCTAssertGreaterThan(field.frame.width, 400, "the field spans the page (408 px)")
         }
-    }
-
-    func testLanguagePageIsOneDropDownList() throws {
-        let page = try optionsPage(OptionsLanguagePage.self)
-        let popups = views(NSPopUpButton.self, in: page.view)
-        XCTAssertEqual(popups.count, 1)
-        XCTAssertEqual(popups.first?.frame.width ?? 0, DLU.px(240), accuracy: 1)
-        XCTAssertTrue(views(NSTableView.self, in: page.view).isEmpty)
-        XCTAssertEqual(page.comboTitles.first, "English : English  ---")
     }
 
     /// Nothing on any page needs scrolling or reaches past the page, and the 7-Zip page lists every
@@ -404,20 +293,4 @@ final class DlgFeelTests: AppHostTestCase {
         }
     }
 
-    /// A resizable dialog lays itself out again like its OnSize: Copy keeps "..." at the right
-    /// edge and OK / Cancel at the bottom right.
-    func testResizableDialogsFollowOnSize() {
-        probe("Copy") {
-            _ = CopyMoveDialog.run(move: false, value: "/tmp/", history: [], info: "a\nb", parent: nil)
-        } _: { window in
-            window.setContentSize(NSSize(width: 704, height: 360))
-            let content = window.contentView!
-            let buttons = self.views(NSButton.self, in: content)
-            let dots = buttons.first { $0.title == "..." }
-            let cancel = buttons.first { $0.title == "Cancel" }
-            XCTAssertEqual(dots?.frame.maxX ?? 0, 704 - 12 - 1, accuracy: 1, "\"...\" at the right margin")
-            XCTAssertEqual(cancel?.frame.maxX ?? 0, 704 - 12 - 1, accuracy: 1)
-            XCTAssertEqual(cancel?.frame.maxY ?? 0, 360 - 13, accuracy: 1, "the buttons at the bottom margin")
-        }
-    }
 }

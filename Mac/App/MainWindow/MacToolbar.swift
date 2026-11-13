@@ -12,7 +12,7 @@
 // View > Toolbars still works on it: "Archive Toolbar" and "Standard Toolbar" add or remove their
 // group, "Show Buttons Text" switches between icon and label and icon only, and their check marks
 // show what the toolbar holds (`syncMaskFromMacToolbar`). "Large Buttons" has no Mac counterpart
-// (macOS sizes toolbar icons itself) and only affects the Classic look.
+// (macOS sizes toolbar icons itself) and has no effect.
 
 import AppKit
 

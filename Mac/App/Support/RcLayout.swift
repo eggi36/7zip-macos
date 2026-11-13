@@ -135,10 +135,10 @@ enum DialogMetrics {
     /// width room), or whatever FM.ListFont picks.
     /// native-look: the Mac look's dialogs use the system font at its regular size (13 pt) and
     /// regular-size controls (`controlSize`).
-    static var font: NSFont { AppLook.isMac ? NSFont.systemFont(ofSize: NSFont.systemFontSize) : classicFont }
+    static var font: NSFont { NSFont.systemFont(ofSize: NSFont.systemFontSize) }
     static let classicFont: NSFont = PanelMetrics.listFont
     static var boldFont: NSFont { NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask) }
-    static var controlSize: NSControl.ControlSize { AppLook.isMac ? .regular : .small }
+    static var controlSize: NSControl.ControlSize { .regular }
 
     /// A group box's frame: (227, 227, 227) on the (243, 243, 243) dialog face in the light theme.
     static let groupLine = NSColor(name: nil) { appearance in
@@ -165,7 +165,6 @@ class RcFormView: NSView {
     /// and Help is AppKit's round "?" button at the left margin. Runs after every (re)layout, so
     /// a resizable dialog's OnSize keeps it; idempotent.
     func applyMacButtonOrder() {
-        guard AppLook.isMac else { return }
         func button(_ id: Int) -> NSButton? {
             placedIDs.values.first { $0.id == id && !$0.view.isHidden }?.view as? NSButton
         }
@@ -277,12 +276,12 @@ class RcFormView: NSView {
             let needed = ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: 100_000, height: 100_000)).width)
             return max(0, needed - field.frame.width)
         }
-        if let popup = view as? NSPopUpButton, popup.cell is WinPopUpButtonCell {
-            // A drop-down list's selected item beside the chevron (WinPopUpButtonCell).
+        if let popup = view as? NSPopUpButton, let cell = popup.cell as? NSPopUpButtonCell {
+            // The selected item's title in the room AppKit's pop-up leaves it beside its arrows.
             let title = popup.titleOfSelectedItem ?? ""
             guard !title.isEmpty else { return 0 }
             let width = ceil((title as NSString).size(withAttributes: [.font: popup.font ?? DialogMetrics.font]).width)
-            return max(0, width + WinPopUpButtonCell.textInset + WinPopUpButtonCell.buttonWidth - popup.frame.width)
+            return max(0, width - cell.titleRect(forBounds: popup.bounds).width)
         }
         if let button = view as? NSButton, !(button is NSPopUpButton), let cell = button.cell as? NSButtonCell {
             guard !button.title.isEmpty else { return 0 }
@@ -454,9 +453,8 @@ class RcFormView: NSView {
     /// native-look (HIG "Layout": a form's labels are right-aligned against their controls):
     /// a static label that ends in a colon and stands left of the control it names on the same
     /// line is set right-aligned, its right edge one gap before the control. The template keeps
-    /// the place of every control; only where the label's text sits changes. Classic: nothing.
+    /// the place of every control; only where the label's text sits changes.
     func applyMacLabelAlignment() {
-        guard AppLook.isMac else { return }
         let views = subviews.filter { !$0.isHidden }
         var applied = alignedLabels
         for case let field as NSTextField in views where !field.isEditable && !field.isBezeled && !field.isBordered {
@@ -507,52 +505,30 @@ final class WinGroupBox: NSView {
 
     override var isFlipped: Bool { true }
 
-    private let isMacLook = AppLook.isMac
     /// native-look: where the rounded box starts under the title in the Mac look.
     static let macBoxTop: CGFloat = 17
 
     override func layout() {
         super.layout()
-        if isMacLook {
-            // native-look: the title in semibold, measured in that font (+4 for the label's insets).
-            let font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
-            let w = min(ceil((titleField.stringValue as NSString).size(withAttributes: [.font: font]).width) + 4,
-                        max(0, bounds.width - 4))
-            RcPlace.label(titleField, NSRect(x: 2, y: 0, width: w, height: 13))
-            titleField.font = font
-            setAccessibilityLabel(titleField.stringValue)
-            return
-        }
-        let w = min(ceil(titleField.attributedStringValue.size().width), max(0, bounds.width - 16))
-        RcPlace.label(titleField, NSRect(x: 8, y: 0, width: w, height: 13))
+        // native-look: the title in semibold, measured in that font (+4 for the label's insets).
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        let w = min(ceil((titleField.stringValue as NSString).size(withAttributes: [.font: font]).width) + 4,
+                    max(0, bounds.width - 4))
+        RcPlace.label(titleField, NSRect(x: 2, y: 0, width: w, height: 13))
+        titleField.font = font
         setAccessibilityLabel(titleField.stringValue)
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if isMacLook {
-            // native-look: the title above a softly filled, rounded box (System Settings' groups).
-            let box = NSRect(x: 0, y: Self.macBoxTop, width: bounds.width, height: max(0, bounds.height - Self.macBoxTop))
-            guard box.height > 4 else { return }
-            let path = NSBezierPath(roundedRect: box.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
-            NSColor.labelColor.withAlphaComponent(0.035).setFill()
-            path.fill()
-            NSColor.separatorColor.setStroke()
-            path.lineWidth = 1
-            path.stroke()
-            return
-        }
-        let r = bounds
-        guard r.width > 2, r.height > 8 else { return }
-        let top: CGFloat = 6, bottom = r.height - 2, right = r.width - 1
-        let titleWidth = titleField.stringValue.isEmpty ? 0 : ceil(titleField.attributedStringValue.size().width)
-        let gapFrom: CGFloat = 7, gapTo = titleWidth > 0 ? 8 + titleWidth + 2 : 7
-        DialogMetrics.groupLine.setFill()
-        // top, split around the title
-        NSRect(x: 0, y: top, width: gapFrom, height: 1).fill()
-        if right + 1 > gapTo { NSRect(x: gapTo, y: top, width: right + 1 - gapTo, height: 1).fill() }
-        NSRect(x: 0, y: top, width: 1, height: bottom - top + 1).fill()           // left
-        NSRect(x: right, y: top, width: 1, height: bottom - top + 1).fill()       // right
-        NSRect(x: 0, y: bottom, width: right + 1, height: 1).fill()               // bottom
+        // native-look: the title above a softly filled, rounded box (System Settings' groups).
+        let box = NSRect(x: 0, y: Self.macBoxTop, width: bounds.width, height: max(0, bounds.height - Self.macBoxTop))
+        guard box.height > 4 else { return }
+        let path = NSBezierPath(roundedRect: box.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
+        NSColor.labelColor.withAlphaComponent(0.035).setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.lineWidth = 1
+        path.stroke()
     }
 }
 
@@ -634,17 +610,10 @@ enum RcPlace {
     static let comboHeight: CGFloat = 21
 
     static func popup(_ p: NSPopUpButton, _ r: NSRect) {
-        if AppLook.isMac {
-            // native-look: AppKit's own pop-up button, a little wider than the rect for its bezel.
-            p.font = DialogMetrics.font
-            p.controlSize = .regular
-            p.frame = NSRect(x: r.minX - 3, y: r.minY - 2, width: r.width + 6, height: comboHeight + 4)
-            return
-        }
-        WinPopUpButtonCell.adopt(p)
+        // native-look: AppKit's own pop-up button, a little wider than the rect for its bezel.
         p.font = DialogMetrics.font
-        p.controlSize = .small
-        p.frame = NSRect(x: r.minX, y: r.minY, width: r.width, height: comboHeight)
+        p.controlSize = .regular
+        p.frame = NSRect(x: r.minX - 3, y: r.minY - 2, width: r.width + 6, height: comboHeight + 4)
     }
 
     /// CBS_DROPDOWN: an edit field with the list button, also 21 px.
@@ -659,7 +628,7 @@ enum RcPlace {
     static func edit(_ f: NSTextField, _ r: NSRect) {
         f.font = DialogMetrics.font
         f.controlSize = DialogMetrics.controlSize
-        if AppLook.isMac { f.bezelStyle = .roundedBezel }
+        f.bezelStyle = .roundedBezel
         // The bezel draws a 1 px shadow outside its frame; Windows' border is the rect's edge.
         f.frame = r.insetBy(dx: 1, dy: 1)
     }
@@ -755,69 +724,6 @@ extension RcFormView {
     }
 }
 
-/// A drop-down list (CBS_DROPDOWNLIST) as Windows 11 draws it (WinCombo.swift, reports/feel3.md
-/// §2): the themed box in its normal / hover / focused / disabled colours, the chevron, and the
-/// text left-aligned 4 px in with its baseline 15 px below the top -- AppKit's own pop-up centres
-/// the title in a capsule. The menu that opens stays AppKit's.
-final class WinPopUpButtonCell: NSPopUpButtonCell {
-
-    static let textInset: CGFloat = WinCombo.textX
-    static let buttonWidth: CGFloat = 17
-
-    let hover = WinComboHover()
-
-    /// The copy shares `hover`; NSCell copied the reference without retaining it (`CellCopy`).
-    override func copy(with zone: NSZone? = nil) -> Any {
-        let copy = super.copy(with: zone)
-        if let cell = copy as? WinPopUpButtonCell { CellCopy.adopt(cell.hover) }
-        return copy
-    }
-
-    override func titleRect(forBounds rect: NSRect) -> NSRect {
-        NSRect(x: rect.minX + Self.textInset, y: rect.minY, width: max(0, rect.width - Self.textInset - Self.buttonWidth),
-               height: rect.height)
-    }
-
-    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
-        let flipped = controlView.isFlipped
-        let window = controlView.window
-        let focused = window?.isKeyWindow == true && window?.firstResponder === controlView
-        let state: WinCombo.State = !isEnabled ? .disabled
-            : (hover.isInside || isHighlighted ? .hover : (focused ? .focused : .normal))
-        WinCombo.drawBox(cellFrame, flipped: flipped, editable: false, state: state, hovered: hover.isInside)
-        WinCombo.drawText(titleOfSelectedItem ?? "", in: cellFrame, flipped: flipped, font: font ?? DialogMetrics.font,
-                          color: isEnabled ? WinCombo.text : WinCombo.disabledText,
-                          maxX: cellFrame.maxX - Self.buttonWidth)
-        if focused, state != .disabled {
-            var r = cellFrame
-            if !flipped { r.origin.y = cellFrame.minY }
-            WinCombo.drawFocusRect(r)
-        }
-    }
-
-    /// Gives `popup` this cell, keeping its menu, selection, target / action and state.
-    static func adopt(_ popup: NSPopUpButton) {
-        guard let old = popup.cell as? NSPopUpButtonCell, !(old is WinPopUpButtonCell) else { return }
-        let cell = WinPopUpButtonCell(textCell: "", pullsDown: old.pullsDown)
-        let menu = old.menu
-        let selected = old.indexOfSelectedItem
-        cell.menu = menu
-        cell.target = old.target
-        cell.action = old.action
-        cell.isEnabled = old.isEnabled
-        cell.font = old.font
-        cell.controlSize = old.controlSize
-        cell.arrowPosition = old.arrowPosition
-        cell.autoenablesItems = old.autoenablesItems
-        cell.tag = old.tag
-        cell.alignment = .left                      // CBS_DROPDOWNLIST text is left-aligned
-        popup.cell = cell
-        popup.focusRingType = .none                 // the dotted focus rectangle is drawn instead
-        cell.hover.attach(to: popup)
-        if selected >= 0, selected < cell.numberOfItems { cell.selectItem(at: selected) }
-    }
-}
-
 /// The pieces every resizable dialog's OnSize uses (CDialog::GetMargins(8), GetItemSizes,
 /// MoveItem): the 8 DLU margins and "these buttons at the bottom right, in this order".
 enum RcResize {
@@ -830,7 +736,7 @@ enum RcResize {
     static func bottomRightButtons(_ buttons: [(NSButton, NSSize)], in size: NSSize) -> CGFloat {
         // native-look: the Mac order puts the confirming button rightmost (callers list Windows'
         // order, rightmost first: Cancel, then OK).
-        let buttons = AppLook.isMac ? Array(buttons.reversed()) : buttons
+        let buttons = Array(buttons.reversed())
         guard let height = buttons.first?.1.height else { return size.height }
         let y = size.height - my - height
         var x = size.width - mx
@@ -902,7 +808,6 @@ final class WinProgressBar: NSView {
     override func accessibilityMinValue() -> Any? { minValue }
     override func accessibilityMaxValue() -> Any? { maxValue }
 
-    private let isMacLook = AppLook.isMac
 
     /// native-look: a rounded track with the accent colour, as NSProgressIndicator draws it.
     private func drawMac() {
@@ -920,17 +825,6 @@ final class WinProgressBar: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if isMacLook { drawMac(); return }
-        let b = bounds
-        Self.frameColor.setFill()
-        b.fill()
-        let inner = b.insetBy(dx: 1, dy: 1)
-        Self.trackColor.setFill()
-        inner.fill()
-        let span = maxValue - minValue
-        guard span > 0 else { return }
-        let fraction = min(1, max(0, (doubleValue - minValue) / span))
-        Self.barColor.setFill()
-        NSRect(x: inner.minX, y: inner.minY, width: (inner.width * fraction).rounded(), height: inner.height).fill()
+        drawMac()
     }
 }

@@ -56,6 +56,8 @@ final class WinMatchTests: AppHostTestCase {
     private func makeWindow(mask: UInt32? = nil) -> MainWindowController {
         Settings.numPanels = 1
         if let mask { Settings.toolbarsMask = mask }
+        // A fresh toolbar arrangement: AppKit keeps a customized one per identifier.
+        UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)")
         let controller = MainWindowController()
         controllers.append(controller)
         controller.window?.setContentSize(NSSize(width: 1000, height: 600))
@@ -85,112 +87,15 @@ final class WinMatchTests: AppHostTestCase {
                                 keyCode: 0)!
     }
 
-    /// The toolbar strip as a 1x PNG, `width` points wide (the Windows captures are 420 px wide),
-    /// written next to the Windows half: `screenshots/wincompare-toolbar-<state>-mac.png`.
-    @discardableResult
-    private func captureToolbar(_ bar: FMToolbarView, _ state: String, width: CGFloat = 420) -> URL? {
-        bar.layoutSubtreeIfNeeded()
-        let rect = NSRect(x: 0, y: 0, width: min(width, bar.bounds.width), height: bar.bounds.height)
-        guard rect.width > 1, rect.height > 1,
-              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(rect.width), pixelsHigh: Int(rect.height),
-                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        rep.size = rect.size
-        bar.cacheDisplay(in: rect, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
-        let file = "wincompare-toolbar-\(state)-mac.png"
-        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
-        attachment.name = file
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        let url = URL(fileURLWithPath: TestPaths.screenshots).appendingPathComponent(file)
-        try? png.write(to: url, options: .atomic)
-        return url
-    }
-
     // MARK: - toolbar (App.cpp CreateToolbar / AddButton, 01 §1.3)
-
-    /// The toolbar is a flat strip in the window's content, not an NSToolbar: no bezel, no glass,
-    /// no separators, every button the same size, the label under the bitmap, never disabled.
-    func testToolbarIsAFlatWindowsStrip() throws {
-        let appearance = NSApp.appearance
-        NSApp.appearance = NSAppearance(named: .aqua)          // the paired captures are light
-        defer { NSApp.appearance = appearance }
-        let scratch = makeScratch()
-        let controller = makeWindow(mask: 0x8000_0000 | 8 | 4 | 1)      // kDefaultToolbarMask
-        navigate(controller.focusedPanel, to: scratch)
-        let window = try XCTUnwrap(controller.window)
-        XCTAssertNil(window.toolbar, "no NSToolbar: macOS 26 draws its items as glass capsules")
-        let bar = controller.toolbarView
-        XCTAssertTrue(bar.isDescendant(of: try XCTUnwrap(window.contentView)))
-        XCTAssertEqual(bar.accessibilityRole(), .toolbar)
-
-        let states: [(String, UInt32, [String], Bool, NSSize)] = [
-            ("default", 0xD, ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"], true, NSSize(width: 24, height: 24)),
-            ("large-text", 0xF, ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"], true, NSSize(width: 48, height: 36)),
-            ("small-notext", 0xC, ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"], false, NSSize(width: 24, height: 24)),
-            ("large-notext", 0xE, ["Add", "Extract", "Test", "Copy", "Move", "Delete", "Info"], false, NSSize(width: 48, height: 36)),
-            ("archive-only", 0x9, ["Add", "Extract", "Test"], true, NSSize(width: 24, height: 24)),
-            ("standard-only", 0x5, ["Copy", "Move", "Delete", "Info"], true, NSSize(width: 24, height: 24)),
-        ]
-        for (state, mask, labels, text, image) in states {
-            Settings.toolbarsMask = mask
-            controller.resetToolbarsForTest()
-            window.contentView?.layoutSubtreeIfNeeded()
-            XCTAssertEqual(bar.buttons.map(\.title), labels, state)
-            let size = try XCTUnwrap(bar.buttons.first?.frame.size)
-            XCTAssertTrue(bar.buttons.allSatisfy { $0.frame.size == size }, "\(state): every button the same size")
-            // the bitmap + 7 x 6 padding, plus the 16 pt label line with "Show Buttons Text"
-            XCTAssertEqual(size.height, image.height + 6 + (text ? 16 : 0), state)
-            XCTAssertGreaterThanOrEqual(size.width, image.width + 7, state)
-            if !text { XCTAssertEqual(size.width, image.width + 7, state) }
-            // back to back from the left edge: no separator between the two groups
-            for (i, b) in bar.buttons.enumerated() {
-                XCTAssertEqual(b.frame.minX, CGFloat(i) * size.width, "\(state) button \(i)")
-                XCTAssertFalse(b.isBordered)
-                XCTAssertTrue(b.isEnabled, "7zFM never disables a toolbar button")
-                XCTAssertTrue(b.refusesFirstResponder)
-                XCTAssertEqual(b.toolTip, b.title)
-            }
-            XCTAssertEqual(bar.frame.height, 2 + size.height + 4, "\(state): the strip is 2 + button + 4")
-            captureToolbar(bar, state)
-            if state == "default" || state == "large-text" {
-                let extract = bar.buttons[1]
-                extract.isHovered = true
-                extract.display()
-                captureToolbar(bar, state + "-hover")
-                extract.isHighlighted = true
-                extract.display()
-                captureToolbar(bar, state + "-pressed")
-                extract.isHighlighted = false
-                extract.isHovered = false
-            }
-        }
-        attach(window, "toolbar-window")
-
-        // No toolbar at all when both logical toolbars are off (MoveSubWindows).
-        Settings.toolbarsMask = 0x1
-        controller.resetToolbarsForTest()
-        window.contentView?.layoutSubtreeIfNeeded()
-        XCTAssertTrue(bar.isHidden)
-        XCTAssertEqual(bar.frame.height, 0)
-
-        // TBSTYLE_WRAPABLE: too narrow for one row, the buttons wrap.
-        Settings.toolbarsMask = 0xF
-        controller.resetToolbarsForTest()
-        window.setContentSize(NSSize(width: 200, height: 400))
-        window.contentView?.layoutSubtreeIfNeeded()
-        bar.layoutSubtreeIfNeeded()
-        XCTAssertGreaterThan(bar.buttons.last!.frame.minY, bar.buttons.first!.frame.minY, "wrapped")
-    }
 
     /// A button sends its selector down the responder chain (kMenuCmdID_Toolbar_Add 1070 ...).
     func testToolbarButtonsSendTheirCommands() throws {
         let controller = makeWindow(mask: 0xD)
-        let actions = controller.toolbarView.buttons.map { $0.action.map(NSStringFromSelector) ?? "" }
+        let actions = controller.commandToolbarItems.map { $0.action.map(NSStringFromSelector) ?? "" }
         XCTAssertEqual(actions, ["toolbarAddToArchive:", "toolbarExtractArchives:", "toolbarTestArchives:",
                                  "fileCopyTo:", "fileMoveTo:", "fileDelete:", "fileProperties:"])
-        XCTAssertTrue(controller.toolbarView.buttons.allSatisfy { $0.target == nil })
+        XCTAssertTrue(controller.commandToolbarItems.allSatisfy { $0.target == nil })
     }
 
     // MARK: - a folder just opened (PanelItems.cpp:984-1001, RefreshListCtrl)

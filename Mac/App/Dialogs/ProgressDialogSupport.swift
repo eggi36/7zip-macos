@@ -431,10 +431,10 @@ extension DialogKit {
     /// The window a dialog attaches to as a sheet in the Mac look (HIG "Sheets": a dialog about a
     /// window's content belongs to that window): its owner when that is a main 7-Zip window, or a
     /// dialog that is itself a sheet of one (a question asked from the Add to Archive sheet), on
-    /// screen and without a sheet already. nil = run it as a window of its own -- Classic, 7zG
+    /// screen and without a sheet already. nil = run it as a window of its own -- 7zG
     /// mode, or a dialog owned by a progress window, the benchmark or nothing.
     static func sheetParent(for window: NSWindow) -> NSWindow? {
-        guard AppLook.isMac, !GMode.isActive else { return nil }
+        guard !GMode.isActive else { return nil }
         let hint = (window as? DialogWindow)?.owner ?? (window as? WinMessageBoxWindow)?.ownerWindow
         guard let owner = owner(for: window, parent: hint), owner.isVisible, !owner.isMiniaturized,
               owner.attachedSheet == nil else { return nil }
@@ -504,7 +504,6 @@ enum DialogKit {
         let window = DialogWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 200),
                                   styleMask: style, backing: .buffered, defer: false)
         window.title = title
-        if !AppLook.isMac { window.backgroundColor = WinChrome.face }   // COLOR_BTNFACE (recheck §2); native-look: AppKit's
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
         // SZ_DISABLE_ANIMATIONS: every dialog this app builds goes through here, so one call

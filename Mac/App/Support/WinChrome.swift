@@ -55,7 +55,7 @@ enum WinChrome {
     // MARK: geometry (px = pt)
 
     // The address band's and the status bar's geometry (bandHeight, upButtonRect, comboX,
-    // comboInset, statusHeight) depends on the look and lives in AppLook.swift (app only).
+    // comboInset, statusHeight) lives in AppLook.swift (app only).
     // The status bar: 23 px including its top line; dividers 1 px at a part's right edge - 1,
     // rows 2..21; text ink 2 px into a part.
 }

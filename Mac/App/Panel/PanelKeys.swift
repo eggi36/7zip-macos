@@ -147,10 +147,8 @@ extension PanelViewController {
                 // keeps Space as its Insert key.
                 if usesAlternativeSelection {
                     insertToggleAndAdvance()
-                } else if AppLook.isMac {
-                    quickLook(nil)
                 } else {
-                    calcFocusedItemSize()
+                    quickLook(nil)
                 }
                 return true
             }

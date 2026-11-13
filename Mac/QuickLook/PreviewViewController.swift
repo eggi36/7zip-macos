@@ -92,8 +92,6 @@ struct PreviewSettings {
         case "dark": appearance = NSAppearance(named: .darkAqua)
         default: appearance = nil
         }
-        // native-look: the preview draws like the app's file list in the look the app uses.
-        PreviewMetrics.isMac = prefs.look != "classic"
         timestampLevel = prefs.timestampLevel.flatMap { SZTimestampLevel(rawValue: $0) } ?? .min
         utc = prefs.timestampShowUTC ?? false
     }

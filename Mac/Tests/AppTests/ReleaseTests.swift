@@ -78,20 +78,4 @@ final class ReleaseTests: AppHostTestCase {
         XCTAssertFalse(cache.isEmpty, "no snapshot = not a file-system folder: the real icon is cached")
     }
 
-    /// IDI_LOGO: the About box shows 7zipLogo.ico's 110 x 63 wordmark at its real size
-    /// (AboutDialog.rc:21, requests.md icons -> tools).
-    func testAboutShowsTheWordmark() {
-        let appeared = ModalProbe.present({ AboutDialog.show() }) { window in
-            func imageViews(_ view: NSView?) -> [NSImageView] {
-                guard let view else { return [] }
-                return [view as? NSImageView].compactMap { $0 } + view.subviews.flatMap { imageViews($0) }
-            }
-            let logo = imageViews(window.contentView).first { $0.accessibilityIdentifier() == "aboutLogo" }
-            XCTAssertNotNil(logo, "no logo view")
-            XCTAssertEqual(logo?.image?.size, NSSize(width: 110, height: 63))
-            XCTAssertEqual(logo?.frame.size, NSSize(width: 110, height: 63))
-            _ = self.attach(window, "01-about-logo")
-        }
-        XCTAssertTrue(appeared)
-    }
 }

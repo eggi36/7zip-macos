@@ -148,8 +148,8 @@ final class GModeTests: AppHostTestCase {
             XCTAssertNotNil(box, "not a message box: \(window)")
             XCTAssertNil(box?.ownerWindow, "the box is owned by \(box?.ownerWindow?.title ?? "-")")
             if let screen = NSScreen.main {
+                // An alert of no window sits centred across the screen (NSWindow.center).
                 XCTAssertEqual(window.frame.midX, screen.frame.midX, accuracy: 1)
-                XCTAssertEqual(window.frame.midY, screen.frame.midY, accuracy: 1)
             }
         })
         XCTAssertTrue(inspected)

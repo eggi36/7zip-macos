@@ -167,11 +167,10 @@ final class WinCompareDumpTests: AppHostTestCase {
     private func mainDump(_ controller: MainWindowController) -> String {
         guard let window = controller.window else { return "" }
         var out = WinCompareDump.window(window)
-        if !controller.toolbarView.isHidden {
+        if let toolbar = window.toolbar, toolbar.isVisible {
             out += "== toolbar\n"
-            for button in controller.toolbarView.buttons {
-                out += "  BTN '\(button.title)' id=\(button.identifier?.rawValue ?? "")" + (button.isEnabled ? "" : " DISABLED")
-                    + " rect=\(Int(button.frame.minX)),\(Int(button.frame.minY)) \(Int(button.frame.width))x\(Int(button.frame.height))\n"
+            for item in toolbar.items {
+                out += "  ITEM '\(item.label)' id=\(item.itemIdentifier.rawValue)" + (item.isEnabled ? "" : " DISABLED") + "\n"
             }
         }
         out += "TITLE '\(window.title)'\n"

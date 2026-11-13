@@ -257,17 +257,17 @@ final class PanelIconView: NSView {
             // icons-large.png: the icons 75 px apart both ways, the first one's cell at the
             // list's edge).
             // native-look: Finder's icon view -- 64 pt icons, two-line names, 112 x 116 cells.
-            layout.itemSize = AppLook.isMac ? NSSize(width: 112, height: 116) : NSSize(width: 75, height: 75)
+            layout.itemSize = NSSize(width: 112, height: 116)
             layout.scrollDirection = .vertical
         case 1:
-            layout.itemSize = NSSize(width: AppLook.isMac ? 220 : 200, height: AppLook.isMac ? 24 : 20)
+            layout.itemSize = NSSize(width: 220, height: 24)
             layout.scrollDirection = .vertical
         default:
-            layout.itemSize = NSSize(width: AppLook.isMac ? 220 : 200, height: AppLook.isMac ? 24 : 20)
+            layout.itemSize = NSSize(width: 220, height: 24)
             layout.scrollDirection = .horizontal
         }
-        layout.minimumInteritemSpacing = mode == 0 ? (AppLook.isMac ? 6 : 0) : 2
-        layout.minimumLineSpacing = mode == 0 ? (AppLook.isMac ? 6 : 0) : 2
+        layout.minimumInteritemSpacing = mode == 0 ? (6) : 2
+        layout.minimumLineSpacing = mode == 0 ? (6) : 2
         layout.sectionInset = mode == 0 ? NSEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
                                         : NSEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
         // A vertically scrolling layout follows the clip view's width, a horizontal one (List
@@ -624,8 +624,6 @@ final class PanelCollectionItem: NSCollectionViewItem {
     private var isDeleted = false
     private var baseImage: NSImage?
     fileprivate var large = false
-    /// native-look: Finder's icon view in the Mac look (big icons, two-line names, its selection).
-    fileprivate let isMacLook = AppLook.isMac
 
     override func loadView() {
         let root = ItemBackgroundView()
@@ -661,8 +659,7 @@ final class PanelCollectionItem: NSCollectionViewItem {
     /// LVS_LIST (selcolors-data/win/*-large-*, *-small-*, *-list-*): the icon blended with the
     /// highlight, the label's text on the highlight in white, nothing while the list is unfocused.
     var drawsHighlight: Bool {
-        if isMacLook { return isSelected || highlightState == .asDropTarget }
-        return (isSelected && (panel?.listHasKeyboardFocus ?? true)) || highlightState == .asDropTarget
+        isSelected || highlightState == .asDropTarget
     }
 
     /// native-look: the selection is in the accent colour while the list has the focus, grey
@@ -671,16 +668,9 @@ final class PanelCollectionItem: NSCollectionViewItem {
 
     func updateAppearance() {
         guard isViewLoaded else { return }
-        if isMacLook {
-            let lit = drawsHighlight && macSelectionIsEmphasized
-            label.textColor = lit ? .alternateSelectedControlTextColor : (isDeleted ? .systemRed : .labelColor)
-            icon.image = baseImage
-            view.needsDisplay = true
-            return
-        }
-        let lit = drawsHighlight
-        label.textColor = lit ? PanelSelectionStyle.highlightText : PanelSelectionStyle.normalText(isDeleted: isDeleted)
-        if let baseImage { icon.image = lit ? PanelSelectionStyle.blended(baseImage) : baseImage }
+        let lit = drawsHighlight && macSelectionIsEmphasized
+        label.textColor = lit ? .alternateSelectedControlTextColor : (isDeleted ? .systemRed : .labelColor)
+        icon.image = baseImage
         view.needsDisplay = true
     }
 
@@ -688,7 +678,7 @@ final class PanelCollectionItem: NSCollectionViewItem {
     /// icon, left-aligned after a small one.
     var labelRect: NSRect {
         let frame = label.frame
-        if isMacLook, let cell = label.cell {
+        if let cell = label.cell {
             // the text's own size, up to two lines, centred (large) or left (small) with 4 pt padding
             let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: frame.width, height: 1000))
             let width = min(frame.width, size.width) + 8
@@ -723,21 +713,16 @@ final class PanelCollectionItem: NSCollectionViewItem {
         label.isSelectable = false
         label.isBordered = false
         label.drawsBackground = false
-        label.lineBreakMode = isMacLook && large ? .byWordWrapping : .byTruncatingMiddle
+        label.lineBreakMode = large ? .byWordWrapping : .byTruncatingMiddle
         label.stringValue = displayName
         updateAppearance()
-    }
-
-    fileprivate var drawsFocusRectangle: Bool {
-        guard !isMacLook, let panel, index >= 0 else { return false }
-        return panel.focusedIndex == index && panel.listHasKeyboardFocus
     }
 
     private var installedConstraints: [NSLayoutConstraint] = []
 
     private func layout(large: Bool) {
         NSLayoutConstraint.deactivate(installedConstraints)
-        if isMacLook && large {
+        if large {
             // native-look: a 64 pt icon, the name under it on up to two lines.
             label.alignment = .center
             label.lineBreakMode = .byWordWrapping
@@ -756,33 +741,18 @@ final class PanelCollectionItem: NSCollectionViewItem {
             NSLayoutConstraint.activate(installedConstraints)
             return
         }
-        if isMacLook {
-            label.maximumNumberOfLines = 1
-            label.lineBreakMode = .byTruncatingMiddle
-        }
-        if large {
-            label.alignment = .center
-            installedConstraints = [
-                icon.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
-                icon.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                icon.widthAnchor.constraint(equalToConstant: 32),
-                icon.heightAnchor.constraint(equalToConstant: 32),
-                label.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: 3),
-                label.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
-                label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -2),
-            ]
-        } else {
-            label.alignment = .left
-            installedConstraints = [
-                icon.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
-                icon.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-                icon.widthAnchor.constraint(equalToConstant: 16),
-                icon.heightAnchor.constraint(equalToConstant: 16),
-                label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 4),
-                label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -2),
-                label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            ]
-        }
+        label.maximumNumberOfLines = 1
+        label.lineBreakMode = .byTruncatingMiddle
+        label.alignment = .left
+        installedConstraints = [
+            icon.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 2),
+            icon.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 16),
+            icon.heightAnchor.constraint(equalToConstant: 16),
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 4),
+            label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -2),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ]
         NSLayoutConstraint.activate(installedConstraints)
     }
 
@@ -815,26 +785,16 @@ final class PanelCollectionItem: NSCollectionViewItem {
                 bounds.fill()
             }
             let label = owner.labelRect
-            if owner.isMacLook {
-                // native-look: Finder's selection -- a soft rounded square behind a big icon and a
-                // rounded name field in the accent colour (grey without the focus).
-                guard owner.drawsHighlight else { return }
-                if owner.large, let iconFrame = owner.imageView?.frame {
-                    NSColor.labelColor.withAlphaComponent(0.1).setFill()
-                    NSBezierPath(roundedRect: iconFrame.insetBy(dx: -6, dy: -6), xRadius: 8, yRadius: 8).fill()
-                }
-                (owner.macSelectionIsEmphasized ? NSColor.selectedContentBackgroundColor
-                                                 : NSColor.unemphasizedSelectedContentBackgroundColor).setFill()
-                NSBezierPath(roundedRect: label, xRadius: 5, yRadius: 5).fill()
-                return
+            // Finder's selection -- a soft rounded square behind a big icon and a
+            // rounded name field in the accent colour (grey without the focus).
+            guard owner.drawsHighlight else { return }
+            if owner.large, let iconFrame = owner.imageView?.frame {
+                NSColor.labelColor.withAlphaComponent(0.1).setFill()
+                NSBezierPath(roundedRect: iconFrame.insetBy(dx: -6, dy: -6), xRadius: 8, yRadius: 8).fill()
             }
-            if owner.drawsHighlight {
-                PanelSelectionStyle.highlight.setFill()
-                label.fill()
-            }
-            if owner.drawsFocusRectangle {
-                PanelSelectionStyle.drawFocusRectangle(label, onHighlight: owner.drawsHighlight)
-            }
+            (owner.macSelectionIsEmphasized ? NSColor.selectedContentBackgroundColor
+                                             : NSColor.unemphasizedSelectedContentBackgroundColor).setFill()
+            NSBezierPath(roundedRect: label, xRadius: 5, yRadius: 5).fill()
         }
     }
 }

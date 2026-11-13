@@ -20,59 +20,7 @@ final class AboutDialog: NSObject {
 
         // IDD_ABOUT 2900 (AboutDialog.rc): 160 x 160 DLU = 240 x 260 px, every control on its .rc
         // rect (RcLayout, reports/dlgfeel.md section About).
-        if AppLook.isMac {
-            buildMac(parent: parent)
-            return
-        }
-        let rc = RcDialog(2900)
-        let form = RcFormView()
-
-        // IDI_LOGO 100, SS_REALSIZEIMAGE (AboutDialog.rc:21): 7zipLogo.ico at its real size, the
-        // 110 x 63 wordmark, shipped as `AboutLogo` by make-icons (requests.md, icons -> tools). The
-        // app icon stands in only if the asset is missing.
-        let logo = NSImageView()
-        let wordmark = NSImage(named: "AboutLogo")
-        logo.image = wordmark ?? NSApp.applicationIconImage
-        logo.imageScaling = wordmark == nil ? .scaleProportionallyUpOrDown : .scaleNone
-        logo.imageAlignment = .alignTopLeft
-        logo.setAccessibilityIdentifier("aboutLogo")
-        form.add(logo, rc, -1, 0)
-        // SS_REALSIZEIMAGE: the static takes the image's own size (110 x 63 in the capture).
-        logo.frame.size = wordmark?.size ?? NSSize(width: 64, height: 64)
-
-        // IDT_ABOUT_VERSION 101 = "7-Zip <MY_VERSION> (<cpu>)", with the port's version in it
-        // (pub3): "7-Zip 26.03 for macOS 1.0.0 (arm64)". IDT_ABOUT_DATE 102 = MY_DATE
-        let version = RcPlace.makeLabel(Self.versionText)
-        version.setAccessibilityIdentifier("aboutVersion")
-        form.add(version, rc, 101)
-        form.add(RcPlace.makeLabel(SZBenchmark.engineDateText), rc, 102)
-        // static LTEXT MY_COPYRIGHT (-1, the second static)
-        form.add(RcPlace.makeLabel(SZBenchmark.engineCopyrightText), rc, -1, 1)
-        // The macOS credit: one more 13 px line at the copyright line's pitch (21 px), so it sits
-        // where IDT_ABOUT_INFO started; IDT_ABOUT_INFO moves down by that pitch.
-        let copyrightRect = rc.rect(-1, 1)
-        let pitch = rc.rect(-1, 1).minY - rc.rect(102).minY
-        let credit = RcPlace.makeLabel(Self.macCredit)
-        credit.setAccessibilityIdentifier("aboutMacCredit")
-        form.addSubview(credit)
-        RcPlace.label(credit, copyrightRect.offsetBy(dx: 0, dy: pitch))
-        // IDT_ABOUT_INFO 2901 (the only localized item, kLangIDs): a multi-line LTEXT
-        var infoRect = rc.rect(2901)
-        infoRect.origin.y += pitch
-        infoRect.size.height -= pitch
-        let info = RcPlace.makeWrappingLabel(Lang.text(2901, "7-Zip is free software"))
-        form.addSubview(info)
-        RcPlace.label(info, infoRect)
-        info.frame.size.height = infoRect.height
-
-        // IDB_ABOUT_HOMEPAGE 110 "www.7-zip.org", IDOK (DEFPUSHBUTTON). IDD_ABOUT has only these
-        // two (AboutDialog.rc, and 7zFM 26.03: dlgfeel-data/win/dlg-about.txt). Its help topic is
-        // reached with F1 (CAboutDialog::OnHelp -> ShowHelpWindow("start.htm"), which opens HtmlHelp
-        // in 7zFM's process): `helpKeyMonitor` gives the dialog the same F1 (and the Mac Help key).
-        form.add(DialogKit.button("www.7-zip.org", target: self, action: #selector(homePageClicked)), rc, 110)
-        form.add(DialogKit.button(Lang.text(401, "OK"), target: self, action: #selector(okClicked), key: "\r"), rc, 1)
-
-        RcPlace.install(form, in: window, size: rc.size, parent: parent)
+        buildMac(parent: parent)
     }
 
     /// IDT_ABOUT_VERSION's text: MY_VERSION_CPU with "7-Zip <upstream>" replaced by the port's

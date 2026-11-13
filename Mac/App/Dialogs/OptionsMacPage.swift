@@ -54,8 +54,6 @@ final class OptionsMacPage: OptionsPageBase {
 
     /// Control IDs of this page's own template (macOS only; the grid box reuses 2505's lang text).
     enum ID {
-        static let lookLabel = 9912         // LTEXT "Appearance:" (native-look)
-        static let lookCombo = 9913         // COMBOBOX, CBS_DROPDOWNLIST
         static let themeLabel = 9900        // LTEXT "Theme:"
         static let themeCombo = 9910        // COMBOBOX, CBS_DROPDOWNLIST
         static let showGrid = 9920          // checkbox, lang 2505 "Show &grid lines"
@@ -66,21 +64,16 @@ final class OptionsMacPage: OptionsPageBase {
 
     /// The page template in DLUs, in the IDD_SETTINGS style (m = 8, rows from y 8).
     static let template = RcTemplate(id: -9900, caption: "macOS", width: 316, height: 296, resizable: false, controls: [
-        RcControl(id: ID.lookLabel, kind: .ltext, x: 8, y: 10, width: 76, height: 8, text: "Appearance:"),
-        RcControl(id: ID.lookCombo, kind: .comboList, x: 88, y: 8, width: 120, height: 64, text: ""),
-        RcControl(id: ID.themeLabel, kind: .ltext, x: 8, y: 28, width: 76, height: 8, text: "Theme:"),
-        RcControl(id: ID.themeCombo, kind: .comboList, x: 88, y: 26, width: 120, height: 64, text: ""),
-        RcControl(id: ID.showGrid, kind: .check, x: 8, y: 48, width: 300, height: 10, text: "Show &grid lines"),
-        RcControl(id: ID.checkUpdates, kind: .check, x: 8, y: 64, width: 300, height: 10, text: "Check for updates at startup"),
-        RcControl(id: ID.quickLook, kind: .check, x: 8, y: 80, width: 300, height: 10, text: "Quick Look preview for archives"),
-        RcControl(id: ID.resetAll, kind: .push, x: 8, y: 100, width: 100, height: 14, text: "Reset All Settings..."),
+        RcControl(id: ID.themeLabel, kind: .ltext, x: 8, y: 10, width: 76, height: 8, text: "Theme:"),
+        RcControl(id: ID.themeCombo, kind: .comboList, x: 88, y: 8, width: 120, height: 64, text: ""),
+        RcControl(id: ID.showGrid, kind: .check, x: 8, y: 30, width: 300, height: 10, text: "Show &grid lines"),
+        RcControl(id: ID.checkUpdates, kind: .check, x: 8, y: 46, width: 300, height: 10, text: "Check for updates at startup"),
+        RcControl(id: ID.quickLook, kind: .check, x: 8, y: 62, width: 300, height: 10, text: "Quick Look preview for archives"),
+        RcControl(id: ID.resetAll, kind: .push, x: 8, y: 82, width: 100, height: 14, text: "Reset All Settings..."),
     ])
 
     override var rc: RcDialog { RcDialog(template: Self.template) }
 
-    let lookLabel = RcPlace.makeLabel(AppLook.labelText)
-    let lookPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private var lookChanged = false
     let themeLabel = RcPlace.makeLabel(AppTheme.labelText)
     let themePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private(set) var gridBox: NSButton!
@@ -104,17 +97,6 @@ final class OptionsMacPage: OptionsPageBase {
     override func loadView() {
         super.loadView()
         let rc = self.rc
-        lookPopup.removeAllItems()
-        for look in AppLook.allCases {
-            lookPopup.addItem(withTitle: look.title)
-            lookPopup.lastItem?.representedObject = look.rawValue
-        }
-        lookPopup.target = self
-        lookPopup.action = #selector(lookChosen(_:))
-        lookPopup.setAccessibilityIdentifier("optionsLook")
-        lookLabel.setAccessibilityIdentifier("optionsLookLabel")
-        form.add(lookLabel, rc, ID.lookLabel)
-        form.add(lookPopup, rc, ID.lookCombo)
         themePopup.removeAllItems()
         for theme in AppTheme.allCases {
             themePopup.addItem(withTitle: theme.title)
@@ -151,8 +133,6 @@ final class OptionsMacPage: OptionsPageBase {
     // MARK: OnInit
 
     override func pageDidLoad() {
-        lookPopup.selectItem(at: AppLook.allCases.firstIndex(of: Settings.look) ?? 0)
-        lookChanged = false
         selectTheme(Settings.theme)
         gridBox.state = Settings.showGrid ? .on : .off
         updatesBox.state = Settings.checkUpdates ? .on : .off
@@ -220,8 +200,6 @@ final class OptionsMacPage: OptionsPageBase {
     }
 
     override func relabelPage() {
-        lookLabel.stringValue = AppLook.labelText
-        for (i, look) in AppLook.allCases.enumerated() { lookPopup.item(at: i)?.title = look.title }
         themeLabel.stringValue = AppTheme.labelText
         for (i, theme) in AppTheme.allCases.enumerated() { themePopup.item(at: i)?.title = theme.title }
         themePopup.needsDisplay = true
@@ -237,15 +215,6 @@ final class OptionsMacPage: OptionsPageBase {
 
     func selectTheme(_ theme: AppTheme) {
         themePopup.selectItem(at: AppTheme.allCases.firstIndex(of: theme) ?? 0)
-    }
-
-    var selectedLook: AppLook {
-        (lookPopup.selectedItem?.representedObject as? String).flatMap(AppLook.init(rawValue:)) ?? Settings.look
-    }
-
-    @objc func lookChosen(_ sender: Any?) {
-        lookChanged = true
-        changed()
     }
 
     @objc func themeChosen(_ sender: Any?) {
@@ -276,12 +245,6 @@ final class OptionsMacPage: OptionsPageBase {
         if themeChanged {
             Settings.theme = selectedTheme             // AppTheme applies it at once
             themeChanged = false
-        }
-        if lookChanged {
-            lookChanged = false
-            let look = selectedLook
-            // After this page's own Apply returns: the main windows are rebuilt (AppLook).
-            DispatchQueue.main.async { Settings.look = look }
         }
         if gridChanged {
             Settings.showGrid = gridBox.state == .on

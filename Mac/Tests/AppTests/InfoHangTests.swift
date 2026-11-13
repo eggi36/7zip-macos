@@ -81,7 +81,11 @@ final class InfoHangTests: AppHostTestCase {
         switch way {
         case .okButton: button("OK", in: window)?.performClick(nil)
         case .cancelButton: button("Cancel", in: window)?.performClick(nil)
-        case .escape: NSApp.sendEvent(keyEvent("\u{1b}", keyCode: 53, window: window))
+        case .escape:
+            // A sheet of a background app is not key: its Cancel button's Escape is a key
+            // equivalent, which only the key window gets from NSApp -- do that step directly.
+            let event = keyEvent("\u{1b}", keyCode: 53, window: window)
+            if NSApp.keyWindow === window || !window.performKeyEquivalent(with: event) { NSApp.sendEvent(event) }
         case .returnKey: NSApp.sendEvent(keyEvent("\r", keyCode: 36, window: window))
         case .closeButton: window.standardWindowButton(.closeButton)?.performClick(nil)
         case .commandW:
@@ -154,8 +158,9 @@ final class InfoHangTests: AppHostTestCase {
     /// The toolbar button's own action, down the responder chain as a click sends it; straight to
     /// the focused panel when the host app is in the background and has no key window.
     private func clickToolbar(_ id: String, _ controller: MainWindowController) {
-        guard let button = controller.toolbarView.button(id), let action = button.action else {
-            XCTFail("no toolbar button \(id)"); return
+        guard let button = controller.window?.toolbar?.items.first(where: { $0.itemIdentifier.rawValue == id }),
+              let action = button.action else {
+            XCTFail("no toolbar item \(id)"); return
         }
         controller.window?.makeKeyAndOrderFront(nil)
         controller.window?.makeFirstResponder(controller.focusedPanel.tableView)
@@ -330,10 +335,11 @@ final class InfoHangTests: AppHostTestCase {
         let before = Set((try? fm.contentsOfDirectory(atPath: scratch)) ?? [])
         var failures: [String] = []
         let plan: [(String, String, [CloseWay])] = [
-            ("sz.add", "a.txt", [.closeButton, .commandW]),
-            ("sz.extract", "test.7z", [.closeButton, .commandW]),
-            ("sz.copy", "a.txt", [.closeButton, .commandW]),
-            ("sz.move", "a.txt", [.closeButton, .commandW]),
+            // Sheets of the main window: no close box; Escape is their IDCANCEL.
+            ("sz.add", "a.txt", [.escape]),
+            ("sz.extract", "test.7z", [.escape]),
+            ("sz.copy", "a.txt", [.escape]),
+            ("sz.move", "a.txt", [.escape]),
             ("sz.test", "test.7z", [.okButton]),
         ]
         for (id, name, ways) in plan {

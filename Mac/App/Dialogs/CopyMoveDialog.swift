@@ -95,7 +95,7 @@ private final class CopyMoveDialogController: NSObject {
 
     /// Runs modally on the main thread; the whole value is selected first so typing replaces it.
     func run() -> String? {
-        // native-look: a sheet of the main window (DialogKit.sheetParent); Classic: the dialog.
+        // native-look: a sheet of the main window (DialogKit.sheetParent), else a window.
         if DialogKit.sheetParent(for: window) == nil { window.makeKeyAndOrderFront(nil) }
         combo.selectText(nil)
         DialogKit.runModal(for: window, asSheet: true)

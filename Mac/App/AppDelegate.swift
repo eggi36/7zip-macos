@@ -38,7 +38,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Lang.loadFromSettings()
         // theme: Options > macOS > Theme (FM.Theme) before the first window (AppTheme.swift)
         AppTheme.applyAtLaunch()
-        AppLook.observeChanges()              // native-look: rebuild the windows on a change
         SZFolder.timestampShowUTC = Settings.timestampShowUTC   // g_Timestamp_Show_UTC
         NSApp.mainMenu = MainMenu.build()
     }

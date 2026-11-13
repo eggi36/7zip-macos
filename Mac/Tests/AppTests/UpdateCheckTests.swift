@@ -245,14 +245,15 @@ final class UpdateCheckTests: AppHostTestCase {
 
     func testHelpMenuHasCheckForUpdates() throws {
         let bar = MainMenu.build()
-        let help = try XCTUnwrap(bar.items.last?.submenu, "the Help menu")
+        // The 7-Zip (application) menu, under About, as in most Mac apps.
+        let help = try XCTUnwrap(bar.items.first?.submenu, "the 7-Zip menu")
         let item = try XCTUnwrap(help.items.first { $0.action == #selector(AppDelegate.helpCheckForUpdates(_:)) },
-                                 "Help > Check for Updates...")
+                                 "7-Zip > Check for Updates...")
         XCTAssertEqual(item.title, "Check for Updates...")
         XCTAssertEqual(item.accessibilityIdentifier(), "helpCheckForUpdates:")
         let titles = help.items.map(\.title)
-        XCTAssertLessThan(try XCTUnwrap(titles.firstIndex(of: item.title)),
-                          try XCTUnwrap(titles.firstIndex { $0.hasPrefix("About") }), "just above About")
+        XCTAssertEqual(try XCTUnwrap(titles.firstIndex(of: item.title)),
+                       try XCTUnwrap(titles.firstIndex { $0.hasPrefix("About") }) + 1, "just under About")
         XCTAssertTrue(NSApp.delegate?.responds(to: #selector(AppDelegate.helpCheckForUpdates(_:))) ?? false,
                       "the app delegate answers it, with or without a window")
     }

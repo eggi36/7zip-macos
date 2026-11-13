@@ -5,7 +5,7 @@
 //
 // The editable address field above stays: 7zFM's address combo (01 §1.2) is how a path, an
 // archive path or a mask is typed, and the path bar adds the Mac's way of reading and climbing
-// the same path. Classic has no path bar.
+// the same path.
 
 import AppKit
 

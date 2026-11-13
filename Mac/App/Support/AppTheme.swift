@@ -97,14 +97,15 @@ extension Settings.Key {
 }
 
 extension Settings {
-    /// The theme of a fresh install (fix112: Light; 1.0.0-1.1.1: System).
-    static let defaultTheme = AppTheme.light
+    /// The theme of a fresh install: System, as every Mac app (fix112 made it Light while the
+    /// window copied Windows').
+    static let defaultTheme = AppTheme.system
 
     /// `FM.Theme` (macOS only): System, Light (absent, the default) or Dark. Every choice is
     /// stored, System as "system", so it survives a later change of the default.
     static var theme: AppTheme {
-        // native-look: the Mac look follows the system's Light / Dark unless a theme was chosen.
-        get { string(Key.theme).flatMap(AppTheme.init(rawValue:)) ?? (look == .mac ? .system : defaultTheme) }
+        // Follows the system's Light / Dark unless a theme was chosen.
+        get { string(Key.theme).flatMap(AppTheme.init(rawValue:)) ?? defaultTheme }
         set { setString(newValue.rawValue, Key.theme) }
     }
 }

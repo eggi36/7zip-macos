@@ -120,6 +120,7 @@ final class NavGapsTests: AppHostTestCase {
 
     private func makeWindow() -> MainWindowController {
         Settings.numPanels = 1
+        UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)")
         let controller = MainWindowController()
         controllers.append(controller)
         controller.window?.setContentSize(NSSize(width: 1000, height: 700))
@@ -324,7 +325,7 @@ final class NavGapsTests: AppHostTestCase {
         _ = attach(try XCTUnwrap(controller.window), "navgaps-02-status-sections")
     }
 
-    /// The 7-Zip toolbar bitmaps, large and small; no toolbar at all when both are off; a 4 pt splitter.
+    /// The 7-Zip toolbar bitmaps, large and small; no commands when both toolbars are off; AppKit's thin splitter.
     func testToolbarBitmapsAndVisibility() throws {
         let savedMask = Settings.toolbarsMask
         defer { Settings.toolbarsMask = savedMask }
@@ -336,20 +337,16 @@ final class NavGapsTests: AppHostTestCase {
             XCTAssertEqual(large.size, NSSize(width: 48, height: 36))
             XCTAssertEqual(small.size, NSSize(width: 24, height: 24))
         }
-        // The 7zFM strip (FMToolbar.swift, winmatch): the button size follows the bitmap size.
-        let toolbar = controller.toolbarView
+        // Both logical toolbars off: no command in the window's toolbar; one back on: its commands.
         controller.window?.contentView?.layoutSubtreeIfNeeded()
-        XCTAssertFalse(toolbar.isHidden)
-        XCTAssertEqual(toolbar.buttonSize.height, 36 + 6 + 16, "Large Buttons is on")
+        XCTAssertFalse(controller.commandToolbarItems.isEmpty)
         _ = attach(try XCTUnwrap(controller.window), "navgaps-03-toolbar-bitmaps")
-        controller.viewToolbarsLargeButtons(nil)
-        XCTAssertEqual(toolbar.buttonSize.height, 24 + 6 + 16)
         controller.viewArchiveToolbar(nil)
         controller.viewStandardToolbar(nil)
-        XCTAssertTrue(toolbar.isHidden, "no logical toolbar, no toolbar")
+        XCTAssertTrue(controller.commandToolbarItems.isEmpty, "no logical toolbar, no commands")
         controller.viewStandardToolbar(nil)
-        XCTAssertFalse(toolbar.isHidden)
-        XCTAssertEqual(PanelSplitView().dividerThickness, 4)
+        XCTAssertFalse(controller.commandToolbarItems.isEmpty)
+        XCTAssertEqual(PanelSplitView().dividerThickness, 1)
     }
 
     // MARK: - Ver Edit / Commit / Revert / Diff (PROGRESS 94, 01 §2.1 rows 22-25)

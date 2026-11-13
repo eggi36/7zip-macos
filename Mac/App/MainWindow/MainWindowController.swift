@@ -8,12 +8,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
                                  NSMenuItemValidation, NSUserInterfaceValidations, PanelDelegate {
 
     private let splitView = PanelSplitView()
-    /// The 7zFM toolbar strip (FMToolbar.swift): a flat Windows-style bar at the top of the
-    /// content, not an NSToolbar, so macOS draws no glass capsules around the buttons (winmatch).
-    let toolbarView = FMToolbarView()
-    /// native-look: the look this window is built in (fixed for its lifetime; a change rebuilds it).
-    let look = AppLook.current
-    var isMacLook: Bool { look == .mac }
     /// index 0 always exists; 1 is created on demand (SwitchOnOffOnePanel).
     private(set) var panels: [PanelViewController] = []
     private(set) var numPanels = 1
@@ -69,19 +63,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
                               backing: .buffered, defer: false)
         window.title = "7-Zip"
         window.minSize = NSSize(width: 360, height: 240)
-        if AppLook.isMac {
-            window.toolbarStyle = .unified               // native-look: title and toolbar in one bar
-        } else {
-            window.backgroundColor = WinChrome.face      // COLOR_BTNFACE (recheck §2)
-        }
-        if AppLook.isMac {
-            // native-look: the windows can be tabs of one another (File > New Tab, the tab bar's
-            // "+", Window > Merge All Windows); .automatic follows System Settings' tab preference.
-            window.tabbingMode = .automatic
-            window.tabbingIdentifier = Self.tabbingIdentifier
-        } else {
-            window.tabbingMode = .disallowed
-        }
+        window.toolbarStyle = .unified               // native-look: title and toolbar in one bar
+        // native-look: the windows can be tabs of one another (File > New Tab, the tab bar's
+        // "+", Window > Merge All Windows); .automatic follows System Settings' tab preference.
+        window.tabbingMode = .automatic
+        window.tabbingIdentifier = Self.tabbingIdentifier
         // The controller owns the window; with several windows opening and closing
         // (`MainWindows`), AppKit's extra release on close would free it under the controller.
         window.isReleasedWhenClosed = false
@@ -99,7 +85,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         TestAnimations.apply(to: window)
         // native-look: File > New Tab still works under the test harness. Nothing tabs on its own
         // there: TestAnimations turns NSWindow.allowsAutomaticWindowTabbing off for the process.
-        if AppLook.isMac { window.tabbingMode = .automatic }
+        window.tabbingMode = .automatic
         // Signal 2 of the test-support contract: the reset generation, "0" before the first reset.
         // Only under SZ_TEST_SUPPORT, so a shipped window's accessibility value is untouched.
         if TestSupport.isEnabled {
@@ -137,15 +123,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         splitView.translatesAutoresizingMaskIntoConstraints = false
         let content = MainWindowContentView()
         content.controller = self
-        toolbarView.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(toolbarView)
         content.addSubview(splitView)
         NSLayoutConstraint.activate([
-            // CApp::MoveSubWindows: the toolbar across the top, the panels under it.
-            toolbarView.topAnchor.constraint(equalTo: content.topAnchor),
-            toolbarView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            toolbarView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            splitView.topAnchor.constraint(equalTo: toolbarView.bottomAnchor),
+            // CApp::MoveSubWindows: the panels fill the content; the toolbar is the window's.
+            splitView.topAnchor.constraint(equalTo: content.topAnchor),
             splitView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             splitView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             splitView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
@@ -164,13 +145,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
 
     private func buildToolbar() {
         reloadToolbars()
-    }
-
-    private var visibleToolbarItems: [NSToolbarItem.Identifier] {
-        var ids: [NSToolbarItem.Identifier] = []
-        if (toolbarsMask & 8) != 0 { ids += Self.archiveItems }
-        if (toolbarsMask & 4) != 0 { ids += Self.standardItems }
-        return ids
     }
 
     // MARK: - Startup / persistence (CWindowInfo, CApp::Save)
@@ -267,6 +241,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         // for write-back into its parent (PanelNestedArchives.swift, 01 §3.8).
         for panel in panels { panel.closeNestedArchivesForShutdown() }
         MainWindows.didClose(self)
+        // Toolbars with one identifier mirror each other's item changes (View > Toolbars, a
+        // customization). A closed window that something still holds must not take part: its
+        // toolbar can be out of step, and AppKit then replays a change at an index it lacks.
+        let closing = window
+        DispatchQueue.main.async { closing?.toolbar = nil }
     }
 
     /// Test support only (`sevenzip://test/reset` step 2): a second window goes away without saving,
@@ -337,22 +316,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         let ratio = Double(views[0].frame.width / usable)
         guard ratio > 0, ratio < 1 else { return }       // a degenerate pass must not be stored
         splitterRatio = ratio
-    }
-
-    /// native-look: take over a window built in the other look (`MainWindows.rebuildForLookChange`):
-    /// its frame, its one or two panels, the divider, the focused panel and every panel's folder,
-    /// inside an archive included.
-    func adopt(_ previous: MainWindowController) {
-        guard let window, let old = previous.window else { return }
-        window.setFrame(old.frame, display: false)
-        previous.captureSplitterRatio()
-        splitterRatio = previous.splitterRatio
-        if previous.numPanels != numPanels { switchOnOffOnePanel() }
-        for (i, panel) in panels.enumerated() where i < previous.panels.count {
-            let path = previous.panels[i].currentPath
-            panel.navigate(to: path.isEmpty ? previous.panels[i].pathToPersist : path)
-        }
-        setFocusedPanel(min(previous.focusedPanelIndex, numPanels - 1))
     }
 
     // MARK: - Panels (CApp::SwitchOnOffOnePanel, App.cpp:360-380)
@@ -456,10 +419,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     /// full path as the subtitle, and gives a file-system folder its proxy icon and path menu.
     private func refreshTitle() {
         let path = focusedPanel.currentPath
-        guard isMacLook, let window else {
-            window?.title = path.isEmpty ? "7-Zip" : path
-            return
-        }
+        guard let window else { return }
         let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
         let name = (trimmed as NSString).lastPathComponent
         window.title = path.isEmpty ? "7-Zip" : (name.isEmpty || name == "/" ? trimmed : name)
@@ -589,16 +549,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     /// ReloadToolbars: the archive buttons, then the standard ones, back to back; labels per
     /// "Show Buttons Text", bitmaps per "Large Buttons". Also the language switch's re-label.
     func reloadToolbars() {
-        if isMacLook {
-            toolbarView.configure([], showText: false, large: false)      // the strip takes no room
-            installMacToolbar()
-            Settings.toolbarsMask = toolbarsMask
-            return
-        }
-        let large = (toolbarsMask & 2) != 0
-        let specs = visibleToolbarItems.compactMap { Self.toolbarSpec($0, large: large) }
-        // MoveSubWindows: the toolbar takes room only while one of the two toolbars is on (01 §1.2).
-        toolbarView.configure(specs, showText: (toolbarsMask & 1) != 0, large: large)
+        installMacToolbar()
         Settings.toolbarsMask = toolbarsMask
     }
 
@@ -618,23 +569,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     }
 
     @objc func viewArchiveToolbar(_ sender: Any?) {                                                   // IDM_VIEW_ARCHIVE_TOOLBAR 750
-        if isMacLook { toggleMacToolbarGroup(Self.macArchiveGroup); syncMaskFromMacToolbar(); return }
-        toolbarsMask ^= 8; reloadToolbars()
+        toggleMacToolbarGroup(Self.macArchiveGroup); syncMaskFromMacToolbar()
     }
     @objc func viewStandardToolbar(_ sender: Any?) {                                                  // IDM_VIEW_STANDARD_TOOLBAR 751
-        if isMacLook { toggleMacToolbarGroup(Self.macStandardGroup); syncMaskFromMacToolbar(); return }
-        toolbarsMask ^= 4; reloadToolbars()
+        toggleMacToolbarGroup(Self.macStandardGroup); syncMaskFromMacToolbar()
     }
     @objc func viewToolbarsLargeButtons(_ sender: Any?) { toolbarsMask ^= 2; reloadToolbars() }       // IDM_VIEW_TOOLBARS_LARGE_BUTTONS 752: IDB_* 48x36 vs IDB_*2 24x24
     @objc func viewToolbarsShowButtonsText(_ sender: Any?) {                                          // IDM_VIEW_TOOLBARS_SHOW_BUTTONS_TEXT 753
-        if isMacLook { toggleMacToolbarText(); syncMaskFromMacToolbar(); return }
-        toolbarsMask ^= 1; reloadToolbars()
+        toggleMacToolbarText(); syncMaskFromMacToolbar()
     }
 
     /// native-look: the mask follows what the (customizable) Mac toolbar holds, so the View >
-    /// Toolbars check marks and the Classic look see the same choice.
+    /// Toolbars check marks see the same choice.
     func syncMaskFromMacToolbar() {
-        guard isMacLook else { return }
         let mask = macToolbarMask(keeping: toolbarsMask)
         guard mask != toolbarsMask else { return }
         toolbarsMask = mask
@@ -751,16 +698,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
             return shown
         case #selector(viewTwoPanels(_:)): item.state = numPanels == 2 ? .on : .off
         case #selector(viewAutoRefresh(_:)): item.state = autoRefresh ? .on : .off
-        case #selector(viewArchiveToolbar(_:)) where isMacLook:
+        case #selector(viewArchiveToolbar(_:)):
             syncMaskFromMacToolbar(); item.state = (toolbarsMask & 8) != 0 ? .on : .off
-        case #selector(viewStandardToolbar(_:)) where isMacLook:
+        case #selector(viewStandardToolbar(_:)):
             syncMaskFromMacToolbar(); item.state = (toolbarsMask & 4) != 0 ? .on : .off
-        case #selector(viewToolbarsShowButtonsText(_:)) where isMacLook:
+        case #selector(viewToolbarsShowButtonsText(_:)):
             syncMaskFromMacToolbar(); item.state = (toolbarsMask & 1) != 0 ? .on : .off
-        case #selector(viewArchiveToolbar(_:)): item.state = (toolbarsMask & 8) != 0 ? .on : .off
-        case #selector(viewStandardToolbar(_:)): item.state = (toolbarsMask & 4) != 0 ? .on : .off
         case #selector(viewToolbarsLargeButtons(_:)): item.state = (toolbarsMask & 2) != 0 ? .on : .off
-        case #selector(viewToolbarsShowButtonsText(_:)): item.state = (toolbarsMask & 1) != 0 ? .on : .off
         case #selector(viewTimestampLevel(_:)):
             item.state = ((item.representedObject as? Int) == Settings.timestampLevel) ? .on : .off
         case #selector(viewTimeUTC(_:)): item.state = Settings.timestampShowUTC ? .on : .off
@@ -807,14 +751,8 @@ extension NSToolbarItem.Identifier {
 /// divider. 7zFM draws nothing there: the 4 px between the panels show the window's
 /// COLOR_BTNFACE (recheck §2, two-screen.png x 719-722).
 final class PanelSplitView: NSSplitView {
-    /// native-look: the Mac look uses AppKit's thin divider.
-    private let isMacLook = AppLook.isMac
-    override var dividerThickness: CGFloat { isMacLook ? 1 : 4 }
-    override func drawDivider(in rect: NSRect) {
-        if isMacLook { super.drawDivider(in: rect); return }
-        WinChrome.face.setFill()
-        rect.fill()
-    }
+    /// AppKit's thin divider.
+    override var dividerThickness: CGFloat { 1 }
 }
 
 // MARK: - native-look: window tabs
@@ -826,7 +764,7 @@ extension MainWindowController {
     /// File > New Tab and the tab bar's "+" (the responder-chain action AppKit sends): a new
     /// window from the saved settings, as File > New Window, but as a tab of this one.
     override func newWindowForTab(_ sender: Any?) {
-        guard AppLook.isMac, let window else { return }
+        guard let window else { return }
         MainWindows.openTab(next: window)
     }
 }

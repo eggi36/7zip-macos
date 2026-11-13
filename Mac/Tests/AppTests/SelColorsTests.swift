@@ -232,100 +232,6 @@ final class SelColorsTests: AppHostTestCase {
 
     // MARK: - Details
 
-    /// Light and Dark, FullRow on and off, list focused and not, single and multi selection, a
-    /// focused-but-unselected row, grid lines: every cell readable, the fill where 7zFM puts it.
-    func testDetailsRowsAreReadableInEveryState() {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        controller.window?.makeFirstResponder(panel.tableView)
-        continueAfterFailure = true
-        let a = row(panel, "a.txt"), b = row(panel, "b.bin"), c = row(panel, "c.txt")
-        XCTAssertTrue(a >= 0 && b >= 0 && c >= 0, "fixture rows")
-        for dark in [false, true] {
-            forceTheme(dark)
-            for fullRow in [false, true] {
-                for grid in [false, true] {
-                    Settings.fullRow = fullRow
-                    Settings.showGrid = grid
-                    panel.applyListSettings()
-                    XCTAssertTrue(wait(for: "reload") { panel.rows.count == 5 })
-                    for focused in [true, false] {
-                        panel.listFocusOverride = focused
-                        let tag = "\(appearanceName(dark)) fr\(fullRow ? 1 : 0) g\(grid ? 1 : 0) \(focused ? "focused" : "unfocused")"
-                        select(panel, ["b.bin"], focus: "b.bin")
-                        checkDetails(panel, state: tag + " single", selected: [b], focused: focused, fullRow: fullRow)
-                        select(panel, ["a.txt", "c.txt"], focus: "c.txt")
-                        checkDetails(panel, state: tag + " multi", selected: [a, c], focused: focused, fullRow: fullRow)
-                        select(panel, [], focus: "b.bin")
-                        checkDetails(panel, state: tag + " focus only", selected: [], focused: focused, fullRow: fullRow)
-                    }
-                }
-            }
-        }
-        panel.listFocusOverride = nil
-    }
-
-    /// Inside an archive (its 11 columns: Attributes, CRC, Method, ...) and in flat mode (the Path
-    /// column), Light and Dark, FullRow on and off: every cell of the selected rows readable.
-    func testArchiveAndFlatRowsAreReadable() {
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        var done = false
-        panel.navigate(to: TestPaths.fixture("test.7z")) { _ in done = true }
-        XCTAssertTrue(wait(for: "inside test.7z") { done && !panel.rows.isEmpty })
-        continueAfterFailure = true
-        for flat in [false, true] {
-            if panel.flatMode != flat {
-                let before = panel.loadGeneration
-                panel.setFlatMode(flat)
-                XCTAssertTrue(wait(for: "flat \(flat)") { panel.loadGeneration != before && !panel.rows.isEmpty })
-            }
-            for dark in [false, true] {
-                forceTheme(dark)
-                for fullRow in [false, true] {
-                    Settings.fullRow = fullRow
-                    panel.listFocusOverride = true
-                    let names = panel.rows.prefix(2).map(\.displayName)
-                    select(panel, names, focus: names.last)
-                    checkDetails(panel, state: "test.7z flat=\(flat) \(appearanceName(dark)) fr\(fullRow ? 1 : 0)",
-                                 selected: Set(0..<min(2, panel.rows.count)), focused: true, fullRow: fullRow)
-                }
-            }
-        }
-        if panel.flatMode { panel.setFlatMode(false) }
-        panel.listFocusOverride = nil
-    }
-
-    /// The exact bug report: Light, "Full row select" off (the default), a selected row's other
-    /// columns. Before the fix AppKit drew them white (emphasized) on the white list.
-    func testUnhighlightedColumnsOfASelectedRowKeepTheirColour() {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        NSApp.appearance = NSAppearance(named: .aqua)
-        Settings.fullRow = false
-        panel.applyListSettings()
-        XCTAssertTrue(wait(for: "reload") { panel.rows.count == 5 })
-        panel.listFocusOverride = true
-        select(panel, ["b.bin"], focus: "b.bin")
-        let r = row(panel, "b.bin")
-        for c in 0..<panel.tableView.numberOfColumns {
-            guard let cell = panel.tableView.view(atColumn: c, row: r, makeIfNecessary: false) as? PanelCellView else { continue }
-            XCTAssertEqual(cell.backgroundStyle, .normal, "AppKit's emphasized style must not reach the cell")
-            let isName = PanelViewController.propID(of: panel.tableView.tableColumns[c]) == .name
-            XCTAssertEqual(cell.isHighlighted, isName)
-        }
-        // AppKit itself sets `.emphasized` on a selected row's cells; the cell refuses it.
-        if let cell = panel.tableView.view(atColumn: 1, row: r, makeIfNecessary: false) as? PanelCellView {
-            cell.backgroundStyle = .emphasized
-            XCTAssertEqual(cell.backgroundStyle, .normal)
-        }
-        panel.listFocusOverride = nil
-    }
-
     /// AlternativeSelection's pink rows (01 §3.6) stay readable in Dark mode too.
     func testAlternativeSelectionRowsAreReadable() {
         for dark in [false, true] {
@@ -343,46 +249,6 @@ final class SelColorsTests: AppHostTestCase {
     }
 
     // MARK: - icon modes
-
-    /// Large Icons, Small Icons, List: the label of a selected item white on the highlight, the
-    /// others in the normal colour; nothing highlighted while the list is unfocused.
-    func testIconModesAreReadable() {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        continueAfterFailure = true
-        for mode in 0...2 {
-            panel.setListViewMode(mode)
-            let cv = panel.iconView.collectionView
-            XCTAssertTrue(wait(for: "icon items") {
-                controller.window?.contentView?.layoutSubtreeIfNeeded()
-                return cv.visibleItems().count == 5
-            })
-            for dark in [false, true] {
-                forceTheme(dark)
-                for focused in [true, false] {
-                    panel.listFocusOverride = focused
-                    select(panel, ["a.txt", "c.txt"], focus: "c.txt")
-                    cv.layoutSubtreeIfNeeded()
-                    for i in 0..<panel.rows.count {
-                        guard let item = cv.item(at: IndexPath(item: i, section: 0)), let field = item.textField else { continue }
-                        var rect = field.convert(field.bounds, to: cv)
-                        let w = min(rect.width, field.intrinsicContentSize.width)
-                        if mode == 0 { rect.origin.x = rect.midX - w / 2 }
-                        rect.size.width = w
-                        guard let m = ContrastProbe.measure(cv, rect) else { continue }
-                        let what = "mode \(mode) \(appearanceName(dark)) \(focused ? "focused" : "unfocused") '\(field.stringValue)'"
-                        XCTAssertGreaterThanOrEqual(m.ratio, 4.5, "\(what): \(m.text) on \(m.background)")
-                        let lit = focused && ["a.txt", "c.txt"].contains(field.stringValue)
-                        XCTAssertEqual(m.background.isClose(to: .highlight), lit, "\(what): background \(m.background)")
-                    }
-                }
-            }
-        }
-        panel.listFocusOverride = nil
-        panel.setListViewMode(3)
-    }
 
     // MARK: - which list has the focus
 
@@ -417,30 +283,6 @@ final class SelColorsTests: AppHostTestCase {
     }
 
     // MARK: - the drop target
-
-    func testDropTargetRowIsHighlightedAndReadable() {
-        let scratch = makeScratch()
-        let controller = makeWindow()
-        let panel = controller.focusedPanel
-        navigate(panel, to: scratch)
-        panel.listFocusOverride = false
-        select(panel, [], focus: nil)
-        let r = row(panel, "sub")
-        guard let rowView = panel.tableView.rowView(atRow: r, makeIfNecessary: false) as? PanelRowView,
-              let cell = panel.tableView.view(atColumn: 0, row: r, makeIfNecessary: false) as? NSTableCellView,
-              let field = cell.textField else { return XCTFail("no row view") }
-        for dark in [false, true] {
-            forceTheme(dark)
-            rowView.isTargetForDropOperation = true
-            var rect = field.convert(field.bounds, to: panel.tableView)
-            rect.size.width = min(rect.width, field.intrinsicContentSize.width)
-            let m = ContrastProbe.measure(panel.tableView, rect)
-            XCTAssertTrue(m?.background.isClose(to: .highlight) == true, "\(String(describing: m))")
-            XCTAssertGreaterThanOrEqual(m?.ratio ?? 0, 4.5)
-            rowView.isTargetForDropOperation = false
-        }
-        panel.listFocusOverride = nil
-    }
 
     // MARK: - every other list in the app
 

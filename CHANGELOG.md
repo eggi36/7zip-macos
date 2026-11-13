@@ -13,16 +13,15 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
 ### Added
 
-- **Mac look for the main window** (Options ▸ macOS ▸ **Appearance**: *Mac* or *Classic
-  (Windows)*; Mac is the default of a fresh install). The same window, panels, menus, keys and
-  commands, drawn with macOS's own chrome: the toolbar in the title bar with SF Symbols and Back /
+- **A Mac look replaces the Windows look.** The same window, panels, menus, keys and commands,
+  drawn with macOS's own chrome: the toolbar in the title bar with SF Symbols and Back /
   Forward next to the title (View ▸ Toolbars still picks the groups and the labels), the folder's
   name as the window title with its path below and a proxy icon, a Finder-style list (system font,
   24 pt striped rows, the system selection and column header, overlay scroll bars, the system's
-  file icons), a rounded address field and a quiet status bar. In the Mac look the theme follows
-  the system's Light / Dark until one is chosen. Switching rebuilds the open windows in place,
-  keeping their size, panels and folders. Classic is the Windows window, unchanged.
-  - The dialogs follow the look too: the system font at its regular size, AppKit's own pop-up
+  file icons), a rounded address field and a quiet status bar. The theme follows the system's
+  Light / Dark until one is chosen. The pixel-exact copy of the Windows window ("Classic") and
+  its switch in Options ▸ macOS are gone.
+  - The dialogs look like Mac dialogs: the system font at its regular size, AppKit's own pop-up
     menus, combo boxes and text fields, groups as titled rounded boxes, a macOS progress bar,
     Cancel left of OK and Help as the round "?" button at the left. Every control stays where
     the Windows layout puts it, so nothing moves out of reach.
@@ -66,18 +65,15 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     as a macOS menu. About 7-Zip shows the app icon with the version and credits centred.
   - Space opens Quick Look for the selected files and folders, as in Finder, and an open
     preview follows the selection -- the arrow keys move through the list while it is open -- (F3 still calculates a folder's size; items inside an archive
-    are not previewed). Classic keeps 7zFM's Space.
-  - The Quick Look preview of an archive in Finder follows the look too: in the Mac look its
-    list has the system font, striped rows, the native header and selection and the system's file
+    are not previewed).
+  - The Quick Look preview of an archive in Finder matches: its list has the system font, striped rows, the native header and selection and the system's file
     icons.
 - **New app and document icons in the macOS style.** Archives in Finder show macOS's own
   archive icon -- the grey sheet with the zipper -- with their type written under the zipper the
   way macOS labels a ZIP file (7Z, RAR, TAR, ISO, ...). The app icon is a light tile in the style
   of Apple's utilities with the same grey zipper, its pull in 7-Zip blue, and no lettering (as the
-  HIG asks of app icons). The Classic look's file list keeps 7-Zip's Windows
-  icons. `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
-  - A click anywhere on a row selects it, as in Finder (Classic keeps Windows' rule: only the
-    name and icon, unless *Full row select* is on).
+  HIG asks of app icons). `Mac/scripts/make-mac-icons.sh` regenerates them from the Mac it runs on.
+  - A click anywhere on a row selects it, as in Finder.
   - The toolbar is customizable (right-click ▸ *Customize Toolbar…*), with Up, Refresh, Create
     Folder, Rename, Split, Combine, Flat View, 2 Panels, Folders History and Benchmark to add; the
     arrangement is saved. View ▸ Toolbars adds or removes the archive and standard groups in place.

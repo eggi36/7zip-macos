@@ -33,13 +33,13 @@ struct AddressPopupItem {
 enum AddressPopupMetrics {
     // native-look: the Mac look draws the list as a macOS menu -- 22 pt rows inside a 5 pt padding
     // on the menu material, rounded corners, a rounded accent highlight.
-    static var rowHeight: CGFloat { AppLook.isMac ? 22 : 18 }
-    static var border: CGFloat { AppLook.isMac ? 5 : 1 }
-    static var iconX: CGFloat { AppLook.isMac ? 10 : 4 }
+    static var rowHeight: CGFloat { 22 }
+    static var border: CGFloat { 5 }
+    static var iconX: CGFloat { 10 }
     static let indent: CGFloat = 10
-    static var iconTop: CGFloat { AppLook.isMac ? 3 : 1 }
-    static var textFromIcon: CGFloat { AppLook.isMac ? 22 : 20 }
-    static var baseline: CGFloat { AppLook.isMac ? 16 : 14 }
+    static var iconTop: CGFloat { 3 }
+    static var textFromIcon: CGFloat { 22 }
+    static var baseline: CGFloat { 16 }
     static let highlightInset: CGFloat = 2
     static let maxVisibleRows = 30
 
@@ -103,7 +103,6 @@ final class AddressPopupListView: NSView {
         if r >= 0 { onPick?(r) }
     }
 
-    private let isMacLook = AppLook.isMac
 
     /// native-look: menu rows -- a rounded accent bar under the hot row, white text on it, the icon
     /// as it is, the menu material showing through everywhere else.
@@ -129,35 +128,7 @@ final class AddressPopupListView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if isMacLook { drawMac(dirtyRect); return }
-        WinChrome.window.setFill()
-        dirtyRect.fill()
-        let m = AddressPopupMetrics.self
-        for (i, item) in items.enumerated() {
-            let rr = rowRect(i)
-            guard rr.intersects(dirtyRect) else { continue }
-            let isHot = i == hot
-            if isHot {
-                // 2 px in from the list's edges: the border is outside this view, so 1 px here.
-                let fill = NSRect(x: m.highlightInset - m.border, y: rr.minY,
-                                  width: rr.width - 2 * (m.highlightInset - m.border), height: rr.height)
-                m.highlight.setFill()
-                fill.fill()
-                PanelSelectionStyle.drawFocusRectangle(fill, onHighlight: true)
-            }
-            let iconX = m.iconX - m.border + CGFloat(item.level) * m.indent
-            if let icon = item.icon {
-                let iconRect = NSRect(x: iconX, y: rr.minY + m.iconTop, width: 16, height: 16)
-                // ILD_SELECTED: on the highlight the image list blends the icon 50 % with it.
-                let drawn = isHot ? Self.blended(icon, with: m.highlight) : icon
-                drawn.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-            }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: font, .foregroundColor: isHot ? m.highlightText : WinChrome.text,
-            ]
-            let origin = NSPoint(x: iconX + m.textFromIcon, y: rr.minY + m.baseline - font.ascender)
-            (item.name as NSString).draw(at: origin, withAttributes: attributes)
-        }
+        drawMac(dirtyRect)
     }
 
     static func blended(_ icon: NSImage, with color: NSColor) -> NSImage {
@@ -236,21 +207,17 @@ final class AddressPopup: NSObject {
         list.items = items
         list.font = font
         let content: NSView
-        if AppLook.isMac {
-            // native-look: the menu material with rounded corners.
-            let material = NSVisualEffectView()
-            material.material = .menu
-            material.blendingMode = .behindWindow
-            material.state = .active
-            material.wantsLayer = true
-            material.layer?.cornerRadius = 8
-            material.layer?.masksToBounds = true
-            panel.backgroundColor = .clear
-            panel.isOpaque = false
-            content = material
-        } else {
-            content = AddressPopupBorderView()
-        }
+        // native-look: the menu material with rounded corners.
+        let material = NSVisualEffectView()
+        material.material = .menu
+        material.blendingMode = .behindWindow
+        material.state = .active
+        material.wantsLayer = true
+        material.layer?.cornerRadius = 8
+        material.layer?.masksToBounds = true
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        content = material
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = false
@@ -281,7 +248,7 @@ final class AddressPopup: NSObject {
         let fullHeight = CGFloat(items.count) * m.rowHeight
         let room = max(m.rowHeight, comboRect.minY - screen.minY - 2 * m.border)
         let height = min(fullHeight, min(room, CGFloat(m.maxVisibleRows) * m.rowHeight))
-        let gap: CGFloat = AppLook.isMac ? 4 : 0            // native-look: a menu opens a little below
+        let gap: CGFloat = 4 // native-look: a menu opens a little below
         let frame = NSRect(x: comboRect.minX, y: comboRect.minY - height - 2 * m.border - gap,
                            width: comboRect.width, height: height + 2 * m.border)
         popup.panel.setFrame(frame, display: false)
@@ -354,15 +321,5 @@ final class AddressPopup: NSObject {
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
         if AddressPopup.current === self { AddressPopup.current = nil }
-    }
-}
-
-/// The list's 1 px border.
-private final class AddressPopupBorderView: NSView {
-    override func draw(_ dirtyRect: NSRect) {
-        WinChrome.window.setFill()
-        bounds.fill()
-        AddressPopupMetrics.borderColor.setFill()
-        bounds.frame(withWidth: AddressPopupMetrics.border)
     }
 }

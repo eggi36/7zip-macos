@@ -1,7 +1,6 @@
-// NativeLookTests.swift -- native-look: the main window in the Mac look (AppLook.swift) keeps every
-// command of the Classic window and draws it with AppKit's chrome; the Classic look is unchanged.
-// Writes Mac/build/screenshots/nativelook-<name>.png: the whole window (title bar and toolbar
-// included) in Light and Dark, in the demo folder of the showcase images.
+// NativeLookTests.swift -- the main window and the dialogs drawn with AppKit's chrome (Mac look):
+// the toolbar, menus, Settings window, alerts and sheets, the path bar, window tabs, Undo for
+// Move to Trash and the right-aligned form labels.
 
 import AppKit
 import Quartz
@@ -14,7 +13,6 @@ final class NativeLookTests: AppHostTestCase {
     override var screenshotPrefix: String { "nativelook" }
 
     private var controllers: [MainWindowController] = []
-    private var savedLook: String?
     private var savedTheme: String?
     private var savedNumPanels = 1
     private var savedPanelPath: String?
@@ -22,7 +20,6 @@ final class NativeLookTests: AppHostTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        savedLook = Settings.string(Settings.Key.look)
         savedTheme = Settings.string(Settings.Key.theme)
         savedNumPanels = Settings.numPanels
         savedPanelPath = Settings.panelPath(0)
@@ -53,7 +50,6 @@ final class NativeLookTests: AppHostTestCase {
         closeQuickLook()
         for controller in controllers { controller.closeDiscardingState() }
         controllers = []
-        Settings.setString(savedLook, Settings.Key.look)
         Settings.setString(savedTheme, Settings.Key.theme)
         Settings.numPanels = savedNumPanels
         Settings.setPanelPath(savedPanelPath, 0)
@@ -63,9 +59,8 @@ final class NativeLookTests: AppHostTestCase {
 
     private static let toolbarDefaultsKey = "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)"
 
-    private func openWindow(look: AppLook, panels: Int = 1) throws -> MainWindowController {
+    private func openWindow(panels: Int = 1) throws -> MainWindowController {
         UserDefaults.standard.removeObject(forKey: Self.toolbarDefaultsKey)   // a fresh arrangement
-        Settings.look = look
         Settings.numPanels = panels
         let controller = MainWindowController()
         controllers.append(controller)
@@ -82,26 +77,10 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(wait(for: "folder listed") { done && !panel.rows.isEmpty })
     }
 
-    func testTestHarnessStartsInClassic() {
-        Settings.removeKey(Settings.Key.look)
-        XCTAssertEqual(Settings.look, .classic, "the parity tests describe the Windows window")
-    }
-
-    func testClassicLookIsUnchanged() throws {
-        let controller = try openWindow(look: .classic)
-        let window = try XCTUnwrap(controller.window)
-        XCTAssertNil(window.toolbar, "Classic draws the Windows strip, not an NSToolbar")
-        XCTAssertFalse(controller.toolbarView.isHidden)
-        XCTAssertEqual(controller.toolbarView.buttons.count, 7)
-        XCTAssertEqual(controller.focusedPanel.tableView.rowHeight, 19)
-        XCTAssertEqual(controller.focusedPanel.tableView.style, .plain)
-    }
-
     func testMacLookKeepsEveryToolbarCommand() throws {
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         let window = try XCTUnwrap(controller.window)
         let toolbar = try XCTUnwrap(window.toolbar, "the Mac look uses an NSToolbar")
-        XCTAssertTrue(controller.toolbarView.isHidden, "the Windows strip takes no room")
         let ids = toolbar.items.map(\.itemIdentifier)
         for id in [NSToolbarItem.Identifier.szAdd, .szExtract, .szTest, .szCopy, .szMove, .szDelete, .szInfo,
                    .szBack, .szForward] {
@@ -123,7 +102,7 @@ final class NativeLookTests: AppHostTestCase {
         let saved = Settings.toolbarsMask
         defer { Settings.toolbarsMask = saved }
         Settings.toolbarsMask = 8 | 4 | 1
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         let window = try XCTUnwrap(controller.window)
         XCTAssertEqual(window.toolbar?.displayMode, .iconAndLabel)
         controller.viewToolbarsShowButtonsText(nil)              // text off
@@ -140,7 +119,7 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacToolbarIsCustomizable() throws {
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         let toolbar = try XCTUnwrap(controller.window?.toolbar)
         XCTAssertTrue(toolbar.allowsUserCustomization, "right-click > Customize Toolbar...")
         XCTAssertTrue(toolbar.autosavesConfiguration)
@@ -160,23 +139,18 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacLookClickAnywhereInTheRowSelects() throws {
-        // one look at a time: the look is app-wide (a change rebuilds every window)
-        for (look, expected) in [(AppLook.classic, false), (.mac, true)] {
-            let controller = try openWindow(look: look)
-            show(controller, "/Applications")
-            let table = controller.focusedPanel.tableView
-            table.layoutSubtreeIfNeeded()
-            let rowRect = table.rect(ofRow: 0)
-            // a point near the row's right edge, in the date columns, far from the name
-            let point = NSPoint(x: rowRect.maxX - 20, y: rowRect.midY)
-            XCTAssertEqual(table.isOnItem(point, row: 0), expected,
-                           look == .mac ? "Mac: the whole row is the item" : "Classic: only the name (LVHT_ONITEM)")
-            controller.closeDiscardingState()
-        }
+        let controller = try openWindow()
+        show(controller, "/Applications")
+        let table = controller.focusedPanel.tableView
+        table.layoutSubtreeIfNeeded()
+        let rowRect = table.rect(ofRow: 0)
+        // a point near the row's right edge, in the date columns, far from the name
+        let point = NSPoint(x: rowRect.maxX - 20, y: rowRect.midY)
+        XCTAssertTrue(table.isOnItem(point, row: 0), "the whole row is the item, as in Finder")
     }
 
     func testMacLookTitleNamesTheFolder() throws {
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, "/Applications")
         let window = try XCTUnwrap(controller.window)
         XCTAssertTrue(wait(for: "title") { window.title == "Applications" })
@@ -184,31 +158,12 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(window.representedURL?.path, "/Applications")
     }
 
-    func testLookChangeRebuildsTheWindow() throws {
-        let controller = try openWindow(look: .classic)
-        show(controller, "/Applications")
-        MainWindows.register(controller)
-        Settings.look = .mac
-        MainWindows.rebuildForLookChange()
-        // every registered window is rebuilt (the host app's own one too); ours is the one that
-        // took over /Applications
-        XCTAssertTrue(controller.isClosed, "the old window closes")
-        controllers += MainWindows.controllers
-        XCTAssertTrue(MainWindows.controllers.allSatisfy { $0.isMacLook && $0.window?.toolbar != nil })
-        XCTAssertTrue(wait(for: "same folder") {
-            MainWindows.controllers.contains { $0.isMacLook && $0.focusedPanel.currentPath.hasPrefix("/Applications") }
-        })
-        // put the host app's windows back into the Classic look the other tests expect
-        Settings.look = .classic
-        MainWindows.rebuildForLookChange()
-    }
-
     func testRenderMacLook() throws {
         try ShowcaseDemo.make()
         try SZCodecs.loadCodecs()
         for theme in [AppTheme.light, .dark] {
             Settings.theme = theme
-            let controller = try openWindow(look: .mac)
+            let controller = try openWindow()
             show(controller, ShowcaseDemo.folder)
             let panel = controller.focusedPanel
             if let row = panel.rows.firstIndex(where: { $0.name == "Project backup.7z" }) {
@@ -219,7 +174,7 @@ final class NativeLookTests: AppHostTestCase {
             try writeWholeWindow(try XCTUnwrap(controller.window), "main-\(theme.rawValue)")
 
             Settings.numPanels = 2
-            let two = try openWindow(look: .mac, panels: 2)
+            let two = try openWindow(panels: 2)
             two.window?.setContentSize(NSSize(width: 1100, height: 460))
             show(two, ShowcaseDemo.folder)
             try writeWholeWindow(try XCTUnwrap(two.window), "two-panels-\(theme.rawValue)")
@@ -230,7 +185,6 @@ final class NativeLookTests: AppHostTestCase {
     func testRenderMacDialogs() throws {
         try ShowcaseDemo.make()
         try SZCodecs.loadCodecs()
-        Settings.look = .mac
         let demo = ShowcaseDemo.folder
         defer {
             while NSApp.modalWindow != nil { NSApp.abortModal() }
@@ -282,13 +236,9 @@ final class NativeLookTests: AppHostTestCase {
     func testSystemPageShowsTheBundledIconsInTheMacLook() throws {
         guard let zip = FileTypes.all.first(where: { $0.ext == "zip" }) else { return XCTFail("no zip type") }
         let bundled = try XCTUnwrap(Bundle.main.url(forResource: "doc-zip", withExtension: "icns"))
-        Settings.look = .mac
         let mac = try XCTUnwrap(OptionsSystemPage.formatIcon(for: zip))
         XCTAssertTrue(mac.representations.contains { $0 is NSBitmapImageRep && $0.pixelsWide >= 512 },
-                      "the Mac look uses doc-zip.icns (\(bundled.lastPathComponent)), not the 16 px .ico frame")
-        Settings.look = .classic
-        let classic = try XCTUnwrap(OptionsSystemPage.formatIcon(for: zip))
-        XCTAssertFalse(classic === mac, "Classic keeps the 7z.dll frame")
+                      "doc-zip.icns (\(bundled.lastPathComponent)), not the 16 px .ico frame")
     }
 
     private func spaceKey(_ window: NSWindow) -> NSEvent {
@@ -299,7 +249,7 @@ final class NativeLookTests: AppHostTestCase {
 
     func testSpaceOpensQuickLookInTheMacLook() throws {
         closeQuickLook()
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, "/Applications")
         let panel = controller.focusedPanel
         let window = try XCTUnwrap(controller.window)
@@ -317,7 +267,7 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testArrowKeysInQuickLookMoveThroughTheList() throws {
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, "/Applications")
         let panel = controller.focusedPanel
         let window = try XCTUnwrap(controller.window)
@@ -345,7 +295,7 @@ final class NativeLookTests: AppHostTestCase {
         try SZCodecs.loadCodecs()
         let saved = PreviewMetrics.isMac
         defer { PreviewMetrics.isMac = saved }
-        for (isMac, name) in [(true, "mac"), (false, "classic")] {
+        for (isMac, name) in [(true, "mac")] {
             PreviewMetrics.isMac = isMac
             let url = URL(fileURLWithPath: TestPaths.fixture("test.7z"))
             let preview = ArchivePreviewBuilder.build(path: url.path)
@@ -359,19 +309,6 @@ final class NativeLookTests: AppHostTestCase {
             try writeWholeWindow(window, "quicklook-\(name)")
             window.orderOut(nil)
         }
-    }
-
-    func testSpaceKeepsItsClassicMeaning() throws {
-        closeQuickLook()
-        let controller = try openWindow(look: .classic)
-        show(controller, "/Applications")
-        let panel = controller.focusedPanel
-        let window = try XCTUnwrap(controller.window)
-        panel.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        panel.focusedIndex = 0
-        XCTAssertTrue(panel.handleListKeyDown(spaceKey(window)))
-        XCTAssertFalse(QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible,
-                       "Classic: Space calculates the folder size, as 7zFM does")
     }
 
     // MARK: native-look: Mac menus
@@ -395,13 +332,7 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacMenusUseMacNamesAndKeepEveryCommand() throws {
-        defer { Settings.look = .classic; NSApp.mainMenu = MainMenu.build() }
-        Settings.look = .classic
-        let classic = MainMenu.build()
-        Settings.look = .mac
         let mac = MainMenu.build()
-        let lost = commands(classic).subtracting(commands(mac))
-        XCTAssertTrue(lost.isEmpty, "no command is lost in the Mac menus: \(lost.sorted())")
 
         let a = MenuActions.self
         let settings = try XCTUnwrap(find(mac.items[0].submenu!, #selector(a.toolsOptions(_:))))
@@ -446,14 +377,12 @@ final class NativeLookTests: AppHostTestCase {
             seen[key] = item.title
         }
         XCTAssertEqual(seen["\(NSEvent.ModifierFlags.command.rawValue)-z"], "Undo", "Cmd+Z is Undo")
-        XCTAssertFalse(classic.items.contains { $0.submenu?.title == "Go" }, "Classic keeps 7zFM's menus")
     }
 
     // MARK: native-look: form labels
 
     func testMacFormLabelsAlignRightAgainstTheirControl() throws {
-        func form(_ look: AppLook) -> (RcFormView, named: NSTextField, above: NSTextField, value: NSTextField) {
-            Settings.look = look
+        func form() -> (RcFormView, named: NSTextField, above: NSTextField, value: NSTextField) {
             let form = RcFormView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
             func label(_ text: String, _ rect: NSRect) -> NSTextField {
                 let field = NSTextField(labelWithString: text)
@@ -472,17 +401,13 @@ final class NativeLookTests: AppHostTestCase {
             form.growTextIntoFreeSpace()
             return (form, named, above, value)
         }
-        let mac = form(.mac)
+        let mac = form()
         XCTAssertEqual(mac.named.alignment, .right, "a label left of its control hugs it")
         XCTAssertEqual(mac.named.frame.maxX, 172, accuracy: 0.5)
         XCTAssertNotEqual(mac.above.alignment, .right, "a label above its field stays")
         XCTAssertNotEqual(mac.value.alignment, .right, "a label over its value stays")
         mac.0.growTextIntoFreeSpace()
         XCTAssertEqual(mac.named.frame.maxX, 172, accuracy: 0.5, "a second pass changes nothing")
-
-        let classic = form(.classic)
-        XCTAssertNotEqual(classic.named.alignment, .right, "Classic keeps the template")
-        XCTAssertEqual(classic.named.frame.width, 120)
     }
 
     // MARK: native-look: path bar
@@ -494,7 +419,7 @@ final class NativeLookTests: AppHostTestCase {
         defer { Settings.removeKey(MacPathBar.key) }
         MacPathBar.isShown = true
 
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, "/Applications/Utilities")
         let panel = controller.focusedPanel
         let bar = panel.pathControlBar
@@ -521,17 +446,12 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(bar.isHidden)
         XCTAssertEqual(bar.frame.height, 0)
 
-        let classic = try openWindow(look: .classic)
-        show(classic, "/Applications")
-        MacPathBar.isShown = true
-        XCTAssertTrue(classic.focusedPanel.pathControlBar.isHidden, "Classic has no path bar")
-        XCTAssertFalse(allItems(MainMenu.build()).contains { $0.action == #selector(AppDelegate.toggleMacPathBar(_:)) })
     }
 
     // MARK: native-look: window tabs
 
     func testMacWindowsOpenAsTabs() throws {
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         let window = try XCTUnwrap(controller.window)
         XCTAssertEqual(window.tabbingIdentifier, MainWindowController.tabbingIdentifier)
         window.tabbingMode = .preferred        // TestAnimations turns tabbing off for every test window
@@ -549,10 +469,6 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertTrue(MainWindows.controllers.contains { $0.window === tab })
         tab.toolbar = nil
         tab.close()
-
-        let classic = try openWindow(look: .classic)
-        XCTAssertEqual(classic.window?.tabbingMode, .disallowed, "Classic: no tabs, as 7zFM")
-        XCTAssertFalse(allItems(MainMenu.build()).contains { $0.action == #selector(NSResponder.newWindowForTab(_:)) })
     }
 
     // MARK: native-look: undo Move to Trash
@@ -565,7 +481,7 @@ final class NativeLookTests: AppHostTestCase {
         let file = dir.appendingPathComponent("put-back.txt")
         try Data("7-Zip".utf8).write(to: file)
 
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, dir.path)
         let window = try XCTUnwrap(controller.window)
         let panel = controller.focusedPanel
@@ -588,84 +504,62 @@ final class NativeLookTests: AppHostTestCase {
         undo.undo()
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path), "and Undo works again")
         undo.removeAllActions()
-
-        // Classic keeps 7zFM: no undo is registered.
-        let classic = try openWindow(look: .classic)
-        show(classic, dir.path)
-        let classicUndo = try XCTUnwrap(classic.window?.undoManager)
-        classicUndo.removeAllActions()
-        let classicRow = try XCTUnwrap(classic.focusedPanel.rows.firstIndex { $0.name == "put-back.txt" })
-        classic.focusedPanel.deleteItems(rowIndices: [classicRow], toTrash: true, confirm: false)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
-        XCTAssertFalse(classicUndo.canUndo, "Classic has no Undo")
-        // Put the test file back out of the Trash so the user's Trash stays clean.
-        if let trashed = try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask,
-                                                      appropriateFor: file, create: false)
-            .appendingPathComponent("put-back.txt") {
-            try? FileManager.default.removeItem(at: trashed)
-        }
     }
 
     // MARK: native-look: sheets
 
     func testMacDialogsAreSheetsOfTheirWindow() throws {
         defer { while NSApp.modalWindow != nil { NSApp.abortModal() } }
-        for look in [AppLook.mac, .classic] {
-            let controller = try openWindow(look: look)
-            show(controller, "/Applications")
-            let window = try XCTUnwrap(controller.window)
-            window.makeKeyAndOrderFront(nil)
-            var parent: NSWindow?
-            var answered: WinMessageBox.Result?
-            XCTAssertTrue(ModalProbe.present({
-                answered = WinMessageBox.run("Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
-                                             buttons: .yesNo, icon: .question, owner: window)
-            }) { box in
-                parent = box.sheetParent
-                if look == .mac { try? self.writeSheet(box, on: window, "sheet-alert") }
-                (box as? WinMessageBoxWindow)?.answer(.yes)
-            })
-            XCTAssertEqual(answered, .yes, "the caller still gets its answer")
-            // A DialogKit dialog: Extract, cancelled through its close path (IDCANCEL).
-            var extractParent: NSWindow?
-            var extract = ExtractDialog.Options()
-            extract.directoryPath = "/Users/Shared/"
-            extract.archivePath = "/Users/Shared/demo.zip"
-            extract.parentWindow = window          // as the panel passes it (the test app may be inactive)
-            var returned = false, extractResult: ExtractDialog.Result?
-            XCTAssertTrue(ModalProbe.present({ extractResult = ExtractDialog.run(extract); returned = true }) { dialog in
-                extractParent = dialog.sheetParent
-                if look == .mac { try? self.writeSheet(dialog, on: window, "sheet-extract") }
-                dialog.performClose(nil)
-            })
-            XCTAssertTrue(returned, "run() returned")
-            XCTAssertNil(extractResult, "cancelled")
-            XCTAssertTrue(look == .mac ? extractParent === window : extractParent == nil)
-            XCTAssertNil(window.attachedSheet)
-            // The one-field dialog (Create Folder, Rename, ...): as a sheet its caption is a heading.
-            var labels: [String] = []
-            XCTAssertTrue(ModalProbe.present({
-                _ = ComboDialog.run(title: "Create Folder", label: "Folder name:", value: "New Folder", parent: window)
-            }) { dialog in
-                func texts(_ v: NSView) -> [String] {
-                    ((v as? NSTextField).map { [$0.stringValue] } ?? []) + v.subviews.flatMap(texts)
-                }
-                labels = dialog.contentView.map(texts) ?? []
-                if look == .mac { try? self.writeSheet(dialog, on: window, "sheet-create-folder") }
-                dialog.performClose(nil)
-            })
-            XCTAssertEqual(labels.contains("Create Folder"), look == .mac, "the heading names the command: \(labels)")
-            if look == .mac {
-                XCTAssertTrue(parent === window, "Mac: the question is a sheet of its window")
-                XCTAssertNil(window.attachedSheet, "and it is gone afterwards")
-            } else {
-                XCTAssertNil(parent, "Classic: a window of its own")
+        let controller = try openWindow()
+        show(controller, "/Applications")
+        let window = try XCTUnwrap(controller.window)
+        window.makeKeyAndOrderFront(nil)
+        var parent: NSWindow?
+        var answered: WinMessageBox.Result?
+        XCTAssertTrue(ModalProbe.present({
+            answered = WinMessageBox.run("Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
+                                         buttons: .yesNo, icon: .question, owner: window)
+        }) { box in
+            parent = box.sheetParent
+            try? self.writeSheet(box, on: window, "sheet-alert")
+            (box as? WinMessageBoxWindow)?.answer(.yes)
+        })
+        XCTAssertEqual(answered, .yes, "the caller still gets its answer")
+        // A DialogKit dialog: Extract, cancelled through its close path (IDCANCEL).
+        var extractParent: NSWindow?
+        var extract = ExtractDialog.Options()
+        extract.directoryPath = "/Users/Shared/"
+        extract.archivePath = "/Users/Shared/demo.zip"
+        extract.parentWindow = window          // as the panel passes it (the test app may be inactive)
+        var returned = false, extractResult: ExtractDialog.Result?
+        XCTAssertTrue(ModalProbe.present({ extractResult = ExtractDialog.run(extract); returned = true }) { dialog in
+            extractParent = dialog.sheetParent
+            try? self.writeSheet(dialog, on: window, "sheet-extract")
+            dialog.performClose(nil)
+        })
+        XCTAssertTrue(returned, "run() returned")
+        XCTAssertNil(extractResult, "cancelled")
+        XCTAssertTrue(extractParent === window)
+        XCTAssertNil(window.attachedSheet)
+        // The one-field dialog (Create Folder, Rename, ...): as a sheet its caption is a heading.
+        var labels: [String] = []
+        XCTAssertTrue(ModalProbe.present({
+            _ = ComboDialog.run(title: "Create Folder", label: "Folder name:", value: "New Folder", parent: window)
+        }) { dialog in
+            func texts(_ v: NSView) -> [String] {
+                ((v as? NSTextField).map { [$0.stringValue] } ?? []) + v.subviews.flatMap(texts)
             }
-            controller.closeDiscardingState()
-            // The test keeps the closed window alive; its toolbar would go on syncing with the
-            // next test's (same identifier), so it is detached here.
-            window.toolbar = nil
-        }
+            labels = dialog.contentView.map(texts) ?? []
+            try? self.writeSheet(dialog, on: window, "sheet-create-folder")
+            dialog.performClose(nil)
+        })
+        XCTAssertTrue(labels.contains("Create Folder"), "the heading names the command: \(labels)")
+        XCTAssertTrue(parent === window, "the question is a sheet of its window")
+        XCTAssertNil(window.attachedSheet, "and it is gone afterwards")
+        controller.closeDiscardingState()
+        // The test keeps the closed window alive; its toolbar would go on syncing with the
+        // next test's (same identifier), so it is detached here.
+        window.toolbar = nil
     }
 
     /// The window with its sheet drawn in place.
@@ -695,14 +589,12 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacSettingsApplyAtOnce() throws {
-        Settings.look = .mac
         let wasGrid = Settings.showGrid
         defer {
             Settings.showGrid = wasGrid
             if let w = OptionsWindowController.shared.window, w.isVisible { ModalProbe.close(w) }
         }
         let options = OptionsWindowController.shared
-        XCTAssertEqual(options.look, .mac)
         var page: OptionsMacPage?
         XCTAssertTrue(ModalProbe.present({ OptionsWindowController.showOptions() }) { window in
             options.selectPage(options.pageCount - 1)
@@ -716,13 +608,12 @@ final class NativeLookTests: AppHostTestCase {
     }
 
     func testMacMessageBoxKeepsTheAnswersInMacOrder() throws {
-        Settings.look = .mac
         let box = WinMessageBoxWindow(text: "Are you sure you want to delete 'notes.md'?", caption: "Confirm File Delete",
                                       buttons: .yesNoCancel, icon: .question, owner: nil)
         XCTAssertNotNil(box.macLayout)
         XCTAssertEqual(box.pushButtons.map(\.title), ["Yes", "No", "Cancel"], "same answers")
         XCTAssertTrue(box.defaultButtonCell === box.pushButtons.first?.cell, "Yes stays the default")
-        let layout = try XCTUnwrap(box.macLayout)
+        let layout = box.macLayout
         XCTAssertEqual(layout.messageText, "Are you sure you want to delete 'notes.md'?", "one line: all of it is the bold message")
         XCTAssertTrue(layout.stacksButtons, "three answers stack, as NSAlert does")
         let ys = box.pushButtons.map(\.frame.minY)                    // flipped: the default on top
@@ -732,19 +623,15 @@ final class NativeLookTests: AppHostTestCase {
         XCTAssertEqual(box.titleVisibility, .hidden)
         let two = WinMessageBoxWindow(text: "Cannot open the file as archive\n/Users/demo/Report.pdf", caption: "7-Zip",
                                       buttons: .okCancel, icon: .error, owner: nil)
-        let twoLayout = try XCTUnwrap(two.macLayout)
+        let twoLayout = two.macLayout
         XCTAssertEqual(twoLayout.messageText, "Cannot open the file as archive")
         XCTAssertEqual(twoLayout.informativeText, "/Users/demo/Report.pdf")
         XCTAssertFalse(twoLayout.stacksButtons)
         XCTAssertGreaterThan(two.pushButtons[0].frame.minX, two.pushButtons[1].frame.minX, "the default sits rightmost")
         XCTAssertEqual(two.pushButtons[0].frame.width, two.pushButtons[1].frame.width, "equal widths")
-        Settings.look = .classic
-        let classic = WinMessageBoxWindow(text: "x", caption: "c", buttons: .ok, icon: .none, owner: nil)
-        XCTAssertNil(classic.macLayout)
     }
 
     func testRenderMacAlertsAndProgress() throws {
-        Settings.look = .mac
         for theme in [AppTheme.light, .dark] {
             Settings.theme = theme
             let question = WinMessageBoxWindow(text: "Are you sure you want to delete 'notes.md'?",
@@ -770,7 +657,7 @@ final class NativeLookTests: AppHostTestCase {
         try ShowcaseDemo.make()
         try SZCodecs.loadCodecs()
         Settings.theme = .light
-        let controller = try openWindow(look: .mac)
+        let controller = try openWindow()
         show(controller, ShowcaseDemo.folder)
         let panel = controller.focusedPanel
         let window = try XCTUnwrap(controller.window)

@@ -72,6 +72,9 @@ class AppHostTestCase: XCTestCase {
                       "the host app writes \(Self.isolatedFromRealSettings); it must not be the "
                       + "developer's own preferences domain")
         continueAfterFailure = false
+        // Every test starts from the default toolbar: AppKit saves a customized arrangement
+        // (View > Toolbars, Customize Toolbar) per identifier, and it would carry over.
+        UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(MainWindowController.macToolbarIdentifier)")
         defects = []
         warnings = []
         savedLanguageCode = SZLang.shared.currentLanguageCode
