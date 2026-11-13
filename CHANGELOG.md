@@ -32,8 +32,8 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
     owns them, or another dialog is open, they stay windows of their own, in front. Each still answers the code that asked, so nothing
     else changes. The one-field dialog (Rename, Create Folder, Comment, Select) shows its caption
     as a bold heading, since a sheet has no title bar.
-  - The menus use the Mac's names and shortcuts: *Settings…* (Cmd+,), *About* and *Check for
-    Updates…* in the 7-Zip menu; *New Window* Cmd+N, *New Folder* Shift+Cmd+N, *New File*
+  - The menus use the Mac's names and shortcuts: *Settings…* (Cmd+,) and *About* in the 7-Zip
+    menu; *New Window* Cmd+N, *New Folder* Shift+Cmd+N, *New File*
     Option+Cmd+N, *Open* Cmd+O, *Move to Trash* with *Delete Immediately…* under Option, *Get
     Info* Cmd+I, *Close Window*; Cut, Copy and Paste first in Edit; a *Sort By* submenu with
     Finder's Control+Option+Cmd+1-5, *Show Toolbar* and *Customize Toolbar…* in View; Finder's

@@ -31,7 +31,9 @@ Where to read:
   (e.g. `01 §3.7`, `01b §4.19`) in code comments and reports, and keep the Windows resource
   ID in a comment next to each menu item and dialog control.
 - Tests write screenshots to `Mac/build/screenshots/` (git-ignored). Images for the docs live in
-  `docs/images/` and are full-window screenshots taken by hand (main window 870x500 pt); `Mac/scripts/showcase.sh` renders reference shots into `Mac/build/screenshots/`.
+  `docs/images/` as AVIF: real window screenshots (main window 870x500 pt) that
+  `Mac/scripts/showcase.sh` takes with XCUITest in the neutral demo folder (`ShowcaseUITests`), or
+  taken by hand. Check every image for a user name or machine detail before committing it.
 
 ## Build, run, test
 
