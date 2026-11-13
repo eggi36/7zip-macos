@@ -42,7 +42,7 @@ final class HostTargetTests: AppHostTestCase {
     /// that turned out to be a probe, and eleven UI tests of another scope that used an unaimed
     /// `NSWorkspace.open` were answered by it and failed (`ai/api/resetcmd.md` section 5). So the
     /// copies use `Mac/Tests/AppVariants/Info.plist`, which is `Mac/App/Info.plist` with the URL
-    /// schemes, the 40 document types, their 23 type declarations and the five Services removed --
+    /// schemes, the 52 document types, their 35 type declarations and the five Services removed --
     /// and nothing else. This fails if either half drifts.
     func testTheVariantInfoPlistMatchesTheApps() throws {
         let root = try XCTUnwrap(TestPaths.repoRoot, "the worktree root was not found")

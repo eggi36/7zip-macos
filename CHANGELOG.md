@@ -11,6 +11,22 @@ is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 [7-Zip 26.06](https://github.com/ip7z/7zip/releases/tag/26.06) (2026-11-06), which includes 26.05
 (2026-10-21).
 
+### Added
+
+- **Disc images, as the Iso7z plugin adds them to 7-Zip on Windows**: CUE/BIN, CCD/IMG
+  (CloneCD), MDS/MDF (Alcohol 120%), NRG (Nero), CDI (DiscJuggler), GDI (Dreamcast), CHD v3 / v4
+  (MAME), CSO / ZSO and CISO (compressed ISO, PSP and Wii), ISZ (UltraISO), ECM and zisofs. A disc
+  opens as its tracks -- a data track as *TrackNN.iso*, which opens in turn as ISO 9660 / UDF, an
+  audio track as *TrackNN.wav* -- and a compressed image straight into the files it holds. A
+  multi-session disc also shows *SessionN.iso*, the disc up to the end of each session, so every
+  session's file system opens as it was burnt. A CD-ROM XA disc (Video CD, PlayStation) also
+  shows a *TrackNN* folder with its files decoded; a Form 2 file (a Video CD's .DAT, a .STR
+  movie) comes out as Windows shows it, a RIFF CDXA file of its raw sectors that players open. The
+  sector data is read in place (the 2048 bytes of a raw Mode 1 / Mode 2 Form 1 sector; ECM
+  rebuilds each sector's EDC / ECC), nothing is unpacked to disk first. An ISZ split into .i01,
+  .i02 ... segments opens from its first file. The descriptor extensions can be associated with
+  7-Zip in Settings > System. Not supported: encrypted MDS 2.x and ISZ, CHD v5 and diff CHDs.
+
 ### Changed
 
 - Updated the engine to 7-Zip 26.06. Upstream's summary: improved support for split files created

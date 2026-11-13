@@ -6,8 +6,8 @@
   that makes a claim on the *system* removed:
 
       CFBundleURLTypes              the sevenzip:// and x-7zip:// schemes
-      CFBundleDocumentTypes         the 40 archive extensions
-      UTImportedTypeDeclarations    the 23 type declarations behind them
+      CFBundleDocumentTypes         the 52 archive extensions
+      UTImportedTypeDeclarations    the 35 type declarations behind them
       NSServices                    the five Services menu items
 
   Why, measured: macOS registers an app bundle with Launch Services the moment it is launched, and
