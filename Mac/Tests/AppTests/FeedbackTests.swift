@@ -139,4 +139,13 @@ final class FeedbackTests: AppHostTestCase {
         XCTAssertFalse(titles.contains { $0.localizedCaseInsensitiveContains("update") }, "\(titles)")
         XCTAssertNil(NSClassFromString("SevenZipAppHost.UpdateCheck"))
     }
+
+    /// "~" in a typed archive or destination path is the home folder (review finding).
+    func testTildeMeansTheHomeFolder() {
+        let home = NSHomeDirectory()
+        XCTAssertEqual(CompressDialogController.expandingTilde("~/Desktop/a.7z"), home + "/Desktop/a.7z")
+        XCTAssertEqual(CompressDialogController.expandingTilde("~"), home)
+        XCTAssertEqual(CompressDialogController.expandingTilde("a~b.7z"), "a~b.7z")
+        XCTAssertEqual(CompressDialogController.expandingTilde("~old.7z"), "~old.7z")
+    }
 }

@@ -258,7 +258,10 @@ final class SFFontTests: AppHostTestCase {
                 SFFontTests.retained = progress
             },
             Probe(name: "Message box") {
-                _ = WinMessageBox.run(Lang.text(6000, "Copy") + ": " + archive, caption: "7-Zip",
+                // A fixed path: the checkout's own path would make the line breaks depend on where
+                // the repository lies (a worktree name half a point wider wrapped once more).
+                _ = WinMessageBox.run(Lang.text(6000, "Copy") + ": /Users/Shared/7-Zip Demo/Project backup.7z",
+                                      caption: "7-Zip",
                                       buttons: .yesNoCancel, icon: .question, owner: nil)
             },
         ]

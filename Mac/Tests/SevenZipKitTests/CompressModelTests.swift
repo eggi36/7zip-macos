@@ -397,6 +397,10 @@ final class CompressModelTests: XCTestCase {
         XCTAssertEqual(CompressMemUse(spec: "3G")?.value, 3 << 30)
         XCTAssertEqual(CompressMemUse(spec: "1000")?.value, 1000)
         XCTAssertNil(CompressMemUse(spec: "abc"))
+        // A typed percent far beyond 100 saturates instead of overflowing (it trapped).
+        let huge = CompressMemUse(spec: "99999999999999999%")
+        XCTAssertEqual(huge?.bytes(ram: 16 << 30), UInt64.max)
+        XCTAssertEqual(CompressModel.percent(of: UInt64.max, 50), UInt64.max / 100 * 50)
     }
 
     // MARK: - Memory estimation

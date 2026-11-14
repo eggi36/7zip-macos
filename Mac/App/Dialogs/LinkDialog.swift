@@ -177,9 +177,16 @@ final class LinkDialog: NSObject {
             from = (from as NSString).appendingPathComponent((to as NSString).lastPathComponent)
         }
 
+        // A relative target is relative to the link's own folder -- what a symlink stores and
+        // what the kernel resolves it against. The kind check and link(2) take it resolved; the
+        // process's working directory ("/") means nothing here.
+        let resolvedTo = to.hasPrefix("/") ? to
+            : (((from as NSString).deletingLastPathComponent as NSString).appendingPathComponent(to) as NSString)
+                .standardizingPath
+
         // The existing paths must match the dir/file kind of the chosen type.
         var toIsDir = ObjCBool(false)
-        let toExists = fm.fileExists(atPath: to, isDirectory: &toIsDir)
+        let toExists = fm.fileExists(atPath: resolvedTo, isDirectory: &toIsDir)
         if toExists {
             if type == .symbolicDir && !toIsDir.boolValue {
                 showError("Incorrect link type")
@@ -210,15 +217,28 @@ final class LinkDialog: NSObject {
             showError("WARNING: reparse point will hide the data of existing file")
             return
         }
-        if isSymbolicLink(from) || fm.fileExists(atPath: from) {
-            // replacing an existing empty file / link
+        // Only a link, an empty file or an empty folder is replaced; anything else at `from` stays
+        // and the link is not made (CreateSymbolicLink / CreateHardLink fail on an existing name).
+        // removeItem on a folder would delete its whole tree.
+        if isSymbolicLink(from) {
             try? fm.removeItem(atPath: from)
+        } else if let attributes = try? fm.attributesOfItem(atPath: from) {
+            let type = attributes[.type] as? FileAttributeType
+            let isEmptyFolder = type == .typeDirectory && ((try? fm.contentsOfDirectory(atPath: from))?.isEmpty ?? false)
+            guard type == .typeRegular || isEmptyFolder else {
+                showError(String(cString: strerror(EEXIST)) + ":\n" + from)
+                return
+            }
+            if rmdir(from) != 0 && unlink(from) != 0 {
+                showError(String(cString: strerror(errno)) + ":\n" + from)
+                return
+            }
         }
 
         do {
             if type == .hard {
                 // link(2): both pointers must stay valid for the whole call.
-                let status = to.withCString { target in from.withCString { newPath in link(target, newPath) } }
+                let status = resolvedTo.withCString { target in from.withCString { newPath in link(target, newPath) } }
                 if status != 0 {
                     let code = errno
                     throw NSError(domain: NSPOSIXErrorDomain, code: Int(code),

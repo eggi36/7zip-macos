@@ -149,26 +149,7 @@ final class OverwriteDialog: NSObject {
     @objc private func answerNoToAll() { finish(.noToAll) }
     @objc private func answerCancel() { finish(.cancel) }
 
-    @objc private func answerAutoRename() {
-        // The engine renames with AutoRenamePath ("name (2).ext"); the dialog only reports
-        // the answer, and hands over a suggestion when it can compute one itself.
-        finish(.autoRename, suggestedName: OverwriteDialog.autoRenamedName(for: oldInfo.path))
-    }
-
-    /// AutoRenamePath (CPP/7zip/Common/FilePathAutoRename.cpp): "name (2).ext", "name (3).ext"...
-    static func autoRenamedName(for path: String) -> String? {
-        let name = (path as NSString).lastPathComponent
-        guard !name.isEmpty else { return nil }
-        let base = (name as NSString).deletingPathExtension
-        let ext = (name as NSString).pathExtension
-        let directory = (path as NSString).deletingLastPathComponent
-        var index = 2
-        while index < 10000 {
-            let candidate = ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)"
-            let full = directory.isEmpty ? candidate : (directory as NSString).appendingPathComponent(candidate)
-            if !FileManager.default.fileExists(atPath: full) { return candidate }
-            index += 1
-        }
-        return nil
-    }
+    /// The engine names the copy itself (AutoRenamePath, FilePathAutoRename.cpp: "name_1.ext"), for
+    /// this file and every later conflict of the operation alike; the dialog only reports the answer.
+    @objc private func answerAutoRename() { finish(.autoRename) }
 }

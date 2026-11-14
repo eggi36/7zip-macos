@@ -349,14 +349,10 @@ final class ExtractDialog: NSObject, NSTextFieldDelegate {
         }
 
         // The combo text, or the selected history entry.
-        var path: String
-        let selected = pathCombo.indexOfSelectedItem
-        if selected < 0 {
-            path = pathCombo.stringValue
-        } else {
-            path = pathCombo.itemObjectValue(at: selected) as? String ?? pathCombo.stringValue
-        }
-        path = path.trimmingCharacters(in: .whitespaces)
+        // The combo's text: choosing a history entry puts it there, and an edit after the choice
+        // must win (Windows reads GetLBText only because CBN_SELCHANGE comes before the text).
+        var path = pathCombo.stringValue.trimmingCharacters(in: .whitespaces)
+        path = CompressDialogController.expandingTilde(path)          // "~/..." is the home folder
         path = Self.normalizeDirPathPrefix(path)
 
         let splitDest = nameEnableBox.state == .on
@@ -392,7 +388,7 @@ final class ExtractDialog: NSObject, NSTextFieldDelegate {
         // _info.Paths = the new path first, then the other history entries, max kHistorySize
         // (AddUniqueString is case-insensitive).
         var history: [String] = [path]
-        for i in 0..<pathCombo.numberOfItems where i != selected {
+        for i in 0..<pathCombo.numberOfItems {             // duplicates of the new path are skipped below
             guard let entry = (pathCombo.itemObjectValue(at: i) as? String)?
                     .trimmingCharacters(in: .whitespaces) else { continue }
             if entry.isEmpty { continue }

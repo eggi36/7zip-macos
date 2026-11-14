@@ -193,7 +193,9 @@ final class CompressModel {
     static func percent(of size: UInt64, _ percent: UInt64) -> UInt64 {
         if percent == 0 { return 0 }
         if size <= UInt64.max / percent { return size * percent / 100 }
-        return size / 100 * percent
+        // Saturates: a typed "99999999999999999%" means "more than there is", not a crash.
+        let (value, overflow) = (size / 100).multipliedReportingOverflow(by: percent)
+        return overflow ? UInt64.max : value
     }
 
     /// Switching the format keeps the dialog's own idea of the level etc.; the caller then

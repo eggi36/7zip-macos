@@ -684,7 +684,7 @@ final class CompressDialogController: NSObject, NSTextFieldDelegate, NSComboBoxD
 
     /// `SetArcPathFields` (:830-858) / `ArcPath_WasChanged`.
     private func updateFolderLabel() {
-        let typed = archiveCombo.stringValue
+        let typed = Self.expandingTilde(archiveCombo.stringValue)
         if (typed as NSString).isAbsolutePath {
             let dir = (typed as NSString).deletingLastPathComponent
             directoryPrefix = dir.hasSuffix("/") ? dir : dir + "/"
@@ -693,9 +693,14 @@ final class CompressDialogController: NSObject, NSTextFieldDelegate, NSComboBoxD
         folderLabel.stringValue = directoryPrefix
     }
 
+    /// "~" and "~/..." mean the home folder, as in every Mac save panel (a macOS addition).
+    static func expandingTilde(_ path: String) -> String {
+        path == "~" || path.hasPrefix("~/") ? (path as NSString).expandingTildeInPath : path
+    }
+
     /// `GetFinalPath_Smart` (:811-828): resolve the typed name against the folder prefix.
     private func finalArchivePath() -> String? {
-        let name = archiveCombo.stringValue.trimmingCharacters(in: .whitespaces)
+        let name = Self.expandingTilde(archiveCombo.stringValue.trimmingCharacters(in: .whitespaces))
         guard !name.isEmpty else { return nil }
         if (name as NSString).isAbsolutePath { return (name as NSString).standardizingPath }
         var prefix = directoryPrefix
