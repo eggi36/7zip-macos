@@ -830,6 +830,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         applyListViewMode()
         reloadList()
         restoreSelection(names: names, focusName: focus)     // items and selection are preserved
+        (view.window?.windowController as? MainWindowController)?.syncViewModeItems()   // the toolbar's view switcher
     }
 
     private func applyListViewMode() {
@@ -900,6 +901,7 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
         listViewMode = mode
         Settings.setListMode(mode, panelIndex)
         applyListViewMode()
+        (view.window?.windowController as? MainWindowController)?.syncViewModeItems()
         // Forget the cached column model so the next apply() rebuilds it -- and with it the sort
         // order -- from the settings domain as it now stands (`FM.Columns.<FolderTypeID>`).
         folderTypeOfColumns = ""

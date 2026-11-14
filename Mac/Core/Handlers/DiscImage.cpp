@@ -215,9 +215,44 @@ UString CDiscHandler::ArchiveName(IArchiveOpenCallback *callback)
   return name;
 }
 
-HRESULT CDiscHandler::AddVolume(IArchiveOpenCallback *callback, const UString &name, int &index)
+// A FILE name of a cue / gdi / ccd sheet stays inside the sheet's folder: an absolute path, a
+// drive letter or a ".." component is reduced to its last component (the file next to the sheet,
+// where rippers put it), so a downloaded sheet cannot list a private file elsewhere as a track.
+static UString ConfinedName(const UString &name)
+{
+  bool unsafe = name.IsEmpty() || name[0] == L'/' || name[0] == L'\\' || (name.Len() >= 2 && name[1] == L':');
+  unsigned start = 0;
+  for (unsigned i = 0; i <= name.Len() && !unsafe; i++)
+    if (i == name.Len() || name[i] == L'/' || name[i] == L'\\')
+    {
+      if (i - start == 2 && name[start] == L'.' && name[start + 1] == L'.')
+        unsafe = true;
+      start = i + 1;
+    }
+  if (!unsafe)
+    return name;
+  int slash = -1;
+  for (unsigned i = 0; i < name.Len(); i++)
+    if (name[i] == L'/' || name[i] == L'\\')
+      slash = (int)i;
+  UString base = name.Ptr((unsigned)(slash + 1));
+  if (base.Len() >= 2 && base[1] == L':')
+    base.DeleteFrontal(2);
+  if (base == L".." || base == L".")
+    base.Empty();
+  return base;
+}
+
+HRESULT CDiscHandler::AddVolume(IArchiveOpenCallback *callback, const UString &requested, int &index)
 {
   index = -1;
+  const UString name = ConfinedName(requested);
+  if (name.IsEmpty())
+  {
+    if (MissingFile.IsEmpty())
+      MissingFile = UnicodeStringToMultiByte(requested, CP_UTF8);
+    return S_OK;
+  }
   // Already open (several tracks in one .bin)?
   for (unsigned i = 0; i < _volumeNames.Size(); i++)
     if (_volumeNames[i].IsEqualTo_NoCase(name))

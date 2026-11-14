@@ -245,7 +245,7 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
     RINOK(ReadStream_FALSE(stream, mh, 16))
     const UInt32 tag = GetBe32(mh);
     const UInt32 length = GetBe32(mh + 4) & 0xFFFFFF;
-    const UInt64 next = GetBe64(mh + 8);
+    meta = GetBe64(mh + 8);         // the next entry; set first, so a skipped entry advances too
     if (length < 4096 && (tag == 0x43485432 || tag == 0x43485452))     // 'CHT2', 'CHTR'
     {
       CByteBuffer text(length);
@@ -272,7 +272,6 @@ HRESULT CHandler::ParseImage(IInStream *stream, IArchiveOpenCallback * /* callba
         frameOffset += n + ((n + kTrackPadding - 1) / kTrackPadding * kTrackPadding - n);
       }
     }
-    meta = next;
   }
   if (Tracks.IsEmpty())
   {

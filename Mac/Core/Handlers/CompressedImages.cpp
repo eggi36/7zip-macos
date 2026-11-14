@@ -662,8 +662,17 @@ HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback *openCallback)
 
   if (ptrOffset == 0)
   {
-    // No block table: the image is stored as it is.
+    // No block table: the image is stored as it is, so it has to fit into the segments' data --
+    // a header alone (totalSectors x sectorSize, any chunk size) could otherwise ask for some
+    // 10^14 blocks.
+    UInt64 stored = 0;
+    for (unsigned k = 0; k < _segLength.Size(); k++)
+      stored += _segLength[k];
+    if (_size > stored)
+      return S_FALSE;
     const UInt64 n = (_size + _blockSize - 1) / _blockSize;
+    if (n > (1 << 26))
+      return S_FALSE;
     UInt64 pos = 0;
     for (UInt64 i = 0; i < n; i++, pos += _blockSize)
     {

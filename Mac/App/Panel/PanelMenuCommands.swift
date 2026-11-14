@@ -47,36 +47,27 @@ extension PanelViewController: NSUserInterfaceValidations {
         guard let focused = focusedRow(), !focused.isParentRow else { return }
         if focused.isDirectory { calcFocusedItemSize(); return }     // F3 on a folder = CalcItemFullSize
         if focused.fullPath.isEmpty, forwardToNextResponder(#selector(fileView(_:)), sender: sender) { return }
-        openWithExternalTool(path: focused.fullPath, tool: Settings.viewerPath)
+        openWithExternalTool(path: focused.fullPath, tool: Settings.viewerPath, kind: .viewer)
     }
 
     @objc func fileEdit(_ sender: Any?) {                                                            // IDM_FILE_EDIT 544
         guard let focused = focusedRow(), !focused.isParentRow, !focused.isDirectory else { return }
         if focused.fullPath.isEmpty, forwardToNextResponder(#selector(fileEdit(_:)), sender: sender) { return }
-        openWithExternalTool(path: focused.fullPath, tool: Settings.editorPath)
+        openWithExternalTool(path: focused.fullPath, tool: Settings.editorPath, kind: .editor)
     }
 
-    /// StartEditApplication (PanelItemOpen.cpp:719). Items inside an archive need the temp-file
-    /// flow of the `extract` scope (PROGRESS §4.6), which is not on this branch.
-    private func openWithExternalTool(path: String, tool: String) {
+    /// StartEditApplication / StartApplication (PanelItemOpen.cpp:719, :867) for a file on disk:
+    /// no tool configured opens the default application; a configured one is started by
+    /// `ExternalTool` (an .app bundle, an executable with its arguments, or an application name),
+    /// never through a shell, so a path with spaces works and nothing in the setting is executed
+    /// as a command.
+    private func openWithExternalTool(path: String, tool: String, kind: ExternalTool.Kind) {
         guard !path.isEmpty else { showUnsupportedOperation(); return }
-        let url = URL(fileURLWithPath: path)
-        guard !tool.isEmpty else {
-            NSWorkspace.shared.open(url)
+        guard !tool.trimmingCharacters(in: .whitespaces).isEmpty else {
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
             return
         }
-        if tool.hasSuffix(".app") {
-            let configuration = NSWorkspace.OpenConfiguration()
-            NSWorkspace.shared.open([url], withApplicationAt: URL(fileURLWithPath: tool),
-                                    configuration: configuration)
-            return
-        }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "\(tool) \"$1\"", "sh", path]
-        do {
-            try process.run()
-        } catch {
+        if !ExternalTool.open([path], with: kind) {
             showError(message: Lang.text(3011, "Cannot start editor"))
         }
     }

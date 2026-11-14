@@ -162,6 +162,25 @@ final class DiscImageTests: XCTestCase {
         XCTAssertTrue(texts.contains { $0.contains("gone.bin") }, "\(texts)")
     }
 
+    /// A sheet's FILE stays in the sheet's folder: an absolute path or one through ".." is not
+    /// followed (a downloaded sheet could otherwise list a private file elsewhere as a track).
+    func testCueCannotNameAFileOutsideItsFolder() throws {
+        let outside = path("elsewhere")
+        try FileManager.default.createDirectory(atPath: outside, withIntermediateDirectories: true)
+        try iso.write(to: URL(fileURLWithPath: outside + "/secret.bin"))
+        try FileManager.default.createDirectory(atPath: path("sheets"), withIntermediateDirectories: true)
+        for (sheet, file) in [("absolute.cue", outside + "/secret.bin"), ("dotdot.cue", "../elsewhere/secret.bin")] {
+            try write(Data("FILE \"\(file)\" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n".utf8),
+                      "sheets/" + sheet)
+            let folder = try SZFolder.folder(forPath: path("sheets/" + sheet), passwordDelegate: nil)
+            try folder.loadItems()
+            XCTAssertEqual(folder.itemCount, 0, sheet)
+        }
+        // The file next to the sheet, by its last name, is what such a FILE means.
+        try iso.write(to: URL(fileURLWithPath: path("sheets/secret.bin")))
+        XCTAssertEqual(data(try extract(path("sheets/absolute.cue")), "Track01.iso"), iso)
+    }
+
     func testATextFileIsNoCueSheet() throws {
         try write(Data("just some notes\nnothing to see\n".utf8), "notes.cue")
         XCTAssertThrowsError(try list(path("notes.cue")))
@@ -777,6 +796,19 @@ final class DiscImageTests: XCTestCase {
         let items = try list(path("disk.chd"))
         XCTAssertEqual(items.map(\.name), ["image.img"])
         XCTAssertEqual(data(try extract(path("disk.chd")), "image.img"), disk)
+    }
+
+    /// A stored ISZ (no block table) whose header claims ~10^14 one-byte blocks is refused at
+    /// once instead of building a block list of that length.
+    func testIszHeaderWithAnAbsurdStoredSizeIsRefused() throws {
+        var h = Data("IsZ!".utf8) + Data([64, 1]) + le32(0) + le16(0xFFFF) + le32(0xFFFF_FFFF)
+        h += Data([0]) + le64(0) + le32(0) + le32(1) + Data([0, 0])
+        h += le32(0) + le32(0) + le32(64) + Data([0])
+        h += Data(count: 64 - h.count)
+        try write(h + Data(count: 4096), "absurd.isz")
+        let start = Date()
+        XCTAssertThrowsError(try list(path("absurd.isz")))
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
     }
 
     // MARK: - ISZ segments

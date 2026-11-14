@@ -230,10 +230,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     }
 
     /// After every event: the toolbar's view switcher shows the focused panel's mode (MacToolbar.swift).
-    func windowDidUpdate(_ notification: Notification) {
-        syncViewModeItems()
-    }
-
     func windowWillClose(_ notification: Notification) {
         guard !isClosed else { return }
         refreshTimer?.invalidate()
@@ -414,6 +410,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
         focusedPanelIndex = index
         for (i, panel) in panels.enumerated() { panel.isActive = i == index }
         focusedPanel.refreshQuickLookIfShown()      // an open preview shows the other panel's selection
+        syncViewModeItems()                         // the view switcher shows this panel's mode
         refreshTitle()
     }
 
