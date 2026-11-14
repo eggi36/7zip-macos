@@ -64,7 +64,7 @@ final class Fix112UITests: SevenZipUITestCase {
         screenshot("01-sorted-with-dots")
     }
 
-    /// Options > macOS > Reset All Settings... > Yes, with real clicks: the app quits, its domain
+    /// Options > Settings > Reset All Settings... > Yes, with real clicks: the app quits, its domain
     /// file keeps only the first-launch marker (nothing the quitting instance saved), and a new
     /// instance of the same bundle starts on that file.
     func testResetAllSettingsEmptiesTheDomainAndRestarts() throws {
@@ -76,9 +76,10 @@ final class Fix112UITests: SevenZipUITestCase {
         let seed = try XCTUnwrap(sevenZip.seedFile)
         XCTAssertTrue(sevenZip.selectMenuItem(SevenZipApp.appMenuTitle, "Settings…"), "7-Zip > Settings…")
         // The Settings window's toolbar switches the panes; each item's label is the pane's title.
-        let tab = app.toolbars.descendants(matching: .any).matching(NSPredicate(format: "label == 'macOS' OR title == 'macOS'")).firstMatch
+        // The macOS rows (theme, Quick Look, Reset All Settings) are part of the Settings pane.
+        let tab = app.toolbars.descendants(matching: .any).matching(NSPredicate(format: "label == 'Settings' OR title == 'Settings'")).firstMatch
         if !tab.waitForExistence(timeout: 15) { sevenZip.dumpTree("fix112-options") }
-        XCTAssertTrue(tab.exists, "no macOS tab")
+        XCTAssertTrue(tab.exists, "no Settings pane")
         tab.click()
         let reset = app.buttons["optionsMacResetAll"]
         XCTAssertTrue(reset.waitForExistence(timeout: 10), "no Reset All Settings... button")

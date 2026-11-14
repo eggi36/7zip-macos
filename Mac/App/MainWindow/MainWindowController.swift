@@ -54,11 +54,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSSplitV
     var panelHostWindow: NSWindow? { window }
 
 
+    /// The accessibility identifier of every file-manager window.
+    static let accessibilityIdentifier = "SZFileManagerWindow"
+
     init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.title = "7-Zip"
+        // The UI tests tell a file-manager window from a dialog by this, not by its title (which is
+        // just the folder's name since the path subtitle went).
+        window.setAccessibilityIdentifier(Self.accessibilityIdentifier)
         window.minSize = NSSize(width: 360, height: 240)
         window.toolbarStyle = .unified               // native-look: title and toolbar in one bar
         // native-look: the windows can be tabs of one another (File > New Tab, the tab bar's
