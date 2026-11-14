@@ -5,6 +5,38 @@ All notable changes to 7-Zip for macOS are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its own version; the engine version
 is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
+## [1.3.1] — 2026-11-14
+
+7-Zip 26.06 for macOS 1.3.1: fixes from a full review of the port.
+
+### Changed
+
+- View (F3) and Edit (F4) with an external viewer or editor set in Options ▸ Editor start that
+  program directly, never through a shell: nothing in the setting is run as a command.
+- The release workflow no longer updates a Homebrew tap.
+
+### Fixed
+
+- Disc images:
+  - a CUE, GDI or CCD sheet can only name track files in its own folder; an absolute path, a
+    drive letter or `..` is reduced to the file name;
+  - an Xbox (XDVDFS) image whose directory tables point back at each other is refused instead of
+    being walked without end, and its tables are capped in size;
+  - an ISZ image with an impossible stored size is refused;
+  - a CHD file whose metadata entry is skipped no longer stops the walk of the remaining entries;
+  - opening a large GCM or Xbox image reports progress and can be cancelled.
+- Link: a relative target is resolved against the link's folder, and an existing file or folder
+  is only replaced when it is a link, an empty file or an empty folder; otherwise the error says
+  it exists.
+- Overwrite: *Auto Rename* leaves the new name to the engine's own rule ("name (2).ext") again
+  instead of passing on a name the dialog worked out itself.
+- Add to Archive and Extract: a path starting with `~` means the home folder.
+- Extract: a path chosen from the history and then edited is used as edited, and the entry it
+  came from stays in the history.
+- Add to Archive: a memory-usage limit given in percent of the RAM no longer overflows.
+- Quick Look of a file inside an archive: the temporary copies are removed when the panel closes
+  or changes folder, and a file opened from an archive is written under a valid file name.
+
 ## [1.3.0] — 2026-11-14
 
 7-Zip 26.06 for macOS 1.3.0: the engine updated to
@@ -346,6 +378,7 @@ First public release: a native macOS port of the 7-Zip File Manager on the 7-Zip
   behaves correctly on macOS; Windows behaviour is unchanged. See
   [Mac/docs/upstream-patches.md](Mac/docs/upstream-patches.md).
 
+[1.3.1]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.1
 [1.3.0]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.0
 [1.2.1]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.2.1
 [1.2.0]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.2.0
