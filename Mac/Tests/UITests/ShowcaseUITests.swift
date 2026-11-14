@@ -8,6 +8,7 @@
 // SEVENZIP_SHOWCASE=1 is in the runner's environment) and the demo folder exists. `Mac/scripts/showcase.sh` runs both.
 // The screenshot is an XCTest attachment that test.sh exports to Mac/build/screenshots/.
 
+import AppKit
 import XCTest
 
 final class ShowcaseUITests: SevenZipUITestCase {
@@ -162,5 +163,97 @@ final class ShowcaseUITests: SevenZipUITestCase {
         screenshot("context-menu")
         sevenZip.app.typeKey(.escape, modifierFlags: [])
         sevenZip.app.typeKey(.escape, modifierFlags: [])
+    }
+
+    /// The README's Finder image: Finder's own right-click menu on `Photos 2025.zip` in the demo
+    /// folder with the 7-Zip submenu open (03 §1.4), cropped to the Finder window and the menus.
+    /// The sidebar is hidden for the shot -- it shows the user's name -- and shown again afterwards.
+    /// Only opens the menu: whichever copy's Finder extension Finder runs builds it, nothing is chosen
+    /// (as in `FinderContextMenuTests`, submenus are entered with the arrow keys).
+    func testFinderContextMenuImage() throws {
+        try requireShowcase()
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        let zip = Self.demo + "/Photos 2025.zip"
+        finder.activate()
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: zip)])
+        finder.activate()
+        let window = finder.windows.matching(NSPredicate(format: "title == %@", "7-Zip Demo")).firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 15), "Finder did not open the demo folder")
+        func viewMenu(_ item: String) -> Bool {
+            finder.menuBars.menuBarItems["View"].click()
+            let entry = finder.menuBars.menuItems[item]
+            guard entry.waitForExistence(timeout: 3), entry.isEnabled else {
+                finder.typeKey(.escape, modifierFlags: [])
+                return false
+            }
+            entry.click()
+            return true
+        }
+        _ = viewMenu("as List")
+        let hidSidebar = viewMenu("Hide Sidebar")
+        defer {
+            finder.typeKey(.escape, modifierFlags: [])
+            finder.typeKey(.escape, modifierFlags: [])
+            if hidSidebar { _ = viewMenu("Show Sidebar") }
+            finder.typeKey("w", modifierFlags: .command)
+        }
+        // A window like the main window's README shots: about 1000 x 760 pt.
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
+        let frame = window.frame
+        corner.press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 1000 - 3, dy: 760 - 3)))
+        sleep(1)
+        XCTAssertNotEqual(window.frame, .zero, "window vanished (was \(frame))")
+
+        let item = window.descendants(matching: .any).matching(NSPredicate(format: "value == %@", "Photos 2025.zip")).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 15), "Finder did not show Photos 2025.zip")
+        item.click()
+        item.rightClick()
+
+        // The context menu (the one with "Get Info"), its rows top to bottom, one per row.
+        func rows(_ menu: XCUIElementSnapshot) -> [XCUIElementSnapshot] {
+            var seen = Set<Int>()
+            return menu.children
+                .filter { $0.elementType == .menuItem && $0.frame.width > 0 && !$0.title.isEmpty }
+                .sorted { $0.frame.minY < $1.frame.minY }
+                .filter { seen.insert(Int($0.frame.minY)).inserted && $0.isEnabled }
+        }
+        func visibleMenus() -> [XCUIElementSnapshot] {
+            finder.menus.allElementsBoundByIndex.compactMap { try? $0.snapshot() }.filter { $0.frame.width > 0 }
+        }
+        var context: XCUIElementSnapshot?
+        _ = waitFor("context menu", timeout: 10) {
+            context = visibleMenus().first { rows($0).contains { $0.title == "Get Info" } }
+            return context != nil
+        }
+        guard let menu = context else { return XCTFail("Finder's context menu did not open") }
+        let top = rows(menu)
+        guard let index = top.firstIndex(where: { $0.title == "7-Zip" }) else {
+            throw XCTSkip("Finder shows no 7-Zip submenu: the Finder extension is not enabled")
+        }
+        for _ in index..<top.count { finder.typeKey(.upArrow, modifierFlags: []) }
+        finder.typeKey(.rightArrow, modifierFlags: [])
+        var submenu: XCUIElementSnapshot?
+        _ = waitFor("7-Zip submenu", timeout: 10) {
+            submenu = visibleMenus().first { rows($0).contains { $0.title == "Extract Here" } }
+            return submenu != nil
+        }
+        guard let sub = submenu else { return XCTFail("the 7-Zip submenu did not open") }
+        sleep(1)
+
+        // Crop the screen to the window and both menus, with a margin.
+        let screen = XCUIScreen.main.screenshot().image
+        guard let cg = screen.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let main = NSScreen.screens.first else { return XCTFail("no screen image") }
+        let scale = CGFloat(cg.width) / main.frame.width
+        let area = window.frame.union(menu.frame).union(sub.frame).insetBy(dx: -12, dy: -12)
+        let pixels = CGRect(x: area.minX * scale, y: area.minY * scale,
+                            width: area.width * scale, height: area.height * scale).integral
+            .intersection(CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        guard let cropped = cg.cropping(to: pixels) else { return XCTFail("crop failed: \(pixels)") }
+        let attachment = XCTAttachment(image: NSImage(cgImage: cropped, size: area.size))
+        attachment.name = "showcase-readme-finder-context-menu.png"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }
