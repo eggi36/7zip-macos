@@ -381,6 +381,11 @@ tally() {
   passed=$(grep -c "Test Case .* passed" "$log" || true)
   failed=$(grep -c "Test Case .* failed" "$log" || true)
   skipped=$(grep -c "Test Case .* skipped" "$log" || true)
+  # A test that runs past its time allowance gets no "Test Case ... failed" line: the runner is
+  # killed and restarted. xcodebuild still names it under "Failing tests:", so count that list too.
+  local listed
+  listed=$(awk '/^Failing tests:/ { f = 1; next } f && /^\t/ { n++; next } f { f = 0 } END { print n + 0 }' "$log")
+  if [ "$listed" -gt "$failed" ]; then failed=$listed; fi
   TOTAL_PASS=$((TOTAL_PASS + passed))
   TOTAL_FAIL=$((TOTAL_FAIL + failed))
   # A run that executed nothing is never a pass: an -only-testing filter that matches no test in

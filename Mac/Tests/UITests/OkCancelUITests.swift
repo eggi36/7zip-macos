@@ -89,15 +89,17 @@ final class OkCancelUITests: SevenZipUITestCase {
         return true
     }
 
-    /// Add to archive... and Compress and email... from the context menu, Cancel clicked, 20 times
-    /// each, alternating, so every dialog also comes right after another one.
+    /// Add to archive... and Compress and email... from the context menu, Cancel clicked, 10 times
+    /// each, alternating, so every dialog also comes right after another one. (A round takes ~14 s:
+    /// XCUI waits ~5.5 s for each menu click while the dialog opens. 20 rounds ran past the time
+    /// allowance in a full run; OKC_ROUNDS asks for more.)
     func testContextMenuCompressDialogsCancelWithTheMouse() throws {
         let scratch = try makeScratch()
         launch(seed: .values([SettingsDomain.Key.panelPath0: scratch]))
         let panel = sevenZip.panel(0)
         XCTAssertTrue(panel.waitForRow(named: "alpha.txt"))
         var failures: [String] = []
-        for round in 1...(ProcessInfo.processInfo.environment["OKC_ROUNDS"].flatMap(Int.init) ?? 20) {
+        for round in 1...(ProcessInfo.processInfo.environment["OKC_ROUNDS"].flatMap(Int.init) ?? 10) {
             for verb in ["Add to archive...", "Compress and email..."] {
                 guard let dialog = openVerb(verb, on: round % 2 == 0 ? "alpha.txt" : "beta.txt",
                                             expecting: "Add to Archive") else {
