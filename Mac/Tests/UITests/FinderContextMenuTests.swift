@@ -143,8 +143,7 @@ final class FinderContextMenuTests: XCTestCase {
 
     /// The open context menu: the visible menu that has a "Get Info" item.
     private func contextMenu() -> XCUIElementSnapshot? {
-        for menu in finder.menus.allElementsBoundByIndex {
-            guard let snap = try? menu.snapshot(), snap.frame.width > 0 else { continue }
+        for snap in FinderMenus.visible(in: finder) {
             if snap.children.contains(where: { $0.title == "Get Info" && $0.frame.width > 0 }) {
                 return snap
             }
@@ -152,14 +151,8 @@ final class FinderContextMenuTests: XCTestCase {
         return nil
     }
 
-    /// The selectable rows of a menu, top to bottom: visible, titled, enabled items, one per row
-    /// (an alternate such as "Always Open With" shares its row with "Open With").
     private func rows(of menu: XCUIElementSnapshot) -> [XCUIElementSnapshot] {
-        var seen = Set<Int>()
-        return menu.children
-            .filter { $0.elementType == .menuItem && $0.frame.width > 0 && !$0.title.isEmpty }
-            .sorted { $0.frame.minY < $1.frame.minY }
-            .filter { seen.insert(Int($0.frame.minY)).inserted && $0.isEnabled }
+        FinderMenus.rows(of: menu)
     }
 
     /// Chooses `item` inside the context menu's submenu `submenu` with the keyboard: Up from no
@@ -178,8 +171,7 @@ final class FinderContextMenuTests: XCTestCase {
 
         var children: [XCUIElementSnapshot] = []
         _ = waitFor(10) {
-            for menu in self.finder.menus.allElementsBoundByIndex {
-                guard let snap = try? menu.snapshot(), snap.frame.width > 0 else { continue }
+            for snap in FinderMenus.visible(in: self.finder) {
                 let r = self.rows(of: snap)
                 if r.first?.isSelected == true, r.contains(where: { $0.title == item })
                     || (r.first?.isSelected == true && snap.frame.minX > 0 && !r.contains { $0.title == "Get Info" }) {

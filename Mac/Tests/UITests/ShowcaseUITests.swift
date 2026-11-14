@@ -165,95 +165,147 @@ final class ShowcaseUITests: SevenZipUITestCase {
         sevenZip.app.typeKey(.escape, modifierFlags: [])
     }
 
+
     /// The README's Finder image: Finder's own right-click menu on `Photos 2025.zip` in the demo
-    /// folder with the 7-Zip submenu open (03 §1.4), cropped to the Finder window and the menus.
-    /// The sidebar is hidden for the shot -- it shows the user's name -- and shown again afterwards.
-    /// Only opens the menu: whichever copy's Finder extension Finder runs builds it, nothing is chosen
-    /// (as in `FinderContextMenuTests`, submenus are entered with the arrow keys).
+    /// folder with the 7-Zip submenu open (03 §1.4), cut out to exactly the Finder window.
+    ///
+    /// * Finder is relaunched in English (`-AppleLanguages (en)`) so the image matches the English
+    ///   README, and relaunched as the user has it in teardown. Nothing below looks up a Finder title
+    ///   except the "Get Info" check that the relaunch took effect.
+    /// * The shot is taken in a window of its own (⌘N, then Go to Folder), never in one of the
+    ///   user's windows; teardown blocks -- which run even after a failure -- show the sidebar again
+    ///   and close that window.
+    /// * The sidebar, which shows the user's name, is hidden with ⌃⌘S; whether the toggle hid or
+    ///   showed it is read from where the file's row moved, not from a menu title.
+    /// * Only the menu is opened: whichever copy's Finder extension Finder runs builds it, nothing is
+    ///   chosen. Submenus are entered with the arrow keys, as in `FinderContextMenuTests`.
+    /// * The image is the window only, with transparent rounded corners: the menus must fit inside it
+    ///   (checked), so nothing behind the window -- desktop, other apps -- can end up in the image.
     func testFinderContextMenuImage() throws {
         try requireShowcase()
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
-        let zip = Self.demo + "/Photos 2025.zip"
-        finder.activate()
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: zip)])
-        finder.activate()
-        let window = finder.windows.matching(NSPredicate(format: "title == %@", "7-Zip Demo")).firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 15), "Finder did not open the demo folder")
-        func viewMenu(_ item: String) -> Bool {
-            finder.menuBars.menuBarItems["View"].click()
-            let entry = finder.menuBars.menuItems[item]
-            guard entry.waitForExistence(timeout: 3), entry.isEnabled else {
-                finder.typeKey(.escape, modifierFlags: [])
-                return false
-            }
-            entry.click()
-            return true
+        let size = CGSize(width: 1100, height: 840)
+
+        // An English Finder; afterwards the user's own Finder again.
+        addTeardownBlock {
+            finder.terminate()
+            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"),
+                                               configuration: NSWorkspace.OpenConfiguration())
         }
-        _ = viewMenu("as List")
-        let hidSidebar = viewMenu("Hide Sidebar")
-        defer {
+        finder.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        finder.launch()
+        finder.activate()
+
+        // A window of its own, in the demo folder.
+        finder.typeKey("n", modifierFlags: .command)
+        let window = finder.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10), "Finder opened no window")
+        let sidebar = SidebarState()
+        addTeardownBlock {
             finder.typeKey(.escape, modifierFlags: [])
             finder.typeKey(.escape, modifierFlags: [])
-            if hidSidebar { _ = viewMenu("Show Sidebar") }
+            if sidebar.hidden { finder.typeKey("s", modifierFlags: [.control, .command]) }
             finder.typeKey("w", modifierFlags: .command)
         }
-        // A window like the main window's README shots: about 1000 x 760 pt.
-        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
-        let frame = window.frame
-        corner.press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: 1000 - 3, dy: 760 - 3)))
+        finder.typeKey("g", modifierFlags: [.shift, .command])
         sleep(1)
-        XCTAssertNotEqual(window.frame, .zero, "window vanished (was \(frame))")
+        finder.typeText(Self.demo + "\n")
+        XCTAssertTrue(waitFor("the demo folder in Finder", timeout: 15) { window.title == "7-Zip Demo" },
+                      "Finder did not go to the demo folder (window: \(window.title))")
+        finder.typeKey("2", modifierFlags: .command)     // as List
+
+        // Top left of the main display, then the size of the image.
+        guard let display = NSScreen.screens.first else { return XCTFail("no display") }
+        let titleBar = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12))
+        let target = CGPoint(x: 60, y: display.frame.height - display.visibleFrame.maxY + 40)
+        titleBar.press(forDuration: 0.3, thenDragTo: titleBar.withOffset(
+            CGVector(dx: target.x - window.frame.minX, dy: target.y - window.frame.minY)))
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
+        corner.press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: size.width - 3, dy: size.height - 3)))
+        sleep(1)
+        XCTAssertEqual(window.frame.width, size.width, accuracy: 4, "the window was not resized: \(window.frame)")
+        XCTAssertEqual(window.frame.height, size.height, accuracy: 4, "the window was not resized: \(window.frame)")
 
         let item = window.descendants(matching: .any).matching(NSPredicate(format: "value == %@", "Photos 2025.zip")).firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 15), "Finder did not show Photos 2025.zip")
-        item.click()
-        item.rightClick()
 
-        // The context menu (the one with "Get Info"), its rows top to bottom, one per row.
-        func rows(_ menu: XCUIElementSnapshot) -> [XCUIElementSnapshot] {
-            var seen = Set<Int>()
-            return menu.children
-                .filter { $0.elementType == .menuItem && $0.frame.width > 0 && !$0.title.isEmpty }
-                .sorted { $0.frame.minY < $1.frame.minY }
-                .filter { seen.insert(Int($0.frame.minY)).inserted && $0.isEnabled }
+        // Hide the sidebar: the row moves left when it goes, right when it comes back.
+        let before = item.frame.minX - window.frame.minX
+        finder.typeKey("s", modifierFlags: [.control, .command])
+        XCTAssertTrue(waitFor("the sidebar toggle", timeout: 5) { abs(item.frame.minX - window.frame.minX - before) > 20 },
+                      "⌃⌘S did not toggle the sidebar")
+        if item.frame.minX - window.frame.minX < before {
+            sidebar.hidden = true
+        } else {                                            // it was hidden already: undo
+            finder.typeKey("s", modifierFlags: [.control, .command])
+            sleep(1)
         }
-        func visibleMenus() -> [XCUIElementSnapshot] {
-            finder.menus.allElementsBoundByIndex.compactMap { try? $0.snapshot() }.filter { $0.frame.width > 0 }
-        }
+
+        item.click()
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).rightClick()
+
+        // The context menu is the one with the 7-Zip row.
         var context: XCUIElementSnapshot?
         _ = waitFor("context menu", timeout: 10) {
-            context = visibleMenus().first { rows($0).contains { $0.title == "Get Info" } }
+            context = FinderMenus.visible(in: finder).first { FinderMenus.rows(of: $0).contains { $0.title == "7-Zip" } }
             return context != nil
         }
-        guard let menu = context else { return XCTFail("Finder's context menu did not open") }
-        let top = rows(menu)
-        guard let index = top.firstIndex(where: { $0.title == "7-Zip" }) else {
+        guard let menu = context else {
             throw XCTSkip("Finder shows no 7-Zip submenu: the Finder extension is not enabled")
         }
+        let top = FinderMenus.rows(of: menu)
+        XCTAssertTrue(top.contains { $0.title == "Get Info" }, "Finder is not running in English: \(top.map(\.title))")
+        guard let index = top.firstIndex(where: { $0.title == "7-Zip" }) else { return XCTFail("no 7-Zip row") }
         for _ in index..<top.count { finder.typeKey(.upArrow, modifierFlags: []) }
         finder.typeKey(.rightArrow, modifierFlags: [])
         var submenu: XCUIElementSnapshot?
         _ = waitFor("7-Zip submenu", timeout: 10) {
-            submenu = visibleMenus().first { rows($0).contains { $0.title == "Extract Here" } }
+            submenu = FinderMenus.visible(in: finder).first { $0.frame != menu.frame && $0.frame.minX > menu.frame.minX }
             return submenu != nil
         }
         guard let sub = submenu else { return XCTFail("the 7-Zip submenu did not open") }
         sleep(1)
 
-        // Crop the screen to the window and both menus, with a margin.
+        // The window only: the menus have to lie inside it.
+        let frame = window.frame
+        XCTAssertTrue(frame.contains(menu.frame) && frame.contains(sub.frame),
+                      "the menus stick out of the window \(frame): \(menu.frame), \(sub.frame)")
         let screen = XCUIScreen.main.screenshot().image
-        guard let cg = screen.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let main = NSScreen.screens.first else { return XCTFail("no screen image") }
-        let scale = CGFloat(cg.width) / main.frame.width
-        let area = window.frame.union(menu.frame).union(sub.frame).insetBy(dx: -12, dy: -12)
-        let pixels = CGRect(x: area.minX * scale, y: area.minY * scale,
-                            width: area.width * scale, height: area.height * scale).integral
-            .intersection(CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
-        guard let cropped = cg.cropping(to: pixels) else { return XCTFail("crop failed: \(pixels)") }
-        let attachment = XCTAttachment(image: NSImage(cgImage: cropped, size: area.size))
+        guard let cg = screen.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return XCTFail("no screen image")
+        }
+        let scale = CGFloat(cg.width) / display.frame.width
+        XCTAssertEqual(scale, display.backingScaleFactor, accuracy: 0.01,
+                       "the screenshot is not of the main display (\(cg.width) px for \(display.frame.width) pt)")
+        XCTAssertTrue(CGRect(origin: .zero, size: display.frame.size).contains(frame),
+                      "the window is not on the main display: \(frame)")
+        let pixels = CGRect(x: frame.minX * scale, y: frame.minY * scale,
+                            width: frame.width * scale, height: frame.height * scale).integral
+        guard let cropped = cg.cropping(to: pixels),
+              let context2 = CGContext(data: nil, width: cropped.width, height: cropped.height, bitsPerComponent: 8,
+                                       bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return XCTFail("crop failed: \(pixels)")
+        }
+        // Transparent corners: what is behind the window's rounded corners stays out.
+        let bounds = CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height)
+        let radius = 26 * scale
+        context2.addPath(CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil))
+        context2.clip()
+        context2.draw(cropped, in: bounds)
+        guard let masked = context2.makeImage(),
+              let png = NSBitmapImageRep(cgImage: masked).representation(using: .png, properties: [:]) else {
+            return XCTFail("could not encode the image")
+        }
+        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
         attachment.name = "showcase-readme-finder-context-menu.png"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+}
+
+/// Whether the Finder test hid the sidebar, for its teardown block.
+private final class SidebarState: @unchecked Sendable {
+    var hidden = false
 }
