@@ -184,8 +184,8 @@ enum FinderExtensionControl {
 
     /// What a launch does with one of this copy's extensions (pure; AppFeelTests / QuickLookPreviewTests).
     enum LaunchRegistration: Equatable {
-        /// PlugInKit has no registration at all -- the app was replaced in place (a `brew upgrade`,
-        /// a drag from the disk image over the old copy) after its path had been removed, and Launch
+        /// PlugInKit has no registration at all -- the app was replaced in place (a drag from the
+        /// disk image over the old copy) after its path had been removed, and Launch
         /// Services does not bring it back (measured on macOS 26): add this copy's appex.
         case register
         /// Another copy is registered: remove it and add this one.

@@ -5,7 +5,7 @@ Releases are built by GitHub Actions from a tag. Nothing is built or uploaded by
 | Workflow | Runs on | Does |
 |---|---|---|
 | [`ci.yml`](../.github/workflows/ci.yml) | every push to `macos`, every pull request into it | hygiene checks, universal Debug and Release builds and the disk image, unit tests on arm64 and on x86_64 under Rosetta 2 |
-| [`release.yml`](../.github/workflows/release.yml) | a pushed tag `v*` | checks the tag against `Mac/VERSION`, runs the unit tests on both slices, builds and packages the universal app, signs and notarizes it if the secrets exist, publishes the GitHub Release, updates the Homebrew cask |
+| [`release.yml`](../.github/workflows/release.yml) | a pushed tag `v*` | checks the tag against `Mac/VERSION`, runs the unit tests on both slices, builds and packages the universal app, signs and notarizes it if the secrets exist, publishes the GitHub Release |
 
 The app-hosted tests (`Mac/scripts/test.sh -H`) and the XCUITest suites (`Mac/scripts/test.sh -u`)
 do not run on GitHub: the hosted runner's GUI session is not one they can be trusted on, and the UI
@@ -47,18 +47,12 @@ What the release workflow then does:
    with the image and its `.sha256`. The body is the version's CHANGELOG section, then the install
    steps (with the *Open Anyway* steps while the build is not notarized) and the SHA-256. Re-running the job
    replaces the assets and the notes of the existing release.
-3. **tap**: if the secret `TAP_TOKEN` exists, rewrites `version` and `sha256` (and nothing else, so
-   the cask's quarantine step is kept) in
-   `Casks/7zip-macos.rb` of [yrambler2001/homebrew-tap](https://github.com/yrambler2001/homebrew-tap)
-   (`Mac/scripts/update-cask.sh`) and pushes the commit. Without the secret the job only prints a
-   notice; update the cask by hand then (below).
-
 **Dry run.** *Actions ▸ Release ▸ Run workflow* on a branch builds, tests and packages that commit
 and uploads the disk image as a workflow artifact, and publishes nothing.
 
 **If a release fails** after the tag is pushed: fix the cause on `macos`, delete the tag
 (`git push origin :v1.3.0 && git tag -d v1.3.0`) and the draft or partial release if one was
-created, then tag again. A failure in the **tap** job alone can be re-run from the Actions page.
+created, then tag again.
 
 ## One-time setup on GitHub
 
@@ -71,42 +65,13 @@ created, then tag again. A failure in the **tap** job alone can be re-run from t
   *Unit tests (x86_64)*.
 - Optionally protect tags `v*` (*Settings ▸ Rules ▸ Rulesets*) so only maintainers can push them.
 
-### The Homebrew tap
-
-1. Create the public repository `yrambler2001/homebrew-tap` (empty, no README) and push the
-   prepared tap to it (`Casks/7zip-macos.rb`, `README.md`, `LICENSE`).
-2. Create a fine-grained personal access token: *GitHub ▸ Settings ▸ Developer settings ▸ Personal
-   access tokens ▸ Fine-grained tokens ▸ Generate new token*.
-   - Resource owner: yrambler2001; repository access: *Only select repositories* ▸ `homebrew-tap`.
-   - Permissions: *Contents: Read and write* (Metadata: read-only is added automatically). Nothing
-     else.
-   - Expiration: up to a year; put a reminder in the calendar to renew it.
-3. In `yrambler2001/7zip-macos`: *Settings ▸ Secrets and variables ▸ Actions ▸ New repository
-   secret*, name `TAP_TOKEN`, value the token.
-
-Updating the cask by hand (no token, or a failed tap job):
-
-```sh
-cd homebrew-tap
-/path/to/7zip-macos/Mac/scripts/update-cask.sh Casks/7zip-macos.rb 1.3.0 26.06 <sha256 from the release>
-git commit -am "7zip-macos 1.3.0 (7-Zip 26.06)" && git push
-```
-
-The cask's version is `<port>,<upstream>` (`1.3.0,26.06`), because the image's name carries both.
-Homebrew 7 needs a third-party tap to be trusted before it loads it implicitly: users install with
-the full name (`brew install --cask yrambler2001/tap/7zip-macos`) and run `brew trust
-yrambler2001/tap` once so that `brew upgrade` includes it; the tap's README and the cask's caveats
-say so.
-
 ### Signing and notarization (later, with an Apple Developer ID)
 
 Until these secrets exist every release is ad-hoc signed, and users of the disk image need *Open
-Anyway* after each install and update; the Homebrew cask removes the quarantine flag itself (its
-`postflight_steps`, the user's decision for 1.1.2), so Homebrew installs open directly. Once the
+Anyway* after each install and update. Once the
 secrets exist, the next tag is signed with the hardened runtime, notarized and stapled
 automatically; the release notes then leave out the *Open Anyway* steps. Remember to update the
-README's "First launch: Gatekeeper" section and the cask's caveats at the same time, and drop the
-cask's quarantine step, which a notarized app does not need.
+README's "First launch: Gatekeeper" section at the same time.
 
 | Secret | Value |
 |---|---|
@@ -159,7 +124,7 @@ When upstream publishes, say, 7-Zip 26.04 after port 1.0.0:
    and hashes), regenerate `Mac/docs/upstream-patches.diff`, and note "Updated the engine to 7-Zip
    26.04" under *Changed* in the new CHANGELOG section.
 4. Open a pull request into `macos`; when CI is green, merge it and cut the release as above. The
-   image is then `7-Zip-26.04-macOS-1.1.0.dmg` and the cask version `1.1.0,26.04`.
+   image is then `7-Zip-26.04-macOS-1.1.0.dmg`.
 
 ## Pinned actions and tools
 

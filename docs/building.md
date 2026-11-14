@@ -114,7 +114,7 @@ git commit -am "Version 1.3.0" && git tag -a v1.3.0 -m "7-Zip 26.06 for macOS 1.
 git push origin macos v1.3.0               # the release workflow builds, tests and publishes it
 ```
 
-[releasing.md](releasing.md) describes the workflow, the Homebrew tap and the signing secrets.
+[releasing.md](releasing.md) describes the workflow and the signing secrets.
 `Mac/scripts/package.sh` makes the same disk image locally.
 
 ## Bundled assets
