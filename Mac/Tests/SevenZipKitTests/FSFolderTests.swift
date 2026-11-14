@@ -809,9 +809,16 @@ final class FSFolderTests: XCTestCase {
 
     func testChangeNotificationForThisDirectoryOnly() throws {
         try mkdir("sub")
-        let f = try folder()
+        let f = try folder()                // LoadItems arms the watcher
         XCTAssertTrue(f.supportsChangeNotification)
-        XCTAssertFalse(f.wasChanged, "the first poll only arms the watcher")
+        // The mkdir above can still be on its way through fseventsd when the stream starts (seen
+        // on the slow x86_64 runner): wait until the stream has been quiet for a second.
+        var quiet = 0
+        for _ in 0..<50 where quiet < 5 {
+            quiet = f.wasChanged ? 0 : quiet + 1
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        XCTAssertEqual(quiet, 5, "the stream never went quiet")
         XCTAssertFalse(f.directoryWasRemoved)
 
         func waitForChange(_ timeout: TimeInterval) -> Bool {

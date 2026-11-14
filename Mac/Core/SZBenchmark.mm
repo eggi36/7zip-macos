@@ -447,7 +447,17 @@ static NSString *SZRatingsLine(const CSZTotalRes &enc, const CSZTotalRes &dec)
 
 - (BOOL)isRunning
 {
-    return _thread != nil && !_thread.isFinished;
+    // Over once the worker has signalled `_finished` (its last step before the delegate call),
+    // not when the NSThread object says so: that flips a moment later, and `waitUntilFinished`
+    // returns on the signal (the slow x86_64 runner saw isRunning still true after it).
+    if (_thread == nil)
+        return NO;
+    if (dispatch_semaphore_wait(_finished, DISPATCH_TIME_NOW) == 0)
+    {
+        dispatch_semaphore_signal(_finished);
+        return NO;
+    }
+    return YES;
 }
 
 // MARK: - worker (CThreadBenchmark::Process, :1599-1800)
