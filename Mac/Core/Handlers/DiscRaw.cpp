@@ -129,8 +129,18 @@ protected:
   UInt64 _phySize;
   AString _comment;      // the disc's title
   AString _volumeName;   // the disc's ID
+  IArchiveOpenCallback *_openCallback;   // during Open only
 
   virtual HRESULT Open2(IInStream *stream) = 0;
+  // Progress for the open: the items so far and the bytes read. The caller's answer (E_ABORT on a
+  // cancel, or when Quick Look's watchdog runs out of time or entries) ends the parse.
+  HRESULT ReportOpen(UInt64 bytes)
+  {
+    if (!_openCallback)
+      return S_OK;
+    const UInt64 numFiles = _items.Size();
+    return _openCallback->SetCompleted(&numFiles, &bytes);
+  }
   void AddFile(const AString &path, UInt64 offset, UInt64 size)
   {
     CItem &item = _items.AddNew();
@@ -148,7 +158,7 @@ protected:
     item.IsDir = true;
   }
 public:
-  CHandlerBase(): _phySize(0) {}
+  CHandlerBase(): _phySize(0), _openCallback(NULL) {}
   virtual ~CHandlerBase() {}
 };
 
@@ -187,11 +197,13 @@ Z7_COM7F_IMF(CHandlerBase::GetArchivePropertyInfo(UInt32 index, BSTR *name, PROP
   return S_OK;
 }
 
-Z7_COM7F_IMF(CHandlerBase::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallback *))
+Z7_COM7F_IMF(CHandlerBase::Open(IInStream *stream, const UInt64 *, IArchiveOpenCallback *callback))
 {
   COM_TRY_BEGIN
   Close();
+  _openCallback = callback;
   const HRESULT res = Open2(stream);
+  _openCallback = NULL;
   if (res != S_OK)
   {
     Close();
@@ -450,6 +462,8 @@ HRESULT CHandler::Open2(IInStream *stream)
   }
   for (UInt32 i = 1; i < numEntries; i++)
   {
+    if ((i & 0xFFF) == 0)
+      RINOK(ReportOpen((UInt64)fstOffset + fstSize))
     while (stack.Size() > 1 && i >= stack.Back().End)
       stack.DeleteBack();
     const Byte *e = fst + (size_t)i * 12;
@@ -511,6 +525,7 @@ static const Byte kMagic[20] = { 'M','I','C','R','O','S','O','F','T','*','X','B'
 static const UInt32 kSectorSize = 2048;
 static const UInt32 kVolumeOffset = 0x10000;    // sector 32 of the game partition
 static const UInt32 kMaxTable = 1 << 26;
+static const UInt64 kMaxTablesTotal = (UInt64)1 << 28;   // all directory tables together: 256 MiB
 static const unsigned kMaxDepth = 64;
 static const unsigned kMaxItems = 1 << 20;
 
@@ -540,6 +555,8 @@ class CHandler Z7_final: public CHandlerBase
 {
   UInt64 _partition;
   UInt64 _fileSize;
+  CRecordVector<UInt32> _dirSectors;   // the directory tables read so far, sorted
+  UInt64 _tablesTotal;                 // their bytes
   HRESULT Open2(IInStream *stream) Z7_override;
   HRESULT ParseDir(IInStream *stream, UInt32 sector, UInt32 size, const AString &prefix, unsigned depth);
 };
@@ -556,6 +573,16 @@ HRESULT CHandler::ParseDir(IInStream *stream, UInt32 sector, UInt32 size, const 
   const UInt64 pos = _partition + (UInt64)sector * kSectorSize;
   if (pos + size > _fileSize)
     return S_FALSE;
+  // A table is read once: a directory that points at its own table or an ancestor's (a cycle,
+  // only in a damaged or crafted image) would otherwise nest up to kMaxDepth copies of a table of
+  // up to 64 MiB. And all tables together stay below kMaxTablesTotal.
+  if (_dirSectors.FindInSorted(sector) >= 0)
+    return S_FALSE;
+  _dirSectors.AddToUniqueSorted(sector);
+  _tablesTotal += size;
+  if (_tablesTotal > kMaxTablesTotal)
+    return S_FALSE;
+  RINOK(ReportOpen(_tablesTotal))
   CByteBuffer table(size);
   RINOK(InStream_SeekSet(stream, pos))
   RINOK(ReadStream_FALSE(stream, table, size))
@@ -610,6 +637,8 @@ HRESULT CHandler::ParseDir(IInStream *stream, UInt32 sector, UInt32 size, const 
 
 HRESULT CHandler::Open2(IInStream *stream)
 {
+  _dirSectors.Clear();
+  _tablesTotal = 0;
   RINOK(InStream_GetSize_SeekToEnd(stream, _fileSize))
   const int p = FindPartition(stream, _fileSize);
   if (p < 0)

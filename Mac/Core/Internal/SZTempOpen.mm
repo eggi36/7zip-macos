@@ -428,8 +428,9 @@ HRESULT CSZVirtFileSystem::FlushToDisk()
 {
   NSString *temp = [SZSettings.temporaryDirectory stringByStandardizingPath];
   NSString *candidate = [path stringByStandardizingPath];
-  // Never remove anything outside the temp folder, and only our own prefixes.
-  if (![candidate hasPrefix:temp])
+  // Never remove anything outside the temp folder, and only our own prefixes. Compared as a
+  // folder ("<temp>/"), so a sibling such as "<temp>-old/7zO..." is not inside it.
+  if (temp.length == 0 || ![candidate hasPrefix:[temp stringByAppendingString:@"/"]])
     return NO;
   NSString *name = candidate.lastPathComponent;
   if (![name hasPrefix:SZTempOpen.openDirectoryPrefix] && ![name hasPrefix:SZTempOpen.extractDirectoryPrefix])

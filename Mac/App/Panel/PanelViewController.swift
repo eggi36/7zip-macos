@@ -172,7 +172,10 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    deinit { NotificationCenter.default.removeObserver(self) }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        ArchivePreviewStore.shared.remove(id: ObjectIdentifier(self))   // its Quick Look copies
+    }
 
     // MARK: - View construction (CPanel::OnCreate, Panel.cpp:383-597)
 
@@ -626,6 +629,9 @@ final class PanelViewController: NSViewController, NSMenuItemValidation {
 
     func apply(_ snap: PanelSnapshot, selectNames: [String], focusName: String? = nil, keepScroll: Bool = false) {
         let previousPath = snapshot?.fullPath
+        // A new listing may show changed items (another folder, a reload after an update): the
+        // Quick Look copies of the old one go (PanelArchivePreview.swift).
+        ArchivePreviewStore.shared.remove(for: self)
         loadGeneration += 1
         let scroll = scrollView.contentView.bounds.origin
         snapshot = snap

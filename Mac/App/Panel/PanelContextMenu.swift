@@ -395,7 +395,7 @@ extension PanelViewController {
             panel.updateController()
         }
         guard panel.dataSource === self else { return }
-        prepareArchivePreviews()
+        prepareArchivePreviews(onlyFocused: true)
         panel.reloadData()
     }
 }

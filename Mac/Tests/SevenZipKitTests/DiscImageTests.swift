@@ -508,6 +508,20 @@ final class DiscImageTests: XCTestCase {
         try checkXbox(path("game.xiso"))
     }
 
+    /// A damaged or crafted XISO whose folder points back at its own table is refused, quickly:
+    /// each directory table is read once (it once nested up to 64 copies of a table of up to 64 MiB).
+    func testXboxDirectoryCycleIsRefused() throws {
+        var d = xdvdfsPartition()
+        // "media" (sector 49) holds a folder "loop" whose table is sector 49 again.
+        var e = le16(0) + le16(0) + le32(49) + le32(2048) + Data([0x10, 4]) + Data("loop".utf8)
+        e += Data(repeating: 0xFF, count: 2048 - e.count)
+        d.replaceSubrange(49 * 2048..<50 * 2048, with: e)
+        try write(d, "cycle.xiso")
+        let start = Date()
+        XCTAssertThrowsError(try list(path("cycle.xiso")))
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
+
     /// A whole Xbox 360 disc (XGD2): a DVD-video partition that ISO / UDF can open, the game
     /// partition at 0xFD90000. The game is what opens.
     func testWholeXbox360DiscOpensTheGamePartition() throws {
