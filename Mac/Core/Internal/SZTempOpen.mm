@@ -13,6 +13,8 @@
 #import "SZBridgeUtils.h"
 #import "SZFolder+Internal.h"
 
+#include "../../../CPP/7zip/UI/Common/ExtractingFilePath.h"
+
 #include <sys/sysctl.h>
 #include <sys/xattr.h>
 #include <vector>
@@ -268,8 +270,11 @@ HRESULT CSZVirtFileSystem::FlushToDisk()
   FOR_VECTOR (i, Files)
   {
     const CSZVirtFile &file = Files[i];
+    // Get_Correct_FsFile_Name, as CVirtFileSystem::FlushToDisk does (ExtractCallback.cpp:1192):
+    // the item's name as one file-system name, so a ".." or a separator in it cannot leave the
+    // temp folder.
     FString path = DirPrefix;
-    path += us2fs(file.Name);
+    path += us2fs(Get_Correct_FsFile_Name(file.Name));
     if (file.IsDir)
     {
       if (!NDir::CreateComplexDir(path))
