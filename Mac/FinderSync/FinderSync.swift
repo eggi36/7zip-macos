@@ -43,17 +43,37 @@ final class FinderSync: FIFinderSync {
         // 7-Zip's Explorer extension is available everywhere, so the whole file system is
         // monitored. `/Volumes` and `~/Library/CloudStorage` are added because items on File
         // Provider domains and some network volumes are not under `/` from Finder's point of view
-        // (03 section 6.3).
-        FIFinderSyncController.default().directoryURLs = [
-            URL(fileURLWithPath: "/"),
-            URL(fileURLWithPath: "/Volumes"),
-            URL(fileURLWithPath: SevenZipBundle.realHomeDirectory + "/Library/CloudStorage"),
-        ]
+        // (03 section 6.3). Finder does not ask the extension about items on a network volume
+        // (SMB, AFP, NFS) unless that volume's mount point is itself in the set, so every mounted
+        // volume is added, and the set follows mounts and unmounts.
+        updateDirectoryURLs()
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+                     NSWorkspace.didRenameVolumeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.updateDirectoryURLs()
+            }
+        }
         // sec113: whether the app's URL secret is readable from here, and from where. Only the
         // availability is logged, never the value.
         let found = IntegrationSettings.urlToken(extensionBundleID: SevenZipBundle.finderSync)
         let fromPreferences = URLCommandToken.isWellFormed(IntegrationSettings.preferencesURLToken())
         log.log("URL secret: \(found.source.rawValue, privacy: .public); in the app's domain: \(fromPreferences ? "readable" : "absent", privacy: .public)")
+    }
+
+    /// `/`, `/Volumes`, `~/Library/CloudStorage` and the mount point of every mounted volume.
+    private func updateDirectoryURLs() {
+        var urls: Set<URL> = [
+            URL(fileURLWithPath: "/"),
+            URL(fileURLWithPath: "/Volumes"),
+            URL(fileURLWithPath: SevenZipBundle.realHomeDirectory + "/Library/CloudStorage"),
+        ]
+        // Only the mount points are read here, never a volume's contents (sandbox, 03 section 6.4).
+        let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil,
+                                                            options: [.skipHiddenVolumes]) ?? []
+        for volume in volumes { urls.insert(volume.standardizedFileURL) }
+        FIFinderSyncController.default().directoryURLs = urls
+        log.log("monitoring \(urls.count, privacy: .public) folders (\(volumes.count, privacy: .public) volumes)")
     }
 
     // MARK: - Observation (deliberate no-ops)
