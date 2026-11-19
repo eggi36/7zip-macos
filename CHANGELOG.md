@@ -5,6 +5,17 @@ All notable changes to 7-Zip for macOS are recorded here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for its own version; the engine version
 is upstream 7-Zip's (for example *7-Zip 26.03 for macOS 1.0.0*).
 
+## [1.3.2] — 2026-11-19
+
+7-Zip 26.06 for macOS 1.3.2: the Finder menu on network volumes.
+
+### Fixed
+
+- The 7-Zip items in the Finder context menu and toolbar menu now also appear for files on network
+  volumes (SMB, AFP, NFS). Finder only asks the extension about a network volume when the volume
+  itself is registered, so every mounted volume is now registered, and the list follows volumes
+  being mounted, unmounted and renamed.
+
 ## [1.3.1] — 2026-11-14
 
 7-Zip 26.06 for macOS 1.3.1: fixes from a full review of the port.
@@ -378,6 +389,7 @@ First public release: a native macOS port of the 7-Zip File Manager on the 7-Zip
   behaves correctly on macOS; Windows behaviour is unchanged. See
   [Mac/docs/upstream-patches.md](Mac/docs/upstream-patches.md).
 
+[1.3.2]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.2
 [1.3.1]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.1
 [1.3.0]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.3.0
 [1.2.1]: https://github.com/yrambler2001/7zip-macos/releases/tag/v1.2.1
